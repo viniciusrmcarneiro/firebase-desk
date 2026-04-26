@@ -2,7 +2,7 @@
 
 ## Working Name
 
-Firebase Explorer.
+Firebase Desk.
 
 ## Goal
 

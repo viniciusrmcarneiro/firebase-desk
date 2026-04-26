@@ -123,7 +123,7 @@ Hard rules:
 - Feature names: `projects`, `firestore`, `js-query`, `auth`, `settings`.
 - Package names: scoped, e.g. `@firebase-desk/repo-contracts`.
 - Avoid Firefoo naming in code, docs, and UI.
-- Working product name: `Firebase Explorer` until final branding.
+- Working product name: `Firebase Desk` until final branding.
 
 ## Build Phases
 
