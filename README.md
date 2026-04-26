@@ -22,12 +22,13 @@ Status: planning. First implementation target is CI-tested project foundation, t
 - Repository layer between UI and Firebase code.
 - Firebase Admin SDK in the Electron main process or an isolated worker process.
 - Native-feeling UI using system fonts, native menus, OS shortcuts, and keychain-backed local storage.
+- **pnpm + Turborepo monorepo** from day one (`apps/desktop`, `apps/wireframe`, `packages/*`, `e2e/`). See [docs/project-structure.md](docs/project-structure.md).
 - GitHub Actions from the first scaffold: lint, typecheck, unit tests, build, emulator e2e, and release packaging checks.
 - MIT license.
 
 ## Docs
 
-- [wireframes/src/index.html](wireframes/src/index.html)
+- [wireframes/src/index.html](wireframes/src/index.html) (will move to `apps/wireframe/src/index.html` during Phase 1)
 - [wireframes/README.md](wireframes/README.md)
 - [docs/product.md](docs/product.md)
 - [docs/live-wireframe.md](docs/live-wireframe.md)

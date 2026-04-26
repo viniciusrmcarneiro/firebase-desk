@@ -2,9 +2,23 @@
 
 ## Choice
 
-Electron + React + TypeScript.
+Electron + React + TypeScript, organized as a **pnpm + Turborepo monorepo**.
 
-This keeps the desktop app simple while giving the JavaScript Query feature access to Node and the Firebase Admin SDK.
+The Electron shell gives the JavaScript Query feature access to Node and the Firebase Admin SDK. The monorepo layout (see [project-structure.md](project-structure.md)) enforces process and dependency boundaries through workspace packages instead of folder conventions alone.
+
+## Repo Topology
+
+- `apps/desktop` — Electron app (main + preload + renderer).
+- `apps/wireframe` — browser-runnable HTML prototype.
+- `packages/repo-contracts` — repository interfaces, zero runtime deps.
+- `packages/repo-mocks` — mock repositories used by the wireframe and unit tests.
+- `packages/repo-firebase` — Admin-SDK-backed implementations, main-process only.
+- `packages/data-format` — Firestore <-> typed-JSON encoder/decoder.
+- `packages/script-runner` — isolated worker runtime for user JS.
+- `packages/ipc-schemas` — Zod schemas for preload<->main IPC.
+- `packages/ui`, `packages/hotkeys` — shared renderer primitives.
+- `packages/config-*` — shared eslint/tsconfig/vitest presets.
+- `e2e/` — Playwright + Electron specs against the emulator suite.
 
 ## Process Boundaries
 
@@ -30,21 +44,22 @@ This keeps the desktop app simple while giving the JavaScript Query feature acce
 
 ## Repository Layer
 
-All UI-facing data access goes through repository interfaces. UI code depends on contracts, not Firebase implementations.
+All UI-facing data access goes through repository interfaces declared in `packages/repo-contracts`. UI code depends on contracts, not Firebase implementations.
 
 ```text
-Renderer UI -> feature repository interface -> preload IPC client -> main IPC handler -> main repository implementation -> Firebase Admin SDK or emulator
+Renderer UI -> repo-contracts interface -> preload IPC client (ipc-schemas) -> main IPC handler -> repo-firebase implementation -> Firebase Admin SDK or emulator
 ```
 
 ### Rules
 
 - UI components never call Firebase code directly.
+- `apps/desktop/renderer` is forbidden from depending on `repo-firebase`, `script-runner`, or any Node/Electron-only package; lint rules enforce this.
 - Feature hooks/components receive repository contracts or use a feature repository provider.
-- Mock repositories power the live wireframe and unit tests.
-- Real repositories live behind typed IPC and run outside the renderer.
+- `repo-mocks` powers the live wireframe and unit tests; `repo-firebase` powers the shipped app.
+- Real repositories live behind typed IPC (validated by `ipc-schemas`) and run outside the renderer.
 - Cross-cutting behavior such as validation, logging, result normalization, pagination cursors, and emulator switching belongs in repositories/services, not UI components.
 
-### Initial Repositories
+### Initial Repositories (declared in `packages/repo-contracts`)
 
 - `ProjectsRepository`
 - `FirestoreRepository`
@@ -54,8 +69,9 @@ Renderer UI -> feature repository interface -> preload IPC client -> main IPC ha
 
 ### Script Runner
 
+- Lives in `packages/script-runner`, consumed by the main process only.
 - Runs user JavaScript for the active project.
-- Should become an isolated worker process before real Firebase mutations ship.
+- Ships as an isolated worker process before real Firebase mutations are enabled.
 - Captures return value, stdout-like logs, thrown errors, and duration.
 
 ## Data Storage
@@ -85,11 +101,12 @@ Renderer UI -> feature repository interface -> preload IPC client -> main IPC ha
 
 ## Testing Strategy
 
-- Unit tests live next to the code they test.
+- Unit tests live next to the code they test, inside the owning package/app.
+- Each package owns its own vitest config (extending `packages/config-vitest`); turbo runs them in parallel with caching.
 - Repository interfaces make UI tests independent from Firebase.
-- Mock repositories are used for component and feature unit tests.
-- Main-process repository implementations get focused unit tests around payload validation and result normalization.
-- E2E tests use Firebase emulators.
+- `repo-mocks` is used for component and feature unit tests.
+- `repo-firebase` gets focused unit tests around payload validation and result normalization.
+- E2E tests live in the `e2e/` workspace and run against Firebase emulators.
 - GitHub Actions run lint, typecheck, unit tests, build, e2e emulator tests, and release checks from the beginning.
 
 ## Safety Notes

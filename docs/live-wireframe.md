@@ -4,19 +4,19 @@
 
 Build a runnable desktop prototype to validate the look, feel, navigation, tab model, and view coverage before Firebase integration. This phase is for shape and direction, not realistic data behavior.
 
-The first artifact is a browser-runnable source file: [wireframes/src/index.html](../wireframes/src/index.html).
+The first artifact is a browser-runnable source file: [wireframes/src/index.html](../wireframes/src/index.html). During Phase 1 of the monorepo migration this becomes `apps/wireframe/src/index.html` and starts consuming `packages/repo-mocks` and `packages/ui` as workspace dependencies.
 
 Open it directly from `file://`. No build step is required for the current prototype.
 
 ## Prototype Rules
 
 - Use simple fake Firebase accounts, collections, docs, query results, logs, and auth users.
-- Fake data must be served through mock repository implementations.
+- Fake data must be served through mock repository implementations (eventually `packages/repo-mocks`).
 - No real service account parsing yet.
 - No Firebase Admin SDK connection yet.
-- Keep `wireframes/src/index.html` directly runnable in the browser.
+- Keep the wireframe entry HTML directly runnable in the browser even after the move into `apps/wireframe/`.
 - Prefer native HTML `<template>` blocks for repeated wireframe markup over large inline HTML strings in JavaScript.
-- UI code must already use repository contracts, so Firebase integration can replace mocks without rewriting views.
+- UI code must already use repository contracts (`packages/repo-contracts`), so Firebase integration can replace mocks without rewriting views.
 - Navigation, tab opening, tab switching, and account dropdowns should work.
 - Saves/deletes can be visual-only placeholders.
 - UI should use dense, native-feeling desktop patterns.

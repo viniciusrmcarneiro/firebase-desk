@@ -152,7 +152,7 @@ const baseUsers = [
 const RESULT_PAGE_SIZE = 2;
 
 const state = {
-  theme: localStorage.getItem('firebase-explorer-wireframe-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
+  theme: localStorage.getItem('firebase-desk-wireframe-theme') || (matchMedia('(prefers-color-scheme: dark)').matches ? 'dark' : 'light'),
   expandedAccounts: {},
   accountToolStatus: {},
   accountLoadAttempts: {},
@@ -1566,7 +1566,7 @@ function render() {
   app.classList.toggle('sidebar-drawer-open', state.sidebarDrawerOpen && compactShell);
   app.style.setProperty('--sidebar-width', clampSidebarWidth(state.sidebarWidth) + 'px');
   document.documentElement.setAttribute('data-theme', state.theme);
-  localStorage.setItem('firebase-explorer-wireframe-theme', state.theme);
+  localStorage.setItem('firebase-desk-wireframe-theme', state.theme);
   document.querySelectorAll('[data-action="set-theme"]').forEach((button) => {
     button.classList.toggle('active', button.getAttribute('data-theme-value') === state.theme);
   });
