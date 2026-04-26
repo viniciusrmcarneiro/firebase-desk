@@ -1,0 +1,44 @@
+{
+  "name": "@firebase-desk/storybook",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "dev": "storybook dev -p 6006 --host 127.0.0.1",
+    "storybook": "storybook dev -p 6006 --host 127.0.0.1",
+    "build": "storybook build",
+    "lint": "oxlint --config oxlintrc.json .storybook src",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run --passWithNoTests"
+  },
+  "dependencies": {
+    "@firebase-desk/design-tokens": "workspace:*",
+    "@firebase-desk/hotkeys": "workspace:*",
+    "@firebase-desk/product-ui": "workspace:*",
+    "@firebase-desk/repo-mocks": "workspace:*",
+    "@firebase-desk/ui": "workspace:*",
+    "@storybook/addon-docs": "10.3.5",
+    "@storybook/addon-themes": "10.3.5",
+    "@storybook/react": "10.3.5",
+    "@storybook/react-vite": "10.3.5",
+    "@tailwindcss/postcss": "4.2.4",
+    "@vitejs/plugin-react": "6.0.1",
+    "lucide-react": "1.11.0",
+    "postcss": "8.5.11",
+    "storybook": "10.3.5",
+    "tailwindcss": "4.2.4",
+    "vite": "8.0.10"
+  },
+  "devDependencies": {
+    "@firebase-desk/config-oxlint": "workspace:*",
+    "@firebase-desk/config-tsconfig": "workspace:*",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "oxlint": "1.61.0",
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
+    "typescript": "6.0.3",
+    "vitest": "4.1.5"
+  }
+}

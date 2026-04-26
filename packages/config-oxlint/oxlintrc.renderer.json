@@ -14,11 +14,21 @@
       "error",
       {
         "patterns": [
-          "@firebase-desk/repo-firebase",
-          "@firebase-desk/repo-firebase/*",
-          "@firebase-desk/script-runner",
-          "@firebase-desk/script-runner/*",
-          "@firebase-desk/*/src/*",
+          {
+            "group": [
+              "@firebase-desk/repo-firebase",
+              "@firebase-desk/repo-firebase/*",
+              "@firebase-desk/script-runner",
+              "@firebase-desk/script-runner/*"
+            ],
+            "message": "Renderer may import @firebase-desk/design-tokens and @firebase-desk/product-ui; main-process packages stay blocked."
+          },
+          {
+            "group": [
+              "@firebase-desk/*/src/*"
+            ],
+            "message": "Use package root exports; @firebase-desk/design-tokens and @firebase-desk/product-ui are allowed through their package entrypoints."
+          },
           "node:*",
           "electron",
           "fs",

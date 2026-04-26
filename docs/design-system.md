@@ -1061,3 +1061,11 @@ main-process repositories
 ```
 
 These rules are enforced by `packages/config-oxlint/oxlintrc.renderer.json` (`no-restricted-imports`). The design system reinforces them by keeping all UI packages pure React/browser-safe code.
+
+## Deferred Decisions
+
+- TanStack Table installs when the first real tabular Firebase surface needs sorting/column models.
+- Visual regression tooling is deferred until the component set stabilizes in Storybook.
+- Performance and bundle budgets are deferred until real Firebase workflows expose measurable regressions.
+- Hotkey rebinding UI is deferred; the registry and settings override contract exist now.
+- Real Firebase wiring in demo panels is deferred to feature phases; Phase 2.5 stays mock-only.

@@ -106,26 +106,72 @@ Detailed feature tasks and per-page/per-tab specs should be finalized after the 
 
 See [design-system.md](design-system.md). Same package layout: keep `@firebase-desk/ui` (existing virtualized primitives stay; new generic controls land in the same package). Add `@firebase-desk/design-tokens` and `@firebase-desk/product-ui`.
 
-- [ ] Scaffold `packages/design-tokens` (no React): brand primitives, semantic light/dark themes, density, typography, spacing, radius, shadows, motion, z-index, focus-ring, scrollbar tokens.
-- [ ] Add CSS-variable generator script in `packages/design-tokens` that emits `themes.css` (covers `:root[data-theme="light"|"dark"]` blocks).
-- [ ] Add Tailwind + PostCSS to renderer; configure `electron.vite.config.ts`; map Tailwind colors/spacing/radius/motion to CSS variables (no hard-coded hexes in `tailwind.config.ts`).
-- [ ] Add Radix UI primitives, `class-variance-authority`, `tailwind-merge`, `clsx`, and `lucide-react`.
-- [ ] Add appearance provider (`system` / `light` / `dark`) reading from `SettingsRepository`; toggles `<html data-theme>` at runtime; honors `prefers-color-scheme` when mode is `system`. Theme registry leaves room for future named themes (e.g. `high-contrast`, `midnight`, `solarized`).
-- [ ] Wire global focus-ring CSS recipe (`:focus-visible` + `--focus-ring-shadow`) and scrollbar styles in renderer global stylesheet.
-- [ ] Add `prefers-reduced-motion` override for motion tokens.
-- [ ] Build first generic components in `@firebase-desk/ui`: `Button`, `IconButton`, `Input`, `Badge`, `Tooltip`, `Dialog`, `DropdownMenu`, `ContextMenu`, `Tabs`, `Panel` (+ `PanelHeader`/`PanelBody`), `Toolbar`, `EmptyState`, `InlineAlert`, `StatusBadge`. All use Radix where applicable, CVA variants, density tokens, and `data-state` styling.
-- [ ] Wire density token through existing virtualized primitives (`VirtualList`/`VirtualTable`/`VirtualTree` row heights default from `density.compact`).
-- [ ] Add Storybook to `packages/ui` (and `packages/product-ui`): one story per variant, theme/density toggle addons, light + dark backgrounds.
-- [ ] Add `react-resizable-panels` wrapper component (`ResizablePanelGroup`) in `@firebase-desk/ui`.
-- [ ] Add `cmdk` command palette shell wired to Cmd/Ctrl+K via `@firebase-desk/hotkeys`.
-- [ ] Add Monaco Editor wrapper (`CodeEditor`) with theme-switching tied to appearance provider; configure Monaco workers in electron-vite renderer config; lazy-load on first use.
-- [ ] Scaffold `packages/product-ui`: `AppShell`, `SidebarShell`, `WorkspaceShell`, `TabStrip`, `StatusBar`, `TargetModeBadge`, `ProductionWarning`, `SettingsDialog` placeholders. Imports from `@firebase-desk/repo-contracts` only (no Firebase code).
-- [ ] Add demo screen in `apps/desktop/src/renderer` showing AppShell, light/dark mode switching, compact density, sidebar tree (mock), tabs, status bar with `TargetModeBadge`, and placeholder Firebase panels (Firestore/Auth/JS Query). Mock data only.
-- [ ] Update `oxlintrc.renderer.json` `no-restricted-imports` allowlist to permit `@firebase-desk/design-tokens`, `@firebase-desk/product-ui`.
-- [ ] Update `docs/architecture.md` and `docs/project-structure.md` to reference the new packages.
-- [ ] Document deferred decisions in `design-system.md`: TanStack Table installs on first need; visual regression tooling deferred; perf/bundle budget deferred.
+- [x] Scaffold `packages/design-tokens` (no React): brand primitives, semantic light/dark themes, density, typography, spacing, radius, shadows, motion, z-index, focus-ring, scrollbar tokens.
+- [x] Add CSS-variable generator script in `packages/design-tokens` that emits `themes.css` (covers `:root[data-theme="light"|"dark"]` blocks).
+- [x] Add Tailwind + PostCSS to renderer; configure `electron.vite.config.ts`; map Tailwind colors/spacing/radius/motion to CSS variables (no hard-coded hexes in `tailwind.config.ts`).
+- [x] Add Radix UI primitives, `class-variance-authority`, `tailwind-merge`, `clsx`, and `lucide-react`.
+- [x] Add appearance provider (`system` / `light` / `dark`) reading from `SettingsRepository`; toggles `<html data-theme>` at runtime; honors `prefers-color-scheme` when mode is `system`. Theme registry leaves room for future named themes (e.g. `high-contrast`, `midnight`, `solarized`).
+- [x] Wire global focus-ring CSS recipe (`:focus-visible` + `--focus-ring-shadow`) and scrollbar styles in renderer global stylesheet.
+- [x] Add `prefers-reduced-motion` override for motion tokens.
+- [x] Build first generic components in `@firebase-desk/ui`: `Button`, `IconButton`, `Input`, `Badge`, `Tooltip`, `Dialog`, `DropdownMenu`, `ContextMenu`, `Tabs`, `Panel` (+ `PanelHeader`/`PanelBody`), `Toolbar`, `EmptyState`, `InlineAlert`, `StatusBadge`. All use Radix where applicable, CVA variants, density tokens, and `data-state` styling.
+- [x] Wire density token through existing virtualized primitives (`VirtualList`/`VirtualTable`/`VirtualTree` row heights default from `density.compact`).
+- [x] Add Storybook to `packages/ui` (and `packages/product-ui`): one story per variant, theme/density toggle addons, light + dark backgrounds.
+- [x] Add `react-resizable-panels` wrapper component (`ResizablePanelGroup`) in `@firebase-desk/ui`.
+- [x] Add `cmdk` command palette shell wired to Cmd/Ctrl+K via `@firebase-desk/hotkeys`.
+- [x] Add Monaco Editor wrapper (`CodeEditor`) with theme-switching tied to appearance provider; configure Monaco workers in electron-vite renderer config; lazy-load on first use.
+- [x] Scaffold `packages/product-ui`: `AppShell`, `SidebarShell`, `WorkspaceShell`, `TabStrip`, `StatusBar`, `TargetModeBadge`, `ProductionWarning`, `SettingsDialog` placeholders. Imports from `@firebase-desk/repo-contracts` only (no Firebase code).
+- [x] Add demo screen in `apps/desktop/src/renderer` showing AppShell, light/dark mode switching, compact density, sidebar tree (mock), tabs, status bar with `TargetModeBadge`, and placeholder Firebase panels (Firestore/Auth/JS Query). Mock data only.
+- [x] Update `oxlintrc.renderer.json` `no-restricted-imports` allowlist to permit `@firebase-desk/design-tokens`, `@firebase-desk/product-ui`.
+- [x] Update `docs/architecture.md` and `docs/project-structure.md` to reference the new packages.
+- [x] Document deferred decisions in `design-system.md`: TanStack Table installs on first need; visual regression tooling deferred; perf/bundle budget deferred.
 
-## Phase 3: Project Management
+## Phase 3: Mocked General App
+
+Build the complete Firebase Desk app surface before real Firebase integration. Use [product.md](product.md), [live-wireframe.md](live-wireframe.md), and `apps/wireframe` as the source of truth. All runtime data must come through `@firebase-desk/repo-contracts` and `@firebase-desk/repo-mocks`; no renderer code talks to Firebase directly.
+
+- [ ] Replace the Phase 2.5 placeholder desktop demo with a real mocked app composition.
+- [ ] Add an app-level repository provider wiring `MockProjectsRepository`, `MockFirestoreRepository`, `MockAuthRepository`, `MockScriptRunnerRepository`, and `MockSettingsRepository`.
+- [ ] Build the left account tree from `ProjectsRepository.list()`.
+- [ ] Lazy-load account tools under each account: Firestore, Authentication, and JavaScript Query.
+- [ ] Add mocked account-load loading, error, retry, and remove states.
+- [ ] Build workspace tab state: open, focus, close, close others, close left/right, close all, reorder, sort by account.
+- [ ] Add Back/Forward interaction history without duplicate tab creation.
+- [ ] Add account/project dropdown to each tab toolbar; switching affects only that tab.
+- [ ] Add status bar values for selected tree item, active tab account, target mode, and last action.
+- [ ] Build the Add Project mocked dialog using `ProjectsRepository.add()`.
+- [ ] Build settings/about view using `SettingsRepository`.
+- [ ] Build Firestore tree from `FirestoreRepository.listRootCollections()`.
+- [ ] Add collection single-click focus/open behavior and double-click new-tab behavior.
+- [ ] Build Firestore query tab with path input, collection/document path detection, filters, sorts, limit, reset, and run.
+- [ ] Build result overview with first-level field/type aggregation.
+- [ ] Build result table view with row selection, Load more, and double-click document editor modal.
+- [ ] Build result tree view with indentation, arrays, maps, nested subcollection indicators, and Load more.
+- [ ] Build read-only typed JSON result view.
+- [ ] Add result item context menu with Open in new tab.
+- [ ] Build document detail panel and JSON/field editor mock flows.
+- [ ] Add destructive confirmation modal for mocked deletes.
+- [ ] Build JavaScript Query tab with Monaco editor, Run, logs, errors, and collapsed streamed result items.
+- [ ] Build Authentication tab with users table, filter/search, selected user detail, and claims viewer.
+- [ ] Build command palette actions for common mocked app workflows.
+- [ ] Wire responsive behavior from the wireframe: splitters, collapsible sidebar rail, inspector strip, stacked panes, contained scrolling.
+- [ ] Add Storybook stories for the major mocked app surfaces, not only primitives.
+- [ ] Add unit tests as each mocked app surface is built; tests should use `@firebase-desk/repo-mocks` through repository contracts instead of hard-coded component data.
+- [ ] Add focused interaction tests for account tree lazy load, tab behavior, account switching, query run, document modal, JS run, Auth filter, settings, and command palette.
+- [ ] Keep at least one renderer smoke test proving the app boots with mocked repositories.
+
+## Phase 4: Mock Contract Hardening
+
+Close the gap between mocks and the real MVP behavior before swapping in Firebase adapters.
+
+- [ ] Extend mock fixtures with multiple accounts, production/emulator targets, account-load errors, empty states, and large collections.
+- [ ] Extend Firestore mocks with nested subcollections, map/array examples, document path reads, cursor pagination, and Firebase-like errors.
+- [ ] Add mock write/delete methods to contracts if the mocked editor flows need them before real Firebase editing.
+- [ ] Extend JavaScript Query mocks with logs, thrown errors, empty returns, arrays, plain objects, document-like values, query-like values, and streamed output fixtures.
+- [ ] Extend Auth mocks with enough users for pagination/search states and richer custom claims.
+- [ ] Add contract conformance tests covering every repository method used by the mocked app.
+- [ ] Add fixture builder helpers so UI tests can create targeted mock states without duplicating data.
+
+## Phase 5: Project Management
 
 - [ ] Parse service account JSON.
 - [ ] Validate required service account fields.
@@ -137,7 +183,7 @@ See [design-system.md](design-system.md). Same package layout: keep `@firebase-d
 - [ ] Switch active target between production and emulator.
 - [ ] Show active project in status bar.
 
-## Phase 4: Firestore Read And Query
+## Phase 6: Firestore Read And Query
 
 - [ ] Initialize Firebase Admin app per project.
 - [ ] Initialize Firebase Admin app for emulator target.
@@ -151,7 +197,7 @@ See [design-system.md](design-system.md). Same package layout: keep `@firebase-d
 - [ ] Normalize snapshots for renderer.
 - [ ] Render loading, empty, and error states.
 
-## Phase 5: Firestore Editing
+## Phase 7: Firestore Editing
 
 - [ ] Load full document data.
 - [ ] Save full JSON document.
@@ -160,7 +206,7 @@ See [design-system.md](design-system.md). Same package layout: keep `@firebase-d
 - [ ] Confirm destructive actions.
 - [ ] Preserve unsaved editor state on failed save.
 
-## Phase 6: JavaScript Query
+## Phase 8: JavaScript Query
 
 - [ ] Define script context API in `packages/script-runner`.
 - [ ] Run script for active project.
@@ -174,7 +220,7 @@ See [design-system.md](design-system.md). Same package layout: keep `@firebase-d
 - [ ] Add execution timeout.
 - [ ] Move runner to isolated process before enabling real writes (within `packages/script-runner`).
 
-## Phase 7: Authentication
+## Phase 9: Authentication
 
 - [ ] List users with pagination.
 - [ ] List users from emulator target.
@@ -183,7 +229,7 @@ See [design-system.md](design-system.md). Same package layout: keep `@firebase-d
 - [ ] View custom claims.
 - [ ] Decide whether MVP edits custom claims.
 
-## Phase 8: Release Readiness
+## Phase 10: Release Readiness
 
 - [ ] Add README usage notes.
 - [ ] Add safety disclaimer.

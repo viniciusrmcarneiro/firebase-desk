@@ -9,14 +9,18 @@ The Electron shell gives the JavaScript Query feature access to Node and the Fir
 ## Repo Topology
 
 - `apps/desktop` — Electron app (main + preload + renderer).
+- `apps/storybook` — React/Vite component workbench for shared UI packages.
 - `apps/wireframe` — browser-runnable HTML prototype.
+- `packages/design-tokens` — brand primitives, theme tokens, density, CSS variable generation.
+- `packages/ui` — generic Radix/Tailwind React primitives plus virtualized data primitives.
+- `packages/product-ui` — Firebase Desk shell components, appearance provider, command palette, editor wrapper.
 - `packages/repo-contracts` — repository interfaces, zero runtime deps.
 - `packages/repo-mocks` — mock repositories used by the wireframe and unit tests.
 - `packages/repo-firebase` — Admin-SDK-backed implementations, main-process only.
 - `packages/data-format` — Firestore <-> typed-JSON encoder/decoder.
 - `packages/script-runner` — isolated worker runtime for user JS.
 - `packages/ipc-schemas` — Zod schemas for preload<->main IPC.
-- `packages/ui`, `packages/hotkeys` — shared renderer primitives.
+- `packages/hotkeys` — shared keyboard shortcut registry/provider.
 - `packages/config-*` — shared oxlint/dprint/tsconfig/vitest presets.
 - `e2e/` — Playwright + Electron specs against the emulator suite.
 
@@ -120,6 +124,8 @@ Renderer UI -> repo-contracts interface -> preload IPC client (ipc-schemas) -> m
 
 - electron-vite for Electron build/dev flow.
 - React + TypeScript for renderer.
+- Radix UI + Tailwind CSS + CSS variables for generic primitives and theming.
+- Storybook React/Vite for UI package review.
 - TanStack Table for result/auth tables.
 - `@tanstack/react-virtual` for all data-heavy lists/grids/trees (mandatory; see Virtualization below).
 - `@tanstack/react-hotkeys` for keyboard shortcuts (preferred).

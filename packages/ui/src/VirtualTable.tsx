@@ -1,3 +1,4 @@
+import { density as densityTokens, type DensityName } from '@firebase-desk/design-tokens';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { type ReactNode, useRef } from 'react';
 
@@ -11,15 +12,19 @@ export interface VirtualTableColumn<T> {
 export interface VirtualTableProps<T> {
   readonly rows: ReadonlyArray<T>;
   readonly columns: ReadonlyArray<VirtualTableColumn<T>>;
-  readonly rowHeight: number;
+  readonly density?: DensityName;
+  readonly rowHeight?: number;
 }
 
-export function VirtualTable<T>({ rows, columns, rowHeight }: VirtualTableProps<T>) {
+export function VirtualTable<T>(
+  { columns, density = 'compact', rowHeight, rows }: VirtualTableProps<T>,
+) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const resolvedRowHeight = rowHeight ?? densityTokens[density].rowHeight;
   const virtualizer = useVirtualizer({
     count: rows.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: () => rowHeight,
+    estimateSize: () => resolvedRowHeight,
     overscan: 12,
   });
 
@@ -46,7 +51,7 @@ export function VirtualTable<T>({ rows, columns, rowHeight }: VirtualTableProps<
                 width: '100%',
                 transform: `translateY(${row.start}px)`,
                 display: 'flex',
-                height: rowHeight,
+                height: resolvedRowHeight,
               }}
             >
               {columns.map((c) => (

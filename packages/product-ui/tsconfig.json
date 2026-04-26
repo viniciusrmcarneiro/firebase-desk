@@ -1,0 +1,16 @@
+{
+  "extends": "../config-tsconfig/react.json",
+  "compilerOptions": {
+    "outDir": "dist",
+    "rootDir": "src",
+    "tsBuildInfoFile": "dist/.tsbuildinfo"
+  },
+  "include": ["src/**/*"],
+  "references": [
+    { "path": "../design-tokens" },
+    { "path": "../hotkeys" },
+    { "path": "../repo-contracts" },
+    { "path": "../repo-mocks" },
+    { "path": "../ui" }
+  ]
+}

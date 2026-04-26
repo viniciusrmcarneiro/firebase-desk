@@ -2,8 +2,12 @@ import react from '@vitejs/plugin-react';
 import { defineConfig } from 'electron-vite';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import monacoEditorPlugin from 'vite-plugin-monaco-editor';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const monacoEditorPluginFactory =
+  (monacoEditorPlugin as unknown as { default?: typeof monacoEditorPlugin; }).default
+    ?? monacoEditorPlugin;
 
 export default defineConfig({
   main: {
@@ -27,7 +31,20 @@ export default defineConfig({
   },
   renderer: {
     root: resolve(__dirname, 'src/renderer'),
-    plugins: [react()],
+    css: {
+      postcss: resolve(__dirname, 'postcss.config.cjs'),
+    },
+    plugins: [
+      react(),
+      monacoEditorPluginFactory({
+        languageWorkers: [],
+        customWorkers: [
+          { label: 'editorWorkerService', entry: 'monaco-editor/esm/vs/editor/editor.worker.js' },
+          { label: 'json', entry: 'monaco-editor/esm/vs/language/json/json.worker.js' },
+          { label: 'typescript', entry: 'monaco-editor/esm/vs/language/typescript/ts.worker.js' },
+        ],
+      }),
+    ],
     build: {
       outDir: resolve(__dirname, 'out/renderer'),
       rollupOptions: {

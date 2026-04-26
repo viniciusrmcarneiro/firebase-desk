@@ -17,6 +17,7 @@
     "test": "turbo run test",
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
+    "storybook": "pnpm --filter @firebase-desk/storybook dev",
     "test:e2e": "pnpm --filter @firebase-desk/e2e test:e2e",
     "package": "pnpm --filter @firebase-desk/desktop package"
   },
@@ -27,6 +28,12 @@
     "typescript": "6.0.3"
   },
   "pnpm": {
+    "overrides": {
+      "dompurify": "3.4.1",
+      "retry-request": "8.0.2",
+      "teeny-request": "10.1.2",
+      "uuid": "14.0.0"
+    },
     "onlyBuiltDependencies": [
       "electron",
       "electron-winstaller",
