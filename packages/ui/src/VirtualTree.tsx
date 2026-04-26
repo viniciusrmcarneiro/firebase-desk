@@ -1,5 +1,5 @@
 import { density as densityTokens, type DensityName } from '@firebase-desk/design-tokens';
-import { useCallback, useState, type KeyboardEvent } from 'react';
+import { type KeyboardEvent, useCallback, useState } from 'react';
 import { VirtualList } from './VirtualList.tsx';
 
 export interface VirtualTreeNode {
