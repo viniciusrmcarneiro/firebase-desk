@@ -1,0 +1,14 @@
+{
+  "extends": "../../packages/config-tsconfig/electron-preload.json",
+  "compilerOptions": {
+    "outDir": "out/preload",
+    "rootDir": "src/preload",
+    "tsBuildInfoFile": "out/.tsbuildinfo-preload",
+    "types": ["node"]
+  },
+  "include": ["src/preload/**/*"],
+  "references": [
+    { "path": "../../packages/repo-contracts" },
+    { "path": "../../packages/ipc-schemas" }
+  ]
+}

@@ -17,7 +17,7 @@ The Electron shell gives the JavaScript Query feature access to Node and the Fir
 - `packages/script-runner` — isolated worker runtime for user JS.
 - `packages/ipc-schemas` — Zod schemas for preload<->main IPC.
 - `packages/ui`, `packages/hotkeys` — shared renderer primitives.
-- `packages/config-*` — shared eslint/tsconfig/vitest presets.
+- `packages/config-*` — shared oxlint/dprint/tsconfig/vitest presets.
 - `e2e/` — Playwright + Electron specs against the emulator suite.
 
 ## Process Boundaries
@@ -125,8 +125,10 @@ Renderer UI -> repo-contracts interface -> preload IPC client (ipc-schemas) -> m
 - `@tanstack/react-hotkeys` for keyboard shortcuts (preferred).
 - Monaco Editor for JSON and JavaScript editing.
 - Firebase Admin SDK for Firebase operations.
-- keytar or Electron safeStorage strategy for secrets.
+- Electron `safeStorage` for credential encryption (no keytar).
 - Zod for IPC payload validation.
+- `oxlint` for linting.
+- `dprint` for formatting (CI-enforced).
 
 ## Virtualization
 

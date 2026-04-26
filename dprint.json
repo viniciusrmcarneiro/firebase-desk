@@ -1,0 +1,23 @@
+{
+  "$schema": "https://dprint.dev/schemas/v0.json",
+  "extends": [
+    "./packages/config-dprint/dprint.base.json"
+  ],
+  "includes": [
+    "**/*.{ts,tsx,mts,cts,js,jsx,mjs,cjs,json,jsonc,md}"
+  ],
+  "excludes": [
+    "**/node_modules",
+    "**/dist",
+    "**/out",
+    "**/build",
+    "**/coverage",
+    "**/.turbo",
+    "**/release",
+    "**/playwright-report",
+    "**/test-results",
+    "**/*.tsbuildinfo",
+    "pnpm-lock.yaml",
+    "apps/wireframe/**"
+  ]
+}

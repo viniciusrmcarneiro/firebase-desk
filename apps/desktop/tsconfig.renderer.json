@@ -1,0 +1,18 @@
+{
+  "extends": "../../packages/config-tsconfig/electron-renderer.json",
+  "compilerOptions": {
+    "outDir": "out/renderer",
+    "rootDir": "src/renderer",
+    "tsBuildInfoFile": "out/.tsbuildinfo-renderer",
+    "types": ["vite/client"]
+  },
+  "include": ["src/renderer/**/*"],
+  "references": [
+    { "path": "../../packages/repo-contracts" },
+    { "path": "../../packages/repo-mocks" },
+    { "path": "../../packages/ui" },
+    { "path": "../../packages/hotkeys" },
+    { "path": "../../packages/data-format" },
+    { "path": "../../packages/ipc-schemas" }
+  ]
+}

@@ -1,0 +1,37 @@
+{
+  "$schema": "https://dprint.dev/schemas/v0.json",
+  "indentWidth": 2,
+  "lineWidth": 100,
+  "newLineKind": "lf",
+  "useTabs": false,
+  "typescript": {
+    "quoteStyle": "preferSingle",
+    "semiColons": "always",
+    "trailingCommas": "onlyMultiLine",
+    "preferHanging": false
+  },
+  "json": {
+    "trailingCommas": "never"
+  },
+  "markdown": {
+    "lineWidth": 100,
+    "textWrap": "maintain"
+  },
+  "excludes": [
+    "**/node_modules",
+    "**/dist",
+    "**/out",
+    "**/build",
+    "**/coverage",
+    "**/.turbo",
+    "**/release",
+    "**/playwright-report",
+    "**/test-results",
+    "pnpm-lock.yaml"
+  ],
+  "plugins": [
+    "https://plugins.dprint.dev/typescript-0.93.4.wasm",
+    "https://plugins.dprint.dev/json-0.20.0.wasm",
+    "https://plugins.dprint.dev/markdown-0.18.0.wasm"
+  ]
+}

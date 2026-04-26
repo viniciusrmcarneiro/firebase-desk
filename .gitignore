@@ -1,1 +1,46 @@
+# OS
 .DS_Store
+Thumbs.db
+
+# Editor
+.vscode/
+.idea/
+*.swp
+
+# Node
+node_modules/
+.pnpm-store/
+npm-debug.log*
+pnpm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Build output
+dist/
+out/
+build/
+.turbo/
+*.tsbuildinfo
+coverage/
+
+# Electron
+release/
+apps/desktop/release/
+apps/desktop/dist/
+apps/desktop/out/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# Firebase emulator
+firebase/emulator/.firebase/
+firebase-debug.log
+firestore-debug.log
+ui-debug.log
+
+# Local env
+.env
+.env.local
+.env.*.local

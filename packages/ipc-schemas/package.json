@@ -1,0 +1,30 @@
+{
+  "name": "@firebase-desk/ipc-schemas",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts"
+  },
+  "scripts": {
+    "lint": "oxlint --config ../config-oxlint/oxlintrc.base.json src",
+    "typecheck": "tsc -b",
+    "test": "vitest run --passWithNoTests",
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@firebase-desk/config-oxlint": "workspace:*",
+    "@firebase-desk/config-tsconfig": "workspace:*",
+    "@firebase-desk/config-vitest": "workspace:*",
+    "@firebase-desk/repo-contracts": "workspace:*",
+    "oxlint": "1.61.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.5"
+  }
+}

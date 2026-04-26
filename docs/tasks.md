@@ -83,7 +83,7 @@ Detailed feature tasks and per-page/per-tab specs should be finalized after the 
 
 - [ ] Initialize pnpm workspace (`pnpm-workspace.yaml`, root `package.json`).
 - [ ] Add Turborepo (`turbo.json`) with `lint`, `typecheck`, `test`, `build`, `dev` pipelines.
-- [ ] Add `tsconfig.base.json` and shared config packages (`config-eslint`, `config-tsconfig`, `config-vitest`).
+- [ ] Add `tsconfig.base.json` and shared config packages (`config-oxlint`, `config-dprint`, `config-tsconfig`, `config-vitest`).
 - [ ] Scaffold `packages/repo-contracts` with repository interfaces for projects, Firestore, JS Query, Auth, and settings.
 - [ ] Scaffold `packages/repo-mocks` with mock implementations.
 - [ ] Scaffold `packages/data-format`, `packages/ipc-schemas`, `packages/ui`, `packages/hotkeys` skeletons.

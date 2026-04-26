@@ -1,0 +1,18 @@
+{
+  "extends": "../../packages/config-tsconfig/electron-main.json",
+  "compilerOptions": {
+    "outDir": "out/main",
+    "rootDir": "src/main",
+    "tsBuildInfoFile": "out/.tsbuildinfo-main",
+    "types": ["node"]
+  },
+  "include": ["src/main/**/*"],
+  "references": [
+    { "path": "../../packages/repo-contracts" },
+    { "path": "../../packages/ipc-schemas" },
+    { "path": "../../packages/repo-mocks" },
+    { "path": "../../packages/data-format" },
+    { "path": "../../packages/repo-firebase" },
+    { "path": "../../packages/script-runner" }
+  ]
+}

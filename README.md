@@ -37,3 +37,13 @@ Status: planning. First implementation target is CI-tested project foundation, t
 - [docs/project-structure.md](docs/project-structure.md)
 - [docs/testing-ci.md](docs/testing-ci.md)
 - [docs/tasks.md](docs/tasks.md)
+
+## Local Scripts ↔ GitHub Actions
+
+Every workflow has an identical local pnpm command:
+
+| Workflow      | Local equivalent                                                                              |
+| ------------- | --------------------------------------------------------------------------------------------- |
+| `ci.yml`      | `pnpm install && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build` |
+| `e2e.yml`     | `pnpm install && pnpm build && pnpm --filter @firebase-desk/e2e test:withEmulators`           |
+| `release.yml` | `pnpm install && pnpm package` (per-OS)                                                       |

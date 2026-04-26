@@ -1,0 +1,39 @@
+{
+  "name": "firebase-desk",
+  "version": "0.0.0",
+  "private": true,
+  "description": "Firebase Desk monorepo root.",
+  "license": "MIT",
+  "packageManager": "pnpm@10.33.2",
+  "engines": {
+    "node": ">=24",
+    "pnpm": ">=10.33.2"
+  },
+  "scripts": {
+    "lint": "turbo run lint",
+    "format": "dprint fmt",
+    "format:check": "dprint check",
+    "typecheck": "turbo run typecheck",
+    "test": "turbo run test",
+    "build": "turbo run build",
+    "dev": "turbo run dev --parallel",
+    "test:e2e": "pnpm --filter @firebase-desk/e2e test:e2e",
+    "package": "pnpm --filter @firebase-desk/desktop package"
+  },
+  "devDependencies": {
+    "dprint": "0.54.0",
+    "oxlint": "1.61.0",
+    "turbo": "2.9.6",
+    "typescript": "6.0.3"
+  },
+  "pnpm": {
+    "onlyBuiltDependencies": [
+      "electron",
+      "electron-winstaller",
+      "esbuild",
+      "dprint",
+      "@firebase/util",
+      "protobufjs"
+    ]
+  }
+}

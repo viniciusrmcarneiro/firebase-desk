@@ -1,0 +1,26 @@
+{
+  "name": "@firebase-desk/e2e",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "scripts": {
+    "lint": "oxlint --config ../packages/config-oxlint/oxlintrc.base.json specs",
+    "typecheck": "tsc --noEmit",
+    "test": "echo 'e2e tests run via test:e2e (requires emulators)'",
+    "test:e2e": "playwright test",
+    "test:withEmulators": "firebase --project demo-local emulators:exec --only auth,firestore --config ../firebase/emulator/firebase.json 'pnpm --filter @firebase-desk/emulator-tools seed && pnpm --filter @firebase-desk/e2e test'"
+  },
+  "dependencies": {
+    "@firebase-desk/ipc-schemas": "workspace:*"
+  },
+  "devDependencies": {
+    "@firebase-desk/config-oxlint": "workspace:*",
+    "@firebase-desk/config-tsconfig": "workspace:*",
+    "@playwright/test": "1.59.1",
+    "@types/node": "24.10.0",
+    "electron": "41.3.0",
+    "oxlint": "1.61.0",
+    "typescript": "6.0.3"
+  }
+}

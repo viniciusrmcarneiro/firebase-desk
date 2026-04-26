@@ -10,7 +10,7 @@ Adopt a **monorepo** from the start. Even at MVP scope the codebase has clear bo
 - **Task runner**: `turbo` (Turborepo) for cached `lint`, `typecheck`, `test`, `build` across packages.
 - **TypeScript**: project references (`composite: true`) so `tsc -b` builds packages in dependency order and caches incrementally.
 - **Lint/format/config**: shared via `packages/config-*` packages consumed by every workspace.
-- **Versioning**: `changesets` once releasable artifacts beyond the desktop app exist.
+- **Formatting**: `dprint` (CI-enforced via `pnpm format:check`).
 
 ## Layout
 
@@ -21,7 +21,7 @@ firebase-desk/
       ci.yml
       e2e.yml
       release.yml
-  .changeset/
+
   docs/
   package.json              # workspace root, private, scripts delegate to turbo
   pnpm-workspace.yaml
@@ -80,8 +80,9 @@ firebase-desk/
       src/
     hotkeys/                # central keymap registry, default bindings, override hooks
       src/
-    config-eslint/          # shared eslint preset
-    config-tsconfig/        # shared base tsconfigs (node, react, electron-main, electron-renderer)
+    config-oxlint/          # shared oxlint preset
+    config-dprint/          # shared dprint preset
+    config-tsconfig/        # shared base tsconfigs (node, react, electron-main, electron-preload, electron-renderer)
     config-vitest/          # shared vitest preset
   e2e/                      # Playwright + Electron specs against emulator
     package.json
@@ -116,7 +117,7 @@ Hard rules:
 - Wireframe is a real workspace member — it consumes `repo-contracts` + `repo-mocks` + (eventually) `ui`, so design decisions made in the prototype carry into the desktop app.
 - Shared concerns (hotkeys, virtualization primitives, JSON tree, data encoding) live in packages from day one, so a second surface (CLI, web preview, docs site) can pick them up without extraction work.
 - `e2e/` is a standalone workspace so its Playwright/Electron deps don't bleed into app installs.
-- Per-package `tsconfig`/`eslint`/`vitest` presets keep root config tiny and let new packages opt in by extending one file.
+- Per-package `tsconfig`/`oxlint`/`vitest` presets keep root config tiny and let new packages opt in by extending one file.
 
 ## Naming
 
@@ -149,6 +150,8 @@ Hard rules:
 Root `package.json` exposes thin wrappers; turbo fans out:
 
 - `pnpm lint` -> `turbo run lint`
+- `pnpm format` -> `dprint fmt`
+- `pnpm format:check` -> `dprint check`
 - `pnpm typecheck` -> `turbo run typecheck`
 - `pnpm test` -> `turbo run test`
 - `pnpm build` -> `turbo run build`

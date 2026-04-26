@@ -1,0 +1,61 @@
+{
+  "$schema": "https://turbo.build/schema.json",
+  "remoteCache": {
+    "enabled": false
+  },
+  "globalDependencies": [
+    "tsconfig.base.json",
+    "dprint.json",
+    ".nvmrc",
+    ".npmrc"
+  ],
+  "tasks": {
+    "lint": {
+      "dependsOn": [
+        "^lint"
+      ],
+      "outputs": []
+    },
+    "format:check": {
+      "outputs": []
+    },
+    "typecheck": {
+      "dependsOn": [
+        "^typecheck"
+      ],
+      "outputs": [
+        "*.tsbuildinfo"
+      ]
+    },
+    "test": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "coverage/**"
+      ]
+    },
+    "build": {
+      "dependsOn": [
+        "^build"
+      ],
+      "outputs": [
+        "dist/**",
+        "out/**",
+        "build/**"
+      ]
+    },
+    "dev": {
+      "cache": false,
+      "persistent": true
+    },
+    "package": {
+      "dependsOn": [
+        "build"
+      ],
+      "outputs": [
+        "release/**"
+      ]
+    }
+  }
+}

@@ -29,12 +29,14 @@
 
 ### Required Workflows
 
-- `ci.yml`: install (pnpm), restore turbo cache, run `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
+- `ci.yml`: install (pnpm), run `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
 - `e2e.yml`: install, build affected workspaces, start Firebase emulators, seed data, run `pnpm test:e2e`, upload traces/screenshots on failure.
 - `release.yml`: on tag or manual dispatch, run CI checks, run `pnpm package` for the desktop app, package macOS/Windows/Linux artifacts, create draft release.
 
 ### Required Scripts (root `package.json`, delegated via turbo/pnpm filters)
 
+- `pnpm format`
+- `pnpm format:check`
 - `pnpm lint`
 - `pnpm typecheck`
 - `pnpm test`
@@ -49,4 +51,3 @@
 - Pull requests must pass lint, typecheck, unit tests, and build.
 - E2E emulator workflow must exist early, even if first specs are smoke tests.
 - Release workflow must exist before the first packaged build is considered done.
-- Turbo remote cache should be enabled in CI as soon as a cache backend is chosen.

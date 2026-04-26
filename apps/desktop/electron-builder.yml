@@ -1,0 +1,22 @@
+appId: dev.firebase-desk.app
+productName: Firebase Desk
+directories:
+  output: release
+  buildResources: build
+files:
+  - out/**
+  - package.json
+mac:
+  target:
+    - dmg
+    - zip
+  category: public.app-category.developer-tools
+win:
+  target:
+    - nsis
+    - zip
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development
