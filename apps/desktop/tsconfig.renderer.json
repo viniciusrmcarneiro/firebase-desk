@@ -8,6 +8,8 @@
   },
   "include": ["src/renderer/**/*"],
   "references": [
+    { "path": "../../packages/design-tokens" },
+    { "path": "../../packages/product-ui" },
     { "path": "../../packages/repo-contracts" },
     { "path": "../../packages/repo-mocks" },
     { "path": "../../packages/ui" },

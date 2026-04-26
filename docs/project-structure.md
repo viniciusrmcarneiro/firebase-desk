@@ -51,6 +51,9 @@ firebase-desk/
             settings/
           components/
           styles/
+    storybook/              # React/Vite component workbench for ui + product-ui
+      .storybook/
+      src/
     wireframe/              # browser-runnable HTML prototype
       package.json
       src/
@@ -58,6 +61,12 @@ firebase-desk/
         app.js
         styles.css
   packages/
+    design-tokens/          # theme/density tokens + generated CSS variables
+      src/
+    ui/                     # generic React primitives + virtualized data widgets
+      src/
+    product-ui/             # Firebase Desk shell, appearance, command palette, editor wrappers
+      src/
     repo-contracts/         # repository interfaces + shared result types (no Firebase deps)
       src/
         projects/
@@ -76,8 +85,6 @@ firebase-desk/
       src/
     ipc-schemas/            # Zod schemas + generated types for preload<->main IPC
       src/
-    ui/                     # shared React primitives (virtualized table/tree/JSON, hotkeys host)
-      src/
     hotkeys/                # central keymap registry, default bindings, override hooks
       src/
     config-oxlint/          # shared oxlint preset
@@ -95,11 +102,14 @@ firebase-desk/
 ## Dependency Direction
 
 ```text
-apps/desktop/renderer  ->  packages/ui, repo-contracts, repo-mocks (dev), hotkeys, data-format, ipc-schemas (types)
+apps/desktop/renderer  ->  packages/design-tokens, product-ui, ui, repo-contracts, repo-mocks (dev), hotkeys, data-format, ipc-schemas (types)
+apps/storybook         ->  packages/design-tokens, product-ui, ui, repo-mocks
 apps/desktop/preload   ->  packages/ipc-schemas, repo-contracts (types)
 apps/desktop/main      ->  packages/repo-contracts, repo-firebase, ipc-schemas, data-format, script-runner
 apps/wireframe         ->  packages/repo-contracts, repo-mocks, ui (when shareable to plain JS/HTML)
 e2e                    ->  apps/desktop (built artifact), packages/ipc-schemas (types)
+packages/product-ui    ->  packages/design-tokens, ui, hotkeys, repo-contracts
+packages/ui            ->  packages/design-tokens
 packages/repo-firebase ->  packages/repo-contracts, data-format
 packages/repo-mocks    ->  packages/repo-contracts, data-format
 ```
@@ -156,6 +166,7 @@ Root `package.json` exposes thin wrappers; turbo fans out:
 - `pnpm test` -> `turbo run test`
 - `pnpm build` -> `turbo run build`
 - `pnpm dev` -> `turbo run dev --parallel` (desktop + wireframe)
+- `pnpm storybook` -> `pnpm --filter @firebase-desk/storybook dev`
 - `pnpm test:e2e` -> `pnpm --filter @firebase-desk/e2e test`
 - `pnpm package` -> `pnpm --filter @firebase-desk/desktop package`
 

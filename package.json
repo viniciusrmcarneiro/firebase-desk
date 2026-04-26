@@ -17,6 +17,7 @@
     "test": "turbo run test",
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
+    "storybook": "pnpm --filter @firebase-desk/storybook dev",
     "test:e2e": "pnpm --filter @firebase-desk/e2e test:e2e",
     "package": "pnpm --filter @firebase-desk/desktop package"
   },

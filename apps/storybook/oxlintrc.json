@@ -1,0 +1,10 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "extends": [
+    "../../packages/config-oxlint/oxlintrc.base.json"
+  ],
+  "rules": {
+    "import/no-default-export": "off",
+    "import/no-unassigned-import": "off"
+  }
+}

@@ -1,21 +1,24 @@
+import { density as densityTokens, type DensityName } from '@firebase-desk/design-tokens';
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { type ReactNode, useRef } from 'react';
 
 export interface VirtualListProps<T> {
   readonly items: ReadonlyArray<T>;
-  readonly estimateSize: (index: number) => number;
+  readonly density?: DensityName;
+  readonly estimateSize?: (index: number) => number;
   readonly overscan?: number;
   readonly renderItem: (item: T, index: number) => ReactNode;
 }
 
 export function VirtualList<T>(
-  { items, estimateSize, overscan = 8, renderItem }: VirtualListProps<T>,
+  { density = 'compact', estimateSize, items, overscan = 8, renderItem }: VirtualListProps<T>,
 ) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const rowHeight = densityTokens[density].rowHeight;
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => parentRef.current,
-    estimateSize,
+    estimateSize: estimateSize ?? (() => rowHeight),
     overscan,
   });
 

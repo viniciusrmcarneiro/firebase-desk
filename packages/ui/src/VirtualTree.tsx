@@ -1,4 +1,5 @@
-import { useCallback, useState } from 'react';
+import { density as densityTokens, type DensityName } from '@firebase-desk/design-tokens';
+import { useCallback, useState, type KeyboardEvent } from 'react';
 import { VirtualList } from './VirtualList.tsx';
 
 export interface VirtualTreeNode {
@@ -11,18 +12,20 @@ export interface VirtualTreeNode {
 
 export interface VirtualTreeProps {
   readonly flattenedNodes: ReadonlyArray<VirtualTreeNode>;
-  readonly rowHeight: number;
+  readonly density?: DensityName;
+  readonly rowHeight?: number;
   readonly onToggle: (id: string) => void;
   readonly ariaLabel?: string;
 }
 
 export function VirtualTree(
-  { flattenedNodes, rowHeight, onToggle, ariaLabel }: VirtualTreeProps,
+  { ariaLabel, density = 'compact', flattenedNodes, onToggle, rowHeight }: VirtualTreeProps,
 ) {
   const [focusedIndex, setFocusedIndex] = useState(0);
+  const resolvedRowHeight = rowHeight ?? densityTokens[density].treeRowHeight;
 
   const handleKeyDown = useCallback(
-    (e: React.KeyboardEvent<HTMLDivElement>, index: number, node: VirtualTreeNode) => {
+    (e: KeyboardEvent<HTMLDivElement>, index: number, node: VirtualTreeNode) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
         setFocusedIndex(Math.min(index + 1, flattenedNodes.length - 1));
@@ -40,8 +43,9 @@ export function VirtualTree(
   return (
     <div role='tree' aria-label={ariaLabel} style={{ height: '100%' }}>
       <VirtualList
+        density={density}
         items={flattenedNodes}
-        estimateSize={() => rowHeight}
+        estimateSize={() => resolvedRowHeight}
         renderItem={(node, index) => (
           <div
             role='treeitem'
@@ -58,7 +62,7 @@ export function VirtualTree(
             }}
             style={{
               paddingLeft: node.depth * 12,
-              height: rowHeight,
+              height: resolvedRowHeight,
               display: 'flex',
               alignItems: 'center',
               cursor: node.hasChildren ? 'pointer' : 'default',
