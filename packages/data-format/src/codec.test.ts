@@ -25,6 +25,8 @@ describe('data-format codec', () => {
     };
 
     const encoded = encode(native);
+    expect(encoded).toMatchObject({ empty: null });
+
     const decoded = decode(encoded);
     const reencoded = encode(decoded);
 
@@ -33,5 +35,10 @@ describe('data-format codec', () => {
 
   it('rejects unknown __type__ values', () => {
     expect(() => decode({ __type__: 'wat', value: 1 } as never)).toThrow();
+  });
+
+  it('keeps plain JSON null values untagged', () => {
+    expect(encode(null)).toBeNull();
+    expect(decode(null)).toBeNull();
   });
 });

@@ -7,7 +7,6 @@ export type EncodedTimestamp = { __type__: 'timestamp'; value: string; };
 export type EncodedGeoPoint = { __type__: 'geoPoint'; latitude: number; longitude: number; };
 export type EncodedReference = { __type__: 'reference'; path: string; };
 export type EncodedBytes = { __type__: 'bytes'; base64: string; };
-export type EncodedNull = { __type__: 'null'; };
 export type EncodedArray = { __type__: 'array'; value: ReadonlyArray<EncodedValue>; };
 export type EncodedMap = { __type__: 'map'; value: { readonly [k: string]: EncodedValue; }; };
 
@@ -16,7 +15,6 @@ export type EncodedTagged =
   | EncodedGeoPoint
   | EncodedReference
   | EncodedBytes
-  | EncodedNull
   | EncodedArray
   | EncodedMap;
 
@@ -36,7 +34,6 @@ export const ENCODED_TYPES = [
   'bytes',
   'array',
   'map',
-  'null',
 ] as const;
 
 export type EncodedTypeName = (typeof ENCODED_TYPES)[number];

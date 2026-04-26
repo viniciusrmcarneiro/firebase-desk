@@ -1,6 +1,8 @@
 import type { ProjectsRepository, ProjectSummary } from '@firebase-desk/repo-contracts';
 import { PROJECTS } from './fixtures/index.ts';
 
+type ProjectAddInput = Parameters<ProjectsRepository['add']>[0];
+
 export class MockProjectsRepository implements ProjectsRepository {
   private readonly projects: ProjectSummary[] = [...PROJECTS];
 
@@ -12,8 +14,13 @@ export class MockProjectsRepository implements ProjectsRepository {
     return this.projects.find((p) => p.id === id) ?? null;
   }
 
-  async add(input: Omit<ProjectSummary, 'id'>): Promise<ProjectSummary> {
-    const next: ProjectSummary = { id: `proj_${this.projects.length + 1}`, ...input };
+  async add(input: ProjectAddInput): Promise<ProjectSummary> {
+    const next: ProjectSummary = {
+      id: `proj_${this.projects.length + 1}`,
+      name: input.name,
+      projectId: input.projectId,
+      target: input.target,
+    };
     this.projects.push(next);
     return next;
   }

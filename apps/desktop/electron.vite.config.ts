@@ -17,6 +17,7 @@ export default defineConfig({
   },
   preload: {
     build: {
+      externalizeDeps: false,
       outDir: 'out/preload',
       lib: { entry: resolve(__dirname, 'src/preload/index.ts'), formats: ['cjs'] },
       rollupOptions: {

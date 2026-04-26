@@ -32,7 +32,7 @@ function isEncodedTag(
 }
 
 export function encode(value: NativeValue): EncodedValue {
-  if (value === null) return { __type__: 'null' };
+  if (value === null) return null;
   if (typeof value === 'string' || typeof value === 'number' || typeof value === 'boolean') {
     return value;
   }
@@ -89,8 +89,6 @@ export function decode(value: EncodedValue): NativeValue {
 
 function decodeTagged(value: EncodedTagged): NativeValue {
   switch (value.__type__) {
-    case 'null':
-      return null;
     case 'timestamp':
       return new FirestoreTimestamp(value.value);
     case 'geoPoint':

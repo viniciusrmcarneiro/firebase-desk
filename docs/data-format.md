@@ -38,7 +38,6 @@ Special values use an object with a `__type__` field.
 - `bytes`
 - `array`
 - `map`
-- `null`
 
 ## Rules
 
