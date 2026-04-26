@@ -23,10 +23,14 @@ jobs:
                   distribution: temurin
                   java-version: 21
             - run: pnpm install --frozen-lockfile
+            - name: Install Electron runtime deps
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y xvfb libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2t64
             - run: pnpm build
             - run: pnpm --filter @firebase-desk/e2e exec playwright install --with-deps
                   chromium
-            - run: pnpm dlx firebase-tools@15.15.0 --project demo-local emulators:exec --only
+            - run: xvfb-run --auto-servernum -- pnpm dlx firebase-tools@15.15.0 --project demo-local emulators:exec --only
                   auth,firestore --config firebase/emulator/firebase.json "pnpm
                   --filter @firebase-desk/emulator-tools seed && pnpm --filter
                   @firebase-desk/e2e test:e2e"

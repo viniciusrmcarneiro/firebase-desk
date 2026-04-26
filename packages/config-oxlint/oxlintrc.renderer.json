@@ -9,6 +9,7 @@
     "node": false
   },
   "rules": {
+    "import/no-unassigned-import": "off",
     "no-restricted-imports": [
       "error",
       {
