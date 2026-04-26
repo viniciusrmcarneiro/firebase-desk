@@ -1,5 +1,5 @@
-import { expect, test } from '@playwright/test';
 import type { IpcRequest, IpcResponse } from '@firebase-desk/ipc-schemas';
+import { expect, test } from '@playwright/test';
 import { launchDesktop } from '../fixtures/launch.ts';
 
 type FirebaseDeskGlobal = {
