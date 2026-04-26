@@ -28,8 +28,8 @@ Status: planning. First implementation target is CI-tested project foundation, t
 
 ## Docs
 
-- [wireframes/src/index.html](wireframes/src/index.html) (will move to `apps/wireframe/src/index.html` during Phase 1)
-- [wireframes/README.md](wireframes/README.md)
+- [apps/wireframe/src/index.html](apps/wireframe/src/index.html)
+- [apps/wireframe/README.md](apps/wireframe/README.md)
 - [docs/product.md](docs/product.md)
 - [docs/live-wireframe.md](docs/live-wireframe.md)
 - [docs/architecture.md](docs/architecture.md)

@@ -51,7 +51,7 @@ firebase-desk/
             settings/
           components/
           styles/
-    wireframe/              # browser-runnable HTML prototype (current `wireframes/`)
+    wireframe/              # browser-runnable HTML prototype
       package.json
       src/
         index.html
@@ -128,7 +128,7 @@ Hard rules:
 ## Build Phases
 
 1. Monorepo + CI foundation (pnpm workspaces, turbo, shared configs, GitHub Actions).
-2. `repo-contracts` + `repo-mocks` + `ui` skeletons; migrate `wireframes/` to `apps/wireframe/` consuming them.
+2. `repo-contracts` + `repo-mocks` + `ui` skeletons; wire `apps/wireframe/` to consume them.
 3. Electron shell in `apps/desktop` (main + preload + renderer) wired to mocks via IPC.
 4. `repo-firebase` + project credential storage.
 5. Firestore read/query APIs.
@@ -158,6 +158,7 @@ Root `package.json` exposes thin wrappers; turbo fans out:
 
 ## Migration Notes (current repo -> target layout)
 
-- `wireframes/` -> `apps/wireframe/` (move as-is; no source changes needed for the prototype).
-- New top-level files: `pnpm-workspace.yaml`, `turbo.json`, `tsconfig.base.json`, root `package.json` with workspace scripts.
+- [x] `wireframes/` moved to `apps/wireframe/`.
+- [ ] Add `pnpm-workspace.yaml`, `turbo.json`, `tsconfig.base.json`, root `package.json` with workspace scripts.
+- [ ] Add `apps/wireframe/package.json` (`@firebase-desk/wireframe`).
 - Existing `docs/` and `LICENSE` stay at the root.

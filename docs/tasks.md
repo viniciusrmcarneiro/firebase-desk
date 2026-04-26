@@ -21,7 +21,8 @@ Detailed feature tasks and per-page/per-tab specs should be finalized after the 
 - [ ] Scaffold `packages/repo-contracts` with repository interfaces for projects, Firestore, JS Query, Auth, and settings.
 - [ ] Scaffold `packages/repo-mocks` with mock implementations.
 - [ ] Scaffold `packages/data-format`, `packages/ipc-schemas`, `packages/ui`, `packages/hotkeys` skeletons.
-- [ ] Move `wireframes/` to `apps/wireframe/` as a workspace member; wire it to consume `repo-mocks`.
+- [x] Move `wireframes/` to `apps/wireframe/`.
+- [ ] Add `apps/wireframe/package.json` (`@firebase-desk/wireframe`) and wire it to consume `repo-mocks`.
 - [ ] Scaffold `apps/desktop` (Electron + React + TypeScript via electron-vite).
 - [ ] Wire `@tanstack/react-virtual` into `packages/ui` list/table/tree primitives before any data-heavy view ships (workspace tree, query result table, query result tree, JSON viewer, Auth users table, JS Query streamed output).
 - [ ] Wire `@tanstack/react-hotkeys` inside `packages/hotkeys` and ship the central registry with the wireframe defaults; expose an override map via `SettingsRepository` (rebinding UI ships later).
