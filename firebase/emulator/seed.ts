@@ -10,9 +10,9 @@ import {
   FirestoreTimestamp,
 } from '@firebase-desk/data-format';
 import { AUTH_USERS, COLLECTIONS } from '@firebase-desk/repo-mocks/fixtures';
-import { cert, initializeApp } from 'firebase-admin/app';
+import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
-import { getFirestore } from 'firebase-admin/firestore';
+import { GeoPoint, getFirestore } from 'firebase-admin/firestore';
 
 const projectId = process.env['GCLOUD_PROJECT'] ?? 'demo-local';
 
@@ -25,7 +25,7 @@ function toAdminValue(value: unknown): unknown {
     return new Date(value.isoString);
   }
   if (value instanceof FirestoreGeoPoint) {
-    return { latitude: value.latitude, longitude: value.longitude };
+    return new GeoPoint(value.latitude, value.longitude);
   }
   if (value instanceof FirestoreReference) {
     return db.doc(value.path);
@@ -84,6 +84,3 @@ main().catch((err) => {
   console.error('[seed] failed', err);
   process.exit(1);
 });
-
-// Silence unused import if cert isn't used.
-void cert;

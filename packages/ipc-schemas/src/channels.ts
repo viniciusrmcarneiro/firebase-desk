@@ -6,6 +6,7 @@ import {
   SearchUsersRequestSchema,
 } from './auth.ts';
 import {
+  FirestoreCollectionNodeSchema,
   FirestoreDocumentResultSchema,
   FirestoreDocumentsPageSchema,
   FirestoreResultsPageSchema,
@@ -45,7 +46,7 @@ export const IPC_CHANNELS = {
   },
   'firestore.listRootCollections': {
     request: z.object({ projectId: z.string() }),
-    response: z.array(z.object({ path: z.string(), id: z.string() })),
+    response: z.array(FirestoreCollectionNodeSchema),
   },
   'firestore.listDocuments': {
     request: ListDocumentsRequestSchema,
@@ -53,7 +54,7 @@ export const IPC_CHANNELS = {
   },
   'firestore.listSubcollections': {
     request: z.object({ projectId: z.string(), documentPath: z.string() }),
-    response: z.array(z.object({ path: z.string(), id: z.string() })),
+    response: z.array(FirestoreCollectionNodeSchema),
   },
   'firestore.runQuery': {
     request: RunQueryRequestSchema,

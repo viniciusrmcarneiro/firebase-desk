@@ -1,7 +1,7 @@
 import { HotkeysProvider } from '@firebase-desk/hotkeys';
 import type { SettingsSnapshot } from '@firebase-desk/repo-contracts';
 import { MockSettingsRepository } from '@firebase-desk/repo-mocks';
-import { useEffect, useState } from 'react';
+import { type CSSProperties, useEffect, useState } from 'react';
 import { AppShell } from './AppShell.tsx';
 
 const settings = new MockSettingsRepository();
@@ -22,7 +22,7 @@ export function App() {
           '--sidebar-width': `${snapshot.sidebarWidth}px`,
           '--inspector-width': `${snapshot.inspectorWidth}px`,
           height: '100vh',
-        } as React.CSSProperties}
+        } as CSSProperties}
       >
         <AppShell />
       </div>

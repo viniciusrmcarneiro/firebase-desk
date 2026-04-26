@@ -9,7 +9,7 @@
     "typecheck": "tsc --noEmit",
     "test": "echo 'e2e tests run via test:e2e (requires emulators)'",
     "test:e2e": "playwright test",
-    "test:withEmulators": "firebase --project demo-local emulators:exec --only auth,firestore --config ../firebase/emulator/firebase.json 'pnpm --filter @firebase-desk/emulator-tools seed && pnpm --filter @firebase-desk/e2e test'"
+    "test:withEmulators": "firebase --project demo-local emulators:exec --only auth,firestore --config ../firebase/emulator/firebase.json 'pnpm --filter @firebase-desk/emulator-tools seed && pnpm --filter @firebase-desk/e2e test:e2e'"
   },
   "dependencies": {
     "@firebase-desk/ipc-schemas": "workspace:*"

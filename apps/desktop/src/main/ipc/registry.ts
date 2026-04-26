@@ -9,12 +9,10 @@ type Handler<C extends IpcChannel> = (
   | import('@firebase-desk/ipc-schemas').IpcResponse<C>;
 
 const handlers: Partial<{ [C in IpcChannel]: Handler<C>; }> = {
-  'health.check': (request) => ({
+  'health.check': (_request) => ({
     pong: 'pong' as const,
     receivedAt: new Date().toISOString(),
     appVersion: app.getVersion(),
-    // ack the originator's timestamp via debug log only — not part of payload
-    ...(request.ping ? {} : {}),
   }),
 };
 
