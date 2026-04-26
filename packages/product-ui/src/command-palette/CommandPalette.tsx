@@ -17,7 +17,7 @@ export interface CommandPaletteProps {
 export function CommandPalette({ commands, defaultOpen = false }: CommandPaletteProps) {
   const [open, setOpen] = useState(defaultOpen);
 
-  useHotkey('tree.focusFilter', (event) => {
+  useHotkey('commandPalette.open', (event) => {
     event.preventDefault();
     setOpen(true);
   });
@@ -46,7 +46,10 @@ export function CommandPalette({ commands, defaultOpen = false }: CommandPalette
                 key={command.id}
                 className='flex h-8 cursor-default items-center rounded-sm px-2 text-sm data-[selected=true]:bg-action-selected'
                 value={command.label}
-                onSelect={command.onSelect}
+                onSelect={() => {
+                  setOpen(false);
+                  command.onSelect();
+                }}
               >
                 {command.label}
               </Command.Item>

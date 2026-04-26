@@ -22,21 +22,26 @@ export function TabStrip({ activeTabId, className, onSelectTab, tabs }: TabStrip
       )}
       role='tablist'
     >
-      {tabs.map((tab) => (
-        <button
-          key={tab.id}
-          className={cn(
-            'h-full border-b-2 border-transparent px-3 text-sm text-text-secondary',
-            tab.id === activeTabId && 'border-action-primary bg-action-selected text-text-primary',
-          )}
-          data-state={tab.id === activeTabId ? 'active' : 'inactive'}
-          role='tab'
-          type='button'
-          onClick={() => onSelectTab?.(tab.id)}
-        >
-          {tab.label}
-        </button>
-      ))}
+      {tabs.map((tab) => {
+        const active = tab.id === activeTabId;
+        return (
+          <button
+            key={tab.id}
+            aria-selected={active}
+            className={cn(
+              'h-full border-b-2 border-transparent px-3 text-sm text-text-secondary',
+              active && 'border-action-primary bg-action-selected text-text-primary',
+            )}
+            data-state={active ? 'active' : 'inactive'}
+            role='tab'
+            tabIndex={active ? 0 : -1}
+            type='button'
+            onClick={() => onSelectTab?.(tab.id)}
+          >
+            {tab.label}
+          </button>
+        );
+      })}
     </div>
   );
 }

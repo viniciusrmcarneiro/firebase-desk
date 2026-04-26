@@ -3,7 +3,7 @@ import { Button, Dialog, DialogContent } from '@firebase-desk/ui';
 import { useAppearance } from '../appearance/AppearanceProvider.tsx';
 
 export interface SettingsDialogProps {
-  readonly onOpenChange?: (open: boolean) => void;
+  readonly onOpenChange: (open: boolean) => void;
   readonly open: boolean;
 }
 
@@ -11,10 +11,9 @@ const modes: ReadonlyArray<AppearanceMode> = ['system', 'light', 'dark'];
 
 export function SettingsDialog({ onOpenChange, open }: SettingsDialogProps) {
   const appearance = useAppearance();
-  const dialogProps = onOpenChange ? { onOpenChange } : {};
 
   return (
-    <Dialog open={open} {...dialogProps}>
+    <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent description='Configure Firebase Desk appearance.' title='Settings'>
         <div className='grid gap-2'>
           <div className='text-sm font-medium text-text-primary'>Appearance</div>

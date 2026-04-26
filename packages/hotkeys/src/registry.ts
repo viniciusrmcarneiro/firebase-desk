@@ -27,6 +27,12 @@ export const HOTKEYS = {
   'tree.focusFilter': {
     id: 'tree.focusFilter',
     description: 'Focus tree filter',
+    defaultBinding: '/',
+    scope: 'global',
+  },
+  'commandPalette.open': {
+    id: 'commandPalette.open',
+    description: 'Open command palette',
     defaultBinding: 'mod+k',
     scope: 'global',
   },

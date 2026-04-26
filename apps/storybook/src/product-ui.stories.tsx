@@ -37,7 +37,7 @@ type Story = StoryObj;
 
 export const AppShellDefault: Story = {
   render: () => (
-    <div className='h-[420px] [--sidebar-width:240px]'>
+    <div className='h-105 [--sidebar-width:240px]'>
       <AppShell
         sidebar={<SidebarShell title='Firebase Desk'>Project tree</SidebarShell>}
         statusBar={<StatusBar left='Connected' right={<TargetModeBadge mode='emulator' />} />}
@@ -82,7 +82,9 @@ export const TargetModeBadgeProduction: Story = {
 };
 export const TargetModeBadgeEmulator: Story = { render: () => <TargetModeBadge mode='emulator' /> };
 export const ProductionWarningDefault: Story = { render: () => <ProductionWarning /> };
-export const SettingsDialogOpen: Story = { render: () => <SettingsDialog open /> };
+export const SettingsDialogOpen: Story = {
+  render: () => <SettingsDialog open onOpenChange={() => {}} />,
+};
 export const CommandPaletteOpen: Story = {
   render: () => (
     <CommandPalette
@@ -100,7 +102,7 @@ export const CodeEditorJson: Story = {
 };
 export const DemoWorkspacePanel: Story = {
   render: () => (
-    <Panel className='w-[520px]'>
+    <Panel className='w-130'>
       <PanelHeader actions={<Button variant='primary'>Run</Button>}>Firestore Query</PanelHeader>
       <Toolbar aria-label='Panel tools'>/projects/demo/users</Toolbar>
       <PanelBody>Placeholder data surface</PanelBody>
