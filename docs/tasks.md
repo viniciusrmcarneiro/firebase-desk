@@ -102,6 +102,29 @@ Detailed feature tasks and per-page/per-tab specs should be finalized after the 
 - [x] Add GitHub Actions `release.yml`.
 - [x] Verify workflows run locally through equivalent pnpm scripts.
 
+## Phase 2.5: Design System Foundation
+
+See [design-system.md](design-system.md). Same package layout: keep `@firebase-desk/ui` (existing virtualized primitives stay; new generic controls land in the same package). Add `@firebase-desk/design-tokens` and `@firebase-desk/product-ui`.
+
+- [ ] Scaffold `packages/design-tokens` (no React): brand primitives, semantic light/dark themes, density, typography, spacing, radius, shadows, motion, z-index, focus-ring, scrollbar tokens.
+- [ ] Add CSS-variable generator script in `packages/design-tokens` that emits `themes.css` (covers `:root[data-theme="light"|"dark"]` blocks).
+- [ ] Add Tailwind + PostCSS to renderer; configure `electron.vite.config.ts`; map Tailwind colors/spacing/radius/motion to CSS variables (no hard-coded hexes in `tailwind.config.ts`).
+- [ ] Add Radix UI primitives, `class-variance-authority`, `tailwind-merge`, `clsx`, and `lucide-react`.
+- [ ] Add appearance provider (`system` / `light` / `dark`) reading from `SettingsRepository`; toggles `<html data-theme>` at runtime; honors `prefers-color-scheme` when mode is `system`. Theme registry leaves room for future named themes (e.g. `high-contrast`, `midnight`, `solarized`).
+- [ ] Wire global focus-ring CSS recipe (`:focus-visible` + `--focus-ring-shadow`) and scrollbar styles in renderer global stylesheet.
+- [ ] Add `prefers-reduced-motion` override for motion tokens.
+- [ ] Build first generic components in `@firebase-desk/ui`: `Button`, `IconButton`, `Input`, `Badge`, `Tooltip`, `Dialog`, `DropdownMenu`, `ContextMenu`, `Tabs`, `Panel` (+ `PanelHeader`/`PanelBody`), `Toolbar`, `EmptyState`, `InlineAlert`, `StatusBadge`. All use Radix where applicable, CVA variants, density tokens, and `data-state` styling.
+- [ ] Wire density token through existing virtualized primitives (`VirtualList`/`VirtualTable`/`VirtualTree` row heights default from `density.compact`).
+- [ ] Add Storybook to `packages/ui` (and `packages/product-ui`): one story per variant, theme/density toggle addons, light + dark backgrounds.
+- [ ] Add `react-resizable-panels` wrapper component (`ResizablePanelGroup`) in `@firebase-desk/ui`.
+- [ ] Add `cmdk` command palette shell wired to Cmd/Ctrl+K via `@firebase-desk/hotkeys`.
+- [ ] Add Monaco Editor wrapper (`CodeEditor`) with theme-switching tied to appearance provider; configure Monaco workers in electron-vite renderer config; lazy-load on first use.
+- [ ] Scaffold `packages/product-ui`: `AppShell`, `SidebarShell`, `WorkspaceShell`, `TabStrip`, `StatusBar`, `TargetModeBadge`, `ProductionWarning`, `SettingsDialog` placeholders. Imports from `@firebase-desk/repo-contracts` only (no Firebase code).
+- [ ] Add demo screen in `apps/desktop/src/renderer` showing AppShell, light/dark mode switching, compact density, sidebar tree (mock), tabs, status bar with `TargetModeBadge`, and placeholder Firebase panels (Firestore/Auth/JS Query). Mock data only.
+- [ ] Update `oxlintrc.renderer.json` `no-restricted-imports` allowlist to permit `@firebase-desk/design-tokens`, `@firebase-desk/product-ui`.
+- [ ] Update `docs/architecture.md` and `docs/project-structure.md` to reference the new packages.
+- [ ] Document deferred decisions in `design-system.md`: TanStack Table installs on first need; visual regression tooling deferred; perf/bundle budget deferred.
+
 ## Phase 3: Project Management
 
 - [ ] Parse service account JSON.
