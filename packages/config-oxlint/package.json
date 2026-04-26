@@ -1,0 +1,14 @@
+{
+  "name": "@firebase-desk/config-oxlint",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "files": [
+    "oxlintrc.base.json",
+    "oxlintrc.renderer.json"
+  ],
+  "exports": {
+    "./base": "./oxlintrc.base.json",
+    "./renderer": "./oxlintrc.renderer.json"
+  }
+}

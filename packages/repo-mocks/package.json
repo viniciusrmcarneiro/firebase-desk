@@ -1,0 +1,31 @@
+{
+  "name": "@firebase-desk/repo-mocks",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "type": "module",
+  "main": "./src/index.ts",
+  "types": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./fixtures": "./src/fixtures/index.ts"
+  },
+  "scripts": {
+    "lint": "oxlint --config ../config-oxlint/oxlintrc.base.json src",
+    "typecheck": "tsc -b",
+    "test": "vitest run",
+    "build": "tsc -b"
+  },
+  "dependencies": {
+    "@firebase-desk/data-format": "workspace:*",
+    "@firebase-desk/repo-contracts": "workspace:*"
+  },
+  "devDependencies": {
+    "@firebase-desk/config-oxlint": "workspace:*",
+    "@firebase-desk/config-tsconfig": "workspace:*",
+    "@firebase-desk/config-vitest": "workspace:*",
+    "oxlint": "1.61.0",
+    "typescript": "6.0.3",
+    "vitest": "4.1.5"
+  }
+}

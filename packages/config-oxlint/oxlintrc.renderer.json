@@ -1,0 +1,31 @@
+{
+  "$schema": "https://raw.githubusercontent.com/oxc-project/oxc/main/npm/oxlint/configuration_schema.json",
+  "extends": [
+    "./oxlintrc.base.json"
+  ],
+  "env": {
+    "es2022": true,
+    "browser": true,
+    "node": false
+  },
+  "rules": {
+    "import/no-unassigned-import": "off",
+    "no-restricted-imports": [
+      "error",
+      {
+        "patterns": [
+          "@firebase-desk/repo-firebase",
+          "@firebase-desk/repo-firebase/*",
+          "@firebase-desk/script-runner",
+          "@firebase-desk/script-runner/*",
+          "@firebase-desk/*/src/*",
+          "node:*",
+          "electron",
+          "fs",
+          "path",
+          "child_process"
+        ]
+      }
+    ]
+  }
+}

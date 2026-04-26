@@ -1,0 +1,12 @@
+{
+  "name": "@firebase-desk/config-dprint",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "files": [
+    "dprint.base.json"
+  ],
+  "exports": {
+    "./base": "./dprint.base.json"
+  }
+}

@@ -1,0 +1,45 @@
+{
+  "name": "@firebase-desk/desktop",
+  "version": "0.0.0",
+  "private": true,
+  "license": "MIT",
+  "description": "Firebase Desk Electron application.",
+  "type": "module",
+  "main": "out/main/index.js",
+  "scripts": {
+    "dev": "electron-vite dev",
+    "build": "electron-vite build",
+    "preview": "electron-vite preview",
+    "lint": "oxlint --config ../../packages/config-oxlint/oxlintrc.base.json src/main src/preload && oxlint --config ../../packages/config-oxlint/oxlintrc.renderer.json src/renderer",
+    "typecheck": "tsc -b",
+    "test": "vitest run --passWithNoTests",
+    "package": "pnpm run build && electron-builder --config electron-builder.yml"
+  },
+  "dependencies": {
+    "@firebase-desk/data-format": "workspace:*",
+    "@firebase-desk/hotkeys": "workspace:*",
+    "@firebase-desk/ipc-schemas": "workspace:*",
+    "@firebase-desk/repo-contracts": "workspace:*",
+    "@firebase-desk/repo-mocks": "workspace:*",
+    "@firebase-desk/ui": "workspace:*",
+    "react": "19.2.5",
+    "react-dom": "19.2.5",
+    "zod": "4.3.6"
+  },
+  "devDependencies": {
+    "@firebase-desk/config-oxlint": "workspace:*",
+    "@firebase-desk/config-tsconfig": "workspace:*",
+    "@firebase-desk/config-vitest": "workspace:*",
+    "@types/node": "24.10.0",
+    "@types/react": "19.2.14",
+    "@types/react-dom": "19.2.3",
+    "@vitejs/plugin-react": "5.2.0",
+    "electron": "41.3.0",
+    "electron-builder": "26.8.1",
+    "electron-vite": "5.0.0",
+    "oxlint": "1.61.0",
+    "typescript": "6.0.3",
+    "vite": "7.3.2",
+    "vitest": "4.1.5"
+  }
+}
