@@ -32,6 +32,7 @@ Status: planning. First implementation target is CI-tested project foundation, t
 - [apps/wireframe/README.md](apps/wireframe/README.md)
 - [docs/product.md](docs/product.md)
 - [docs/live-wireframe.md](docs/live-wireframe.md)
+- [docs/design-system.md](docs/design-system.md)
 - [docs/architecture.md](docs/architecture.md)
 - [docs/data-format.md](docs/data-format.md)
 - [docs/project-structure.md](docs/project-structure.md)
