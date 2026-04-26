@@ -11,34 +11,9 @@ Detailed feature tasks and per-page/per-tab specs should be finalized after the 
 - [x] Capture repository layer requirement.
 - [x] Capture emulator and e2e requirements.
 - [x] Capture CI-first requirement.
-- [ ] Decide final app name.
+- [x] Decide final app name.
 
-## Phase 1: Engineering Foundation
-
-- [ ] Initialize pnpm workspace (`pnpm-workspace.yaml`, root `package.json`).
-- [ ] Add Turborepo (`turbo.json`) with `lint`, `typecheck`, `test`, `build`, `dev` pipelines.
-- [ ] Add `tsconfig.base.json` and shared config packages (`config-eslint`, `config-tsconfig`, `config-vitest`).
-- [ ] Scaffold `packages/repo-contracts` with repository interfaces for projects, Firestore, JS Query, Auth, and settings.
-- [ ] Scaffold `packages/repo-mocks` with mock implementations.
-- [ ] Scaffold `packages/data-format`, `packages/ipc-schemas`, `packages/ui`, `packages/hotkeys` skeletons.
-- [x] Move `wireframes/` to `apps/wireframe/`.
-- [ ] Add `apps/wireframe/package.json` (`@firebase-desk/wireframe`) and wire it to consume `repo-mocks`.
-- [ ] Scaffold `apps/desktop` (Electron + React + TypeScript via electron-vite).
-- [ ] Wire `@tanstack/react-virtual` into `packages/ui` list/table/tree primitives before any data-heavy view ships (workspace tree, query result table, query result tree, JSON viewer, Auth users table, JS Query streamed output).
-- [ ] Wire `@tanstack/react-hotkeys` inside `packages/hotkeys` and ship the central registry with the wireframe defaults; expose an override map via `SettingsRepository` (rebinding UI ships later).
-- [ ] Persist `--sidebar-width` (global) and `--inspector-width` (per query tab) via `SettingsRepository`/tab state.
-- [ ] Configure colocated unit test runner per package (vitest extending `config-vitest`).
-- [ ] Add first colocated unit test in at least `repo-mocks` and `data-format`.
-- [ ] Add Firebase Emulator Suite config (`firebase/emulator/`) for Firestore and Auth.
-- [ ] Add emulator seed fixture plan.
-- [ ] Scaffold `e2e/` workspace with Playwright/Electron setup.
-- [ ] Add first emulator-backed e2e smoke test.
-- [ ] Add GitHub Actions `ci.yml` (turbo-cached lint/typecheck/test/build).
-- [ ] Add GitHub Actions `e2e.yml`.
-- [ ] Add GitHub Actions `release.yml`.
-- [ ] Verify workflows run locally through equivalent pnpm scripts.
-
-## Phase 2: Live Wireframe
+## Phase 1: Live Wireframe
 
 - [x] Create browser-runnable HTML wireframe.
 - [x] Split wireframe into modular source files.
@@ -102,8 +77,30 @@ Detailed feature tasks and per-page/per-tab specs should be finalized after the 
 - [x] Build Authentication users table.
 - [x] Build Authentication user detail panel.
 - [x] Build settings/about view.
-- [ ] Review wireframe and capture page/tab specs.
-- [ ] Add Playwright smoke test for primary navigation.
+- [x] Review wireframe and capture page/tab specs.
+
+## Phase 2: Engineering Foundation
+
+- [ ] Initialize pnpm workspace (`pnpm-workspace.yaml`, root `package.json`).
+- [ ] Add Turborepo (`turbo.json`) with `lint`, `typecheck`, `test`, `build`, `dev` pipelines.
+- [ ] Add `tsconfig.base.json` and shared config packages (`config-eslint`, `config-tsconfig`, `config-vitest`).
+- [ ] Scaffold `packages/repo-contracts` with repository interfaces for projects, Firestore, JS Query, Auth, and settings.
+- [ ] Scaffold `packages/repo-mocks` with mock implementations.
+- [ ] Scaffold `packages/data-format`, `packages/ipc-schemas`, `packages/ui`, `packages/hotkeys` skeletons.
+- [ ] Scaffold `apps/desktop` (Electron + React + TypeScript via electron-vite).
+- [ ] Wire `@tanstack/react-virtual` into `packages/ui` list/table/tree primitives before any data-heavy view ships (workspace tree, query result table, query result tree, JSON viewer, Auth users table, JS Query streamed output).
+- [ ] Wire `@tanstack/react-hotkeys` inside `packages/hotkeys` and ship the central registry with the wireframe defaults; expose an override map via `SettingsRepository` (rebinding UI ships later).
+- [ ] Persist `--sidebar-width` (global) and `--inspector-width` (per query tab) via `SettingsRepository`/tab state.
+- [ ] Configure colocated unit test runner per package (vitest extending `config-vitest`).
+- [ ] Add first colocated unit test in at least `repo-mocks` and `data-format`.
+- [ ] Add Firebase Emulator Suite config (`firebase/emulator/`) for Firestore and Auth.
+- [ ] Add emulator seed fixture plan.
+- [ ] Scaffold `e2e/` workspace with Playwright/Electron setup.
+- [ ] Add first emulator-backed e2e smoke test.
+- [ ] Add GitHub Actions `ci.yml`.
+- [ ] Add GitHub Actions `e2e.yml`.
+- [ ] Add GitHub Actions `release.yml`.
+- [ ] Verify workflows run locally through equivalent pnpm scripts.
 
 ## Phase 3: Project Management
 
