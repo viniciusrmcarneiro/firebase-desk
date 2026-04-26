@@ -1,0 +1,10 @@
+version: 2
+updates:
+  - package-ecosystem: "npm" # pnpm uses the 'npm' ecosystem in Dependabot
+    directory: "/"           # Target the root where the lockfile resides
+    schedule:
+      interval: "weekly"
+    groups:                  # Recommended to avoid PR fatigue in monorepos
+      dependencies:
+        patterns:
+          - "*"
