@@ -33,7 +33,10 @@ export class MockFirestoreRepository implements FirestoreRepository {
     };
   }
 
-  async listSubcollections(): Promise<ReadonlyArray<FirestoreCollectionNode>> {
+  async listSubcollections(
+    _projectId: string,
+    _documentPath: string,
+  ): Promise<ReadonlyArray<FirestoreCollectionNode>> {
     return [];
   }
 
