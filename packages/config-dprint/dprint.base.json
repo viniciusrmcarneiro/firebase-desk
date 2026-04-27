@@ -22,6 +22,7 @@
     "**/dist",
     "**/out",
     "**/build",
+    "**/.build",
     "**/coverage",
     "**/.turbo",
     "**/release",

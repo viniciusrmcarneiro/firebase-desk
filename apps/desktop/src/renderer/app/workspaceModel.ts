@@ -1,0 +1,315 @@
+import type {
+  AccountTreeItem,
+  FirestoreQueryDraft,
+  FirestoreQueryFilterDraft,
+} from '@firebase-desk/product-ui';
+import type {
+  FirestoreCollectionNode,
+  FirestoreQuery,
+  ProjectSummary,
+} from '@firebase-desk/repo-contracts';
+import { activePath, type WorkspaceTab } from './stores/tabsStore.ts';
+
+export type LoadStatus = 'idle' | 'loading' | 'success' | 'error';
+
+export interface LoadState<T> {
+  readonly status: LoadStatus;
+  readonly items: ReadonlyArray<T>;
+}
+
+export interface TreeCache {
+  readonly roots: Readonly<Record<string, LoadState<FirestoreCollectionNode>>>;
+  readonly tools: Readonly<Record<string, LoadState<'tools'>>>;
+}
+
+export interface ParsedTreeId {
+  readonly kind: string;
+  readonly path?: string;
+  readonly projectId?: string;
+}
+
+export type AccountTargetOption =
+  | 'local-emulator'
+  | 'mock-service-account'
+  | 'production-service-account';
+
+export const DEFAULT_SIDEBAR_WIDTH = 320;
+export const MAX_SIDEBAR_WIDTH = 560;
+export const MIN_SIDEBAR_WIDTH = 280;
+export const MIN_WORKSPACE_WIDTH = 360;
+export const initialTreeCache: TreeCache = { roots: {}, tools: {} };
+export const DEFAULT_FIRESTORE_DRAFT: FirestoreQueryDraft = {
+  path: 'orders',
+  filters: [{ id: 'filter-1', field: '', op: '==', value: '' }],
+  filterField: '',
+  filterOp: '==',
+  filterValue: '',
+  sortField: 'updatedAt',
+  sortDirection: 'desc',
+  limit: 25,
+};
+
+export function projectIdForAccount(name: string): string {
+  const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
+  return slug || 'mock-account';
+}
+
+export function projectTargetForOption(option: AccountTargetOption): ProjectSummary['target'] {
+  return option === 'production-service-account' ? 'production' : 'emulator';
+}
+
+export function buildTreeItems(
+  projects: ReadonlyArray<ProjectSummary>,
+  expandedIds: ReadonlySet<string>,
+  cache: TreeCache,
+  selectedId: string | null,
+  filterValue: string,
+): ReadonlyArray<AccountTreeItem> {
+  const items: AccountTreeItem[] = [];
+  for (const project of projects) {
+    const projectId = projectNodeId(project.id);
+    items.push({
+      id: projectId,
+      kind: 'project',
+      label: project.name,
+      depth: 0,
+      hasChildren: true,
+      expanded: expandedIds.has(projectId),
+      projectTarget: project.target,
+      secondary: project.projectId,
+      selected: selectedId === projectId,
+      canRemove: true,
+    });
+    if (!expandedIds.has(projectId)) continue;
+    const toolState = cache.tools[project.id] ?? { status: 'idle', items: [] };
+    appendStatus(items, toolState, projectId, 1);
+    if (toolState.status !== 'success') continue;
+    const firestoreId = firestoreNodeId(project.id);
+    const rootState = cache.roots[project.id] ?? { status: 'idle', items: [] };
+    items.push({
+      id: firestoreId,
+      kind: 'firestore',
+      label: 'Firestore',
+      depth: 1,
+      hasChildren: true,
+      expanded: expandedIds.has(firestoreId),
+      secondary: rootState.status === 'success' ? String(rootState.items.length) : 'load',
+      selected: selectedId === firestoreId,
+      canRefresh: true,
+    });
+    if (expandedIds.has(firestoreId)) {
+      appendStatus(items, rootState, firestoreId, 2);
+      for (const collection of rootState.items) {
+        appendCollection(items, project.id, collection, 2, selectedId);
+      }
+    }
+    items.push({
+      id: authNodeId(project.id),
+      kind: 'auth',
+      label: 'Authentication',
+      depth: 1,
+      hasChildren: false,
+      expanded: false,
+      secondary: 'users',
+      selected: selectedId === authNodeId(project.id),
+    });
+    items.push({
+      id: scriptNodeId(project.id),
+      kind: 'script',
+      label: 'JavaScript Query',
+      depth: 1,
+      hasChildren: false,
+      expanded: false,
+      secondary: 'SDK',
+      selected: selectedId === scriptNodeId(project.id),
+    });
+  }
+  const filter = filterValue.trim().toLowerCase();
+  if (!filter) return items;
+  return items.filter((item) =>
+    item.label.toLowerCase().includes(filter) || item.secondary?.toLowerCase().includes(filter)
+  );
+}
+
+export function getDraft(
+  tab: WorkspaceTab | undefined,
+  drafts: Readonly<Record<string, FirestoreQueryDraft>>,
+): FirestoreQueryDraft {
+  if (!tab) return DEFAULT_FIRESTORE_DRAFT;
+  return drafts[tab.id] ?? {
+    ...DEFAULT_FIRESTORE_DRAFT,
+    path: activePath(tab) || DEFAULT_FIRESTORE_DRAFT.path,
+  };
+}
+
+export function draftToQuery(projectId: string, draft: FirestoreQueryDraft): FirestoreQuery {
+  const path = normalizePath(draft.path);
+  const useQueryControls = isRootCollectionPath(path);
+  return {
+    projectId,
+    path,
+    filters: useQueryControls ? queryFiltersForDraft(draft) : [],
+    sorts: useQueryControls && draft.sortField.trim()
+      ? [{ field: draft.sortField.trim(), direction: draft.sortDirection }]
+      : [],
+  };
+}
+
+export function queryFiltersForDraft(
+  draft: FirestoreQueryDraft,
+): NonNullable<FirestoreQuery['filters']> {
+  const filters: ReadonlyArray<FirestoreQueryFilterDraft> = draft.filters?.length
+    ? draft.filters
+    : [{ id: 'filter-1', field: draft.filterField, op: draft.filterOp, value: draft.filterValue }];
+  return filters
+    .filter((filter) => filter.field.trim())
+    .map((filter) => ({
+      field: filter.field.trim(),
+      op: filter.op,
+      value: parseFilterValue(filter.value),
+    }));
+}
+
+export function parseFilterValue(value: string): unknown {
+  const trimmed = value.trim();
+  if (!trimmed) return '';
+  try {
+    return JSON.parse(trimmed) as unknown;
+  } catch {
+    return trimmed;
+  }
+}
+
+export function normalizePath(path: string): string {
+  return path.split('/').filter(Boolean).join('/');
+}
+
+export function isDocumentPath(path: string): boolean {
+  const parts = path.split('/').filter(Boolean);
+  return parts.length > 0 && parts.length % 2 === 0;
+}
+
+export function isRootCollectionPath(path: string): boolean {
+  return path.split('/').filter(Boolean).length === 1;
+}
+
+export function resolveProject(
+  projects: ReadonlyArray<ProjectSummary>,
+  projectId?: string | null,
+): ProjectSummary | null {
+  return projects.find((project) => project.id === projectId) ?? null;
+}
+
+export function treeItemIdForTab(tab: WorkspaceTab): string {
+  if (tab.kind === 'auth-users') return authNodeId(tab.projectId);
+  if (tab.kind === 'js-query') return scriptNodeId(tab.projectId);
+  return collectionNodeId(tab.projectId, normalizePath(activePath(tab)));
+}
+
+export function omitKey<T>(
+  record: Readonly<Record<string, T>>,
+  key: string,
+): Readonly<Record<string, T>> {
+  if (!(key in record)) return record;
+  const next: Record<string, T> = {};
+  for (const [itemKey, value] of Object.entries(record)) {
+    if (itemKey !== key) next[itemKey] = value;
+  }
+  return next;
+}
+
+export function projectNodeId(projectId: string): string {
+  return `project:${projectId}`;
+}
+
+export function firestoreNodeId(projectId: string): string {
+  return `firestore:${projectId}`;
+}
+
+export function authNodeId(projectId: string): string {
+  return `auth:${projectId}`;
+}
+
+export function scriptNodeId(projectId: string): string {
+  return `script:${projectId}`;
+}
+
+export function collectionNodeId(projectId: string, path: string): string {
+  return `collection:${projectId}:${path}`;
+}
+
+export function parseTreeId(id: string): ParsedTreeId {
+  const [kind, projectId, ...pathParts] = id.split(':');
+  const path = pathParts.join(':');
+  return {
+    kind: kind ?? '',
+    ...(projectId ? { projectId } : {}),
+    ...(path ? { path } : {}),
+  };
+}
+
+export function parentIdForStatus(id: string): string | null {
+  return id.startsWith('status:') ? id.slice('status:'.length) : null;
+}
+
+export function actionLabelForTreeItem(kind: string, path?: string): string {
+  if (kind === 'collection') return `Opened ${path ?? 'collection'}`;
+  if (kind === 'auth') return 'Opened Authentication';
+  if (kind === 'script') return 'Opened JavaScript Query';
+  if (kind === 'project') return 'Selected account';
+  if (kind === 'firestore') return 'Selected Firestore';
+  return 'Selected tree item';
+}
+
+export function toggleSet(values: ReadonlySet<string>, value: string): ReadonlySet<string> {
+  const next = new Set(values);
+  if (next.has(value)) next.delete(value);
+  else next.add(value);
+  return next;
+}
+
+export function clampSidebarWidth(width: number): number {
+  if (!Number.isFinite(width)) return DEFAULT_SIDEBAR_WIDTH;
+  return Math.min(MAX_SIDEBAR_WIDTH, Math.max(MIN_SIDEBAR_WIDTH, Math.round(width)));
+}
+
+function appendCollection(
+  items: AccountTreeItem[],
+  projectId: string,
+  collection: FirestoreCollectionNode,
+  depth: number,
+  selectedId: string | null,
+) {
+  const id = collectionNodeId(projectId, collection.path);
+  items.push({
+    id,
+    kind: 'collection',
+    label: collection.id,
+    depth,
+    hasChildren: false,
+    expanded: false,
+    secondary: collection.documentCount === undefined
+      ? collection.path
+      : String(collection.documentCount),
+    selected: selectedId === id,
+  });
+}
+
+function appendStatus<T>(
+  items: AccountTreeItem[],
+  state: LoadState<T>,
+  parentId: string,
+  depth: number,
+) {
+  if (state.status !== 'loading' && state.status !== 'error') return;
+  items.push({
+    id: `status:${parentId}`,
+    kind: 'status',
+    label: state.status === 'loading' ? 'Loading' : 'Retry',
+    depth,
+    hasChildren: false,
+    expanded: false,
+    canRefresh: state.status === 'error',
+    status: state.status,
+  });
+}

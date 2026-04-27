@@ -12,7 +12,7 @@ export function SidebarShell({ children, className, footer, title }: SidebarShel
   return (
     <aside
       className={cn(
-        'grid min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] border-r border-border-subtle bg-bg-panel',
+        'grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)_auto] border-r border-border-subtle bg-bg-panel',
         className,
       )}
     >

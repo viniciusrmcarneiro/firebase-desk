@@ -5,7 +5,7 @@
   "license": "MIT",
   "description": "Firebase Desk Electron application.",
   "type": "module",
-  "main": "out/main/index.js",
+  "main": ".build/out/main/index.js",
   "scripts": {
     "dev": "electron-vite dev",
     "build": "electron-vite build",
@@ -24,6 +24,9 @@
     "@firebase-desk/repo-contracts": "workspace:*",
     "@firebase-desk/repo-mocks": "workspace:*",
     "@firebase-desk/ui": "workspace:*",
+    "@tanstack/react-query": "5.90.12",
+    "@tanstack/react-store": "0.11.0",
+    "lucide-react": "1.11.0",
     "react": "19.2.5",
     "react-dom": "19.2.5",
     "zod": "4.3.6"

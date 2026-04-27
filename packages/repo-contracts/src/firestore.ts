@@ -3,6 +3,7 @@ import type { Page, PageRequest } from './pagination.ts';
 export interface FirestoreCollectionNode {
   readonly path: string;
   readonly id: string;
+  readonly documentCount?: number;
 }
 
 export interface FirestoreDocumentNode {
@@ -46,6 +47,7 @@ export interface FirestoreDocumentResult {
   readonly path: string;
   readonly data: Record<string, unknown>;
   readonly hasSubcollections: boolean;
+  readonly subcollections?: ReadonlyArray<FirestoreCollectionNode>;
 }
 
 export interface FirestoreRepository {
@@ -64,4 +66,10 @@ export interface FirestoreRepository {
     request?: PageRequest,
   ): Promise<Page<FirestoreDocumentResult>>;
   getDocument(projectId: string, documentPath: string): Promise<FirestoreDocumentResult | null>;
+  saveDocument(
+    projectId: string,
+    documentPath: string,
+    data: Record<string, unknown>,
+  ): Promise<FirestoreDocumentResult>;
+  deleteDocument(projectId: string, documentPath: string): Promise<void>;
 }

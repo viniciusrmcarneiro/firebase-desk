@@ -7,6 +7,9 @@
     ],
     "types": [],
     "module": "ESNext",
-    "moduleResolution": "Bundler"
+    "moduleResolution": "Bundler",
+    "rootDir": "${configDir}/src/preload",
+    "outDir": "${configDir}/.build/out/preload",
+    "tsBuildInfoFile": "${configDir}/.build/out/.tsbuildinfo-preload"
   }
 }

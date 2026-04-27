@@ -44,7 +44,8 @@
       "outputs": [
         "dist/**",
         "out/**",
-        "build/**"
+        "build/**",
+        ".build/**"
       ]
     },
     "dev": {

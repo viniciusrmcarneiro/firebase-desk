@@ -9,6 +9,9 @@
     "jsx": "react-jsx",
     "types": [],
     "module": "ESNext",
-    "moduleResolution": "Bundler"
+    "moduleResolution": "Bundler",
+    "rootDir": "${configDir}/src/renderer",
+    "outDir": "${configDir}/.build/out/renderer",
+    "tsBuildInfoFile": "${configDir}/.build/out/.tsbuildinfo-renderer"
   }
 }

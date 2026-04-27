@@ -1,9 +1,6 @@
 {
   "extends": "../../packages/config-tsconfig/electron-main.json",
   "compilerOptions": {
-    "outDir": "out/main",
-    "rootDir": "src/main",
-    "tsBuildInfoFile": "out/.tsbuildinfo-main",
     "types": ["node"]
   },
   "include": ["src/main/**/*"],

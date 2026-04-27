@@ -2,6 +2,7 @@ export * from './app-shell/index.ts';
 export * from './appearance/index.ts';
 export * from './code-editor/index.ts';
 export * from './command-palette/index.ts';
+export * from './features/index.ts';
 export * from './production-warning/index.ts';
 export * from './settings-dialog/index.ts';
 export * from './sidebar-shell/index.ts';

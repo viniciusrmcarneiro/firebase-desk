@@ -19,6 +19,7 @@ yarn-error.log*
 dist/
 out/
 build/
+.build/
 .turbo/
 *.tsbuildinfo
 coverage/

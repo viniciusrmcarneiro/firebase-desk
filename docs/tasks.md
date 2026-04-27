@@ -129,47 +129,47 @@ See [design-system.md](design-system.md). Same package layout: keep `@firebase-d
 
 Build the complete Firebase Desk app surface before real Firebase integration. Use [product.md](product.md), [live-wireframe.md](live-wireframe.md), and `apps/wireframe` as the source of truth. All runtime data must come through `@firebase-desk/repo-contracts` and `@firebase-desk/repo-mocks`; no renderer code talks to Firebase directly.
 
-- [ ] Replace the Phase 2.5 placeholder desktop demo with a real mocked app composition.
-- [ ] Add an app-level repository provider wiring `MockProjectsRepository`, `MockFirestoreRepository`, `MockAuthRepository`, `MockScriptRunnerRepository`, and `MockSettingsRepository`.
-- [ ] Build the left account tree from `ProjectsRepository.list()`.
-- [ ] Lazy-load account tools under each account: Firestore, Authentication, and JavaScript Query.
-- [ ] Add mocked account-load loading, error, retry, and remove states.
-- [ ] Build workspace tab state: open, focus, close, close others, close left/right, close all, reorder, sort by account.
-- [ ] Add Back/Forward interaction history without duplicate tab creation.
-- [ ] Add account/project dropdown to each tab toolbar; switching affects only that tab.
-- [ ] Add status bar values for selected tree item, active tab account, target mode, and last action.
-- [ ] Build the Add Project mocked dialog using `ProjectsRepository.add()`.
-- [ ] Build settings/about view using `SettingsRepository`.
-- [ ] Build Firestore tree from `FirestoreRepository.listRootCollections()`.
-- [ ] Add collection single-click focus/open behavior and double-click new-tab behavior.
-- [ ] Build Firestore query tab with path input, collection/document path detection, filters, sorts, limit, reset, and run.
-- [ ] Build result overview with first-level field/type aggregation.
-- [ ] Build result table view with row selection, Load more, and double-click document editor modal.
-- [ ] Build result tree view with indentation, arrays, maps, nested subcollection indicators, and Load more.
-- [ ] Build read-only typed JSON result view.
-- [ ] Add result item context menu with Open in new tab.
-- [ ] Build document detail panel and JSON/field editor mock flows.
-- [ ] Add destructive confirmation modal for mocked deletes.
-- [ ] Build JavaScript Query tab with Monaco editor, Run, logs, errors, and collapsed streamed result items.
-- [ ] Build Authentication tab with users table, filter/search, selected user detail, and claims viewer.
-- [ ] Build command palette actions for common mocked app workflows.
-- [ ] Wire responsive behavior from the wireframe: splitters, collapsible sidebar rail, inspector strip, stacked panes, contained scrolling.
-- [ ] Add Storybook stories for the major mocked app surfaces, not only primitives.
-- [ ] Add unit tests as each mocked app surface is built; tests should use `@firebase-desk/repo-mocks` through repository contracts instead of hard-coded component data.
-- [ ] Add focused interaction tests for account tree lazy load, tab behavior, account switching, query run, document modal, JS run, Auth filter, settings, and command palette.
-- [ ] Keep at least one renderer smoke test proving the app boots with mocked repositories.
+- [x] Replace the Phase 2.5 placeholder desktop demo with a real mocked app composition.
+- [x] Add an app-level repository provider wiring `MockProjectsRepository`, `MockFirestoreRepository`, `MockAuthRepository`, `MockScriptRunnerRepository`, and `MockSettingsRepository`.
+- [x] Build the left account tree from `ProjectsRepository.list()`.
+- [x] Lazy-load account tools under each account: Firestore, Authentication, and JavaScript Query.
+- [x] Add mocked account-load loading, error, retry, and remove states.
+- [x] Build workspace tab state: open, focus, close, close others, close left/right, close all, reorder, sort by account.
+- [x] Add Back/Forward interaction history without duplicate tab creation.
+- [x] Add account/project dropdown to each tab toolbar; switching affects only that tab.
+- [x] Add status bar values for selected tree item, active tab account, target mode, and last action.
+- [x] Build the Add Project mocked dialog using `ProjectsRepository.add()`.
+- [x] Build settings/about view using `SettingsRepository`.
+- [x] Build Firestore tree from `FirestoreRepository.listRootCollections()`.
+- [x] Add collection single-click focus/open behavior and double-click new-tab behavior.
+- [x] Build Firestore query tab with path input, collection/document path detection, filters, sorts, limit, reset, and run.
+- [x] Build result overview with first-level field/type aggregation.
+- [x] Build result table view with row selection, Load more, and double-click document editor modal.
+- [x] Build result tree view with indentation, arrays, maps, nested subcollection indicators, and Load more.
+- [x] Build read-only typed JSON result view.
+- [x] Add result item context menu with Open in new tab.
+- [x] Build document detail panel and JSON/field editor mock flows.
+- [x] Add destructive confirmation modal for mocked deletes.
+- [x] Build JavaScript Query tab with Monaco editor, Run, logs, errors, and collapsed streamed result items.
+- [x] Build Authentication tab with users table, filter/search, selected user detail, and claims viewer.
+- [x] Build command palette actions for common mocked app workflows.
+- [x] Wire responsive behavior from the wireframe: splitters, collapsible sidebar rail, inspector strip, stacked panes, contained scrolling.
+- [x] Add Storybook stories for the major mocked app surfaces, not only primitives.
+- [x] Add unit tests as each mocked app surface is built; tests should use `@firebase-desk/repo-mocks` through repository contracts instead of hard-coded component data.
+- [x] Add focused interaction tests for account tree lazy load, tab behavior, account switching, query run, document modal, JS run, Auth filter, settings, and command palette.
+- [x] Keep at least one renderer smoke test proving the app boots with mocked repositories.
 
 ## Phase 4: Mock Contract Hardening
 
 Close the gap between mocks and the real MVP behavior before swapping in Firebase adapters.
 
-- [ ] Extend mock fixtures with multiple accounts, production/emulator targets, account-load errors, empty states, and large collections.
-- [ ] Extend Firestore mocks with nested subcollections, map/array examples, document path reads, cursor pagination, and Firebase-like errors.
-- [ ] Add mock write/delete methods to contracts if the mocked editor flows need them before real Firebase editing.
-- [ ] Extend JavaScript Query mocks with logs, thrown errors, empty returns, arrays, plain objects, document-like values, query-like values, and streamed output fixtures.
-- [ ] Extend Auth mocks with enough users for pagination/search states and richer custom claims.
-- [ ] Add contract conformance tests covering every repository method used by the mocked app.
-- [ ] Add fixture builder helpers so UI tests can create targeted mock states without duplicating data.
+- [x] Extend mock fixtures with multiple accounts, production/emulator targets, account-load errors, empty states, and large collections.
+- [x] Extend Firestore mocks with nested subcollections, map/array examples, document path reads, cursor pagination, and Firebase-like errors.
+- [x] Add mock write/delete methods to contracts if the mocked editor flows need them before real Firebase editing.
+- [x] Extend JavaScript Query mocks with logs, thrown errors, empty returns, arrays, plain objects, document-like values, query-like values, and streamed output fixtures.
+- [x] Extend Auth mocks with enough users for pagination/search states and richer custom claims.
+- [x] Add contract conformance tests covering every repository method used by the mocked app.
+- [x] Add fixture builder helpers so UI tests can create targeted mock states without duplicating data.
 
 ## Phase 5: Project Management
 
