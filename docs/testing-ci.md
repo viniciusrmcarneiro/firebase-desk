@@ -31,7 +31,7 @@
 
 - `ci.yml`: install (pnpm), run `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:coverage`, publish the coverage summary, then `pnpm build`.
 - `e2e.yml`: install, build affected workspaces, start Firebase emulators, seed data, run `pnpm test:e2e`, upload traces/screenshots on failure.
-- `release.yml`: on PR, merge to `main`, tag, or ad-hoc dispatch, run CI checks and `pnpm package` for the desktop app. PRs always package Linux, and package macOS/Windows when the PR has the `package-all` label or touches package-sensitive paths (`apps/desktop/**`, `e2e/**`, release workflows, package scripts, or lockfile). PR and ad-hoc runs upload temporary workflow artifacts with retention. Merges to `main` create or update the rolling published prerelease `main-latest` with release assets and SHA-256 checksums. Version tags create published prereleases with release assets and SHA-256 checksums.
+- `release.yml`: on PR, merge to `main`, tag, or ad-hoc dispatch, run CI checks and `pnpm package` for the desktop app. PRs always package Linux, and package macOS/Windows when the PR has the `package-all` label or touches package-sensitive paths (`apps/desktop/**`, `e2e/**`, release workflows, package scripts, or lockfile). PR and ad-hoc runs upload temporary workflow artifacts with retention. Merges to `main` create or update the rolling published prerelease `latest` with release assets and SHA-256 checksums. Version tags create published prereleases with release assets and SHA-256 checksums.
 
 ### Required Scripts (root `package.json`, delegated via turbo/pnpm filters)
 
@@ -56,7 +56,7 @@
 - Release workflow must exist before the first packaged build is considered done.
 - PR package outputs are workflow artifacts only, not GitHub Release assets.
 - PR and manual package artifacts use short retention; main and tag artifacts use longer retention.
-- Every merge to `main` updates the rolling published prerelease `main-latest`.
+- Every merge to `main` updates the rolling published prerelease `latest`; keep its tag stable and update assets instead of deleting/recreating the release.
 - Version tags create separate published prereleases.
 - Unsigned builds are published intentionally with SHA-256 checksums; binary signing is not planned.
 - Package-manager distribution is deferred until the direct release path is stable.
