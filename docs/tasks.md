@@ -212,15 +212,15 @@ Move this ahead of real Firebase integration so packaging, artifacts, and instal
 
 ## Phase 6: Project Management
 
-- [ ] Parse service account JSON.
-- [ ] Validate required service account fields.
-- [ ] Add emulator connection profile.
-- [ ] Save project metadata locally.
-- [ ] Store credential securely.
-- [ ] Remove project and credential.
-- [ ] Switch active project.
-- [ ] Switch active target between production and emulator.
-- [ ] Show active project in status bar.
+- [x] Parse service account JSON.
+- [x] Validate required service account fields.
+- [x] Add emulator connection profile.
+- [x] Save project metadata locally.
+- [x] Store credential securely.
+- [x] Remove project and credential.
+- [x] Switch active project.
+- [x] Switch active target between production and emulator.
+- [x] Show active project in status bar.
 
 ## Phase 7: Firestore Read And Query
 

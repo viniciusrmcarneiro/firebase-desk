@@ -1,5 +1,6 @@
 import type {
   HotkeyOverrides,
+  SettingsPatch,
   SettingsRepository,
   SettingsSnapshot,
 } from '@firebase-desk/repo-contracts';
@@ -12,6 +13,7 @@ class TestSettingsRepository implements SettingsRepository {
     hotkeyOverrides: {},
     inspectorWidth: 360,
     sidebarWidth: 280,
+    dataMode: 'mock',
     theme: 'system',
   };
 
@@ -19,8 +21,14 @@ class TestSettingsRepository implements SettingsRepository {
     return this.snapshot;
   }
 
-  async save(patch: Partial<SettingsSnapshot>): Promise<SettingsSnapshot> {
-    this.snapshot = { ...this.snapshot, ...patch };
+  async save(patch: SettingsPatch): Promise<SettingsSnapshot> {
+    this.snapshot = {
+      sidebarWidth: patch.sidebarWidth ?? this.snapshot.sidebarWidth,
+      inspectorWidth: patch.inspectorWidth ?? this.snapshot.inspectorWidth,
+      theme: patch.theme ?? this.snapshot.theme,
+      dataMode: patch.dataMode ?? this.snapshot.dataMode,
+      hotkeyOverrides: patch.hotkeyOverrides ?? this.snapshot.hotkeyOverrides,
+    };
     return this.snapshot;
   }
 

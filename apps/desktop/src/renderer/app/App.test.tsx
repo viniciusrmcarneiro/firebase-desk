@@ -26,7 +26,7 @@ vi.mock('./queryClient.ts', () => ({
 }));
 
 vi.mock('./RepositoryProvider.tsx', () => ({
-  createMockRepositories: () => ({
+  createRepositories: () => ({
     settings: { load: settingsLoad },
   }),
   RepositoryProvider: ({ children }: { readonly children: ReactNode; }) => <>{children}</>,
@@ -35,6 +35,7 @@ vi.mock('./RepositoryProvider.tsx', () => ({
 describe('desktop App', () => {
   beforeEach(() => {
     settingsLoad.mockReset();
+    vi.stubGlobal('firebaseDesk', undefined);
   });
 
   it('shows the splash while settings load', () => {
@@ -47,7 +48,13 @@ describe('desktop App', () => {
   });
 
   it('shows the app shell after settings load', async () => {
-    settingsLoad.mockResolvedValue({ sidebarWidth: 280, inspectorWidth: 360 });
+    settingsLoad.mockResolvedValue({
+      sidebarWidth: 280,
+      inspectorWidth: 360,
+      theme: 'system',
+      dataMode: 'mock',
+      hotkeyOverrides: {},
+    });
 
     render(<App />);
 

@@ -10,6 +10,10 @@ export function createProjectFixture(
     name: patch.name ?? 'Fixture Project',
     projectId: patch.projectId ?? id,
     target: patch.target ?? 'emulator',
+    emulator: patch.emulator ?? { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
+    hasCredential: patch.hasCredential ?? false,
+    credentialEncrypted: patch.credentialEncrypted ?? null,
+    createdAt: patch.createdAt ?? '2026-04-27T00:00:00.000Z',
   };
 }
 

@@ -1,11 +1,23 @@
 import type { ProjectTarget } from '@firebase-desk/repo-contracts';
-import { Badge, cn, IconButton, Input, VirtualTree, type VirtualTreeNode } from '@firebase-desk/ui';
+import {
+  Badge,
+  cn,
+  ContextMenu,
+  ContextMenuContent,
+  ContextMenuItem,
+  ContextMenuTrigger,
+  IconButton,
+  Input,
+  VirtualTree,
+  type VirtualTreeNode,
+} from '@firebase-desk/ui';
 import {
   AlertCircle,
   ChevronRight,
   Code2,
   Database,
   Folder,
+  Pencil,
   Plus,
   RefreshCw,
   Trash2,
@@ -37,6 +49,7 @@ export interface AccountTreeProps {
   readonly items: ReadonlyArray<AccountTreeItem>;
   readonly onAddProject: () => void;
   readonly onFilterChange: (value: string) => void;
+  readonly onEditItem?: (id: string) => void;
   readonly onOpenItem: (id: string) => void;
   readonly onRefreshItem: (id: string) => void;
   readonly onRemoveItem: (id: string) => void;
@@ -49,6 +62,7 @@ export function AccountTree(
     filterValue,
     items,
     onAddProject,
+    onEditItem,
     onFilterChange,
     onOpenItem,
     onRefreshItem,
@@ -83,6 +97,7 @@ export function AccountTree(
           renderNode={(node) => (
             <AccountTreeRow
               item={node as AccountTreeItem}
+              {...(onEditItem ? { onEditItem } : {})}
               onRefreshItem={onRefreshItem}
               onRemoveItem={onRemoveItem}
             />
@@ -98,13 +113,14 @@ export function AccountTree(
 
 interface AccountTreeRowProps {
   readonly item: AccountTreeItem;
+  readonly onEditItem?: (id: string) => void;
   readonly onRefreshItem: (id: string) => void;
   readonly onRemoveItem: (id: string) => void;
 }
 
-function AccountTreeRow({ item, onRefreshItem, onRemoveItem }: AccountTreeRowProps) {
+function AccountTreeRow({ item, onEditItem, onRefreshItem, onRemoveItem }: AccountTreeRowProps) {
   const icon = iconForKind(item.kind);
-  return (
+  const row = (
     <div
       className={cn(
         'group/tree-row relative flex min-w-0 flex-1 items-center gap-2 rounded-md px-2 py-1 text-sm font-medium text-text-primary transition-colors hover:bg-action-ghost-hover',
@@ -155,6 +171,21 @@ function AccountTreeRow({ item, onRefreshItem, onRemoveItem }: AccountTreeRowPro
           />
         )
         : null}
+      {item.kind === 'project' && onEditItem
+        ? (
+          <IconButton
+            icon={<Pencil size={13} aria-hidden='true' />}
+            label={`Edit ${item.label}`}
+            size='xs'
+            variant='ghost'
+            className='opacity-0 transition-opacity group-hover/tree-row:opacity-100'
+            onClick={(event) => {
+              event.stopPropagation();
+              onEditItem(item.id);
+            }}
+          />
+        )
+        : null}
       {item.canRemove
         ? (
           <IconButton
@@ -171,6 +202,23 @@ function AccountTreeRow({ item, onRefreshItem, onRemoveItem }: AccountTreeRowPro
         )
         : null}
     </div>
+  );
+
+  if (item.kind !== 'project' || !onEditItem) return row;
+
+  return (
+    <ContextMenu>
+      <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
+      <ContextMenuContent>
+        <ContextMenuItem onSelect={() => onEditItem(item.id)}>Edit account</ContextMenuItem>
+        {item.canRefresh
+          ? <ContextMenuItem onSelect={() => onRefreshItem(item.id)}>Refresh</ContextMenuItem>
+          : null}
+        {item.canRemove
+          ? <ContextMenuItem onSelect={() => onRemoveItem(item.id)}>Remove</ContextMenuItem>
+          : null}
+      </ContextMenuContent>
+    </ContextMenu>
   );
 }
 

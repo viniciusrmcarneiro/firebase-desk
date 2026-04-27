@@ -19,7 +19,9 @@ import {
 import type {
   AuthUser,
   FirestoreDocumentResult,
+  ProjectAddInput,
   ProjectSummary,
+  ProjectUpdatePatch,
   ScriptRunResult,
 } from '@firebase-desk/repo-contracts';
 import {
@@ -32,7 +34,7 @@ import {
   DropdownMenuItem,
   DropdownMenuTrigger,
   IconButton,
-  Input,
+  InlineAlert,
   ResizableHandle,
   ResizablePanel,
   ResizablePanelGroup,
@@ -51,9 +53,12 @@ import {
   RefreshCw,
   Settings,
   Sun,
+  X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import appIconUrl from '../assets/app-icon.png';
+import { AddProjectDialog } from './dialogs/AddProjectDialog.tsx';
+import { EditProjectDialog } from './dialogs/EditProjectDialog.tsx';
 import { useAuthTabState } from './hooks/useAuthTabState.ts';
 import { useFirestoreTabState } from './hooks/useFirestoreTabState.ts';
 import { useJsTabState } from './hooks/useJsTabState.ts';
@@ -69,15 +74,12 @@ import {
   type WorkspaceTabKind,
 } from './stores/tabsStore.ts';
 import {
-  type AccountTargetOption,
   clampSidebarWidth,
   DEFAULT_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
   MIN_WORKSPACE_WIDTH,
   parseTreeId,
-  projectIdForAccount,
-  projectTargetForOption,
   resolveProject,
   treeItemIdForTab,
 } from './workspaceModel.ts';
@@ -122,7 +124,10 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
 
   const [density, setDensity] = useState<DensityName>('compact');
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [dataDirectoryPath, setDataDirectoryPath] = useState<string | null>(null);
   const [addProjectOpen, setAddProjectOpen] = useState(false);
+  const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
+  const [credentialWarning, setCredentialWarning] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState('Ready');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pendingDestructiveAction, setPendingDestructiveAction] = useState<
@@ -154,6 +159,9 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
     selectedTreeItemId: selection.treeItemId,
     setLastAction,
   });
+  const editingProject = editingProjectId
+    ? projects.find((project) => project.id === editingProjectId) ?? null
+    : null;
   const sidebarDefaultWidth = clampSidebarWidth(initialSidebarWidth);
 
   useEffect(() => {
@@ -168,6 +176,24 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
       tabsState,
     });
   }, [authTab.authFilter, firestoreTab.drafts, jsTab.scripts, tabsState]);
+
+  useEffect(() => {
+    if (!settingsOpen) return;
+    const appApi = getDesktopAppApi();
+    if (!appApi?.getConfig) return;
+    let cancelled = false;
+    setDataDirectoryPath(null);
+    appApi.getConfig()
+      .then((config) => {
+        if (!cancelled) setDataDirectoryPath(config.dataDirectory);
+      })
+      .catch(() => {
+        if (!cancelled) setDataDirectoryPath(null);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [settingsOpen]);
 
   const tabModels = useMemo<ReadonlyArray<WorkspaceTabModel>>(
     () =>
@@ -367,6 +393,29 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
     });
   }
 
+  function handleEditTreeItem(id: string) {
+    const parsed = parseTreeId(id);
+    if (parsed.kind !== 'project' || !parsed.projectId) return;
+    setEditingProjectId(parsed.projectId);
+  }
+
+  async function handleAddProject(input: ProjectAddInput): Promise<ProjectSummary> {
+    const project = await repositories.projects.add(input);
+    await queryClient.invalidateQueries({ queryKey: ['projects'] });
+    setLastAction(`Added ${project.name}`);
+    return project;
+  }
+
+  async function handleUpdateProject(
+    id: string,
+    patch: ProjectUpdatePatch,
+  ): Promise<ProjectSummary> {
+    const project = await repositories.projects.update(id, patch);
+    await queryClient.invalidateQueries({ queryKey: ['projects'] });
+    setLastAction(`Updated ${project.name}`);
+    return project;
+  }
+
   function handleRunQuery() {
     const path = firestoreTab.runQuery();
     if (path) setLastAction(`Ran query ${path}`);
@@ -502,8 +551,17 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
     setLastAction(`Deleted ${documentPath}`);
   }
 
+  async function handleOpenDataDirectory(): Promise<void> {
+    const appApi = getDesktopAppApi();
+    if (!appApi?.openDataDirectory) throw new Error('Data location is unavailable.');
+    await appApi.openDataDirectory();
+    setLastAction('Opened data location');
+  }
+
+  const desktopAppApi = getDesktopAppApi();
+
   return (
-    <div className='grid h-full grid-rows-[40px_minmax(0,1fr)] bg-bg-app text-text-primary'>
+    <div className='relative grid h-full grid-rows-[40px_minmax(0,1fr)] bg-bg-app text-text-primary'>
       <AppHeader
         canGoBack={tabsState.interactionHistoryIndex > 0}
         canGoForward={tabsState.interactionHistoryIndex < tabsState.interactionHistory.length - 1}
@@ -545,6 +603,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
                   filterValue={workspaceTree.treeFilter}
                   items={workspaceTree.treeItems}
                   onAddProject={() => setAddProjectOpen(true)}
+                  onEditItem={handleEditTreeItem}
                   onFilterChange={workspaceTree.setTreeFilter}
                   onOpenItem={workspaceTree.handleOpenItem}
                   onRefreshItem={workspaceTree.handleRefreshItem}
@@ -611,7 +670,8 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
               left={
                 <>
                   {activeProject ? <TargetModeBadge mode={activeProject.target} /> : null}
-                  <span>{activeProject?.projectId ?? 'No project'}</span>
+                  <span>{activeProject?.name ?? 'No project'}</span>
+                  <span>{activeProject?.projectId ?? 'No project id'}</span>
                   <span>{activeTab?.title ?? 'No tab'}</span>
                   <span>{selection.treeItemId ?? 'No tree selection'}</span>
                 </>
@@ -622,6 +682,9 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
         </ResizablePanel>
       </ResizablePanelGroup>
       <SettingsDialog
+        {...(desktopAppApi
+          ? { dataDirectoryPath, onOpenDataDirectory: handleOpenDataDirectory }
+          : {})}
         density={density}
         open={settingsOpen}
         onDensityChange={setDensity}
@@ -635,16 +698,51 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
       />
       <AddProjectDialog
         open={addProjectOpen}
+        projects={repositories.projects}
         onOpenChange={setAddProjectOpen}
-        onSubmit={(input) => {
-          void repositories.projects.add(input).then(() =>
-            queryClient.invalidateQueries({ queryKey: ['projects'] })
-          );
+        onProjectAdded={(project) => {
+          if (project.hasCredential && project.credentialEncrypted === false) {
+            setCredentialWarning(
+              `Credentials for ${project.name} are stored without OS encryption on this machine.`,
+            );
+          }
         }}
+        onSubmit={handleAddProject}
       />
+      <EditProjectDialog
+        open={Boolean(editingProject)}
+        project={editingProject}
+        onOpenChange={(open) => {
+          if (!open) setEditingProjectId(null);
+        }}
+        onSubmit={handleUpdateProject}
+      />
+      {credentialWarning
+        ? (
+          <div className='pointer-events-none absolute left-1/2 top-12 z-popover w-[min(560px,calc(100%-24px))] -translate-x-1/2'>
+            <InlineAlert
+              variant='warning'
+              className='pointer-events-auto flex items-center justify-between gap-3'
+            >
+              <span>{credentialWarning}</span>
+              <IconButton
+                icon={<X size={14} aria-hidden='true' />}
+                label='Dismiss credential warning'
+                size='xs'
+                variant='ghost'
+                onClick={() => setCredentialWarning(null)}
+              />
+            </InlineAlert>
+          </div>
+        )
+        : null}
       <CommandPalette commands={commands} />
     </div>
   );
+}
+
+function getDesktopAppApi(): DesktopAppApi | null {
+  return typeof window !== 'undefined' ? window.firebaseDesk?.app ?? null : null;
 }
 
 function DestructiveActionDialog(
@@ -903,73 +1001,6 @@ function TabView(props: TabViewProps) {
       onSaveDocument={props.onSaveDocument}
       onSelectDocument={props.onSelectDocument}
     />
-  );
-}
-
-interface AddProjectDialogProps {
-  readonly onOpenChange: (open: boolean) => void;
-  readonly onSubmit: (input: Omit<ProjectSummary, 'id'>) => void;
-  readonly open: boolean;
-}
-
-function AddProjectDialog({ onOpenChange, onSubmit, open }: AddProjectDialogProps) {
-  const [name, setName] = useState('New Client Dev');
-  const [target, setTarget] = useState<AccountTargetOption>('mock-service-account');
-  return (
-    <Dialog open={open} onOpenChange={onOpenChange}>
-      <DialogContent aria-describedby={undefined} title='Add Firebase Account'>
-        <div className='grid gap-3'>
-          <label className='grid gap-1.5'>
-            <span className='text-xs font-semibold text-text-secondary'>Display name</span>
-            <Input
-              aria-label='Display name'
-              value={name}
-              onChange={(event) => setName(event.currentTarget.value)}
-            />
-          </label>
-          <label className='grid gap-1.5'>
-            <span className='text-xs font-semibold text-text-secondary'>Target</span>
-            <select
-              aria-label='Target'
-              className='rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
-              style={{ height: 'var(--density-compact-control-height)' }}
-              value={target}
-              onChange={(event) => setTarget(event.currentTarget.value as AccountTargetOption)}
-            >
-              <option value='mock-service-account'>Mock service account</option>
-              <option value='local-emulator'>Local emulator</option>
-              <option value='production-service-account'>Production service account</option>
-            </select>
-          </label>
-          <div className='rounded-md border border-dashed border-border bg-bg-subtle p-3'>
-            <strong className='text-sm text-text-primary'>service-account.json</strong>
-            <div className='text-xs text-text-secondary'>
-              Drop/select placeholder for final desktop app
-            </div>
-          </div>
-        </div>
-        <div className='flex flex-wrap items-center justify-between gap-3'>
-          <span className='text-xs text-text-muted'>Wireframe only. No credentials are read.</span>
-          <div className='flex justify-end gap-2'>
-            <Button variant='ghost' onClick={() => onOpenChange(false)}>Cancel</Button>
-            <Button
-              variant='primary'
-              onClick={() => {
-                const accountName = name.trim() || 'New Client Dev';
-                onSubmit({
-                  name: accountName,
-                  projectId: projectIdForAccount(accountName),
-                  target: projectTargetForOption(target),
-                });
-                onOpenChange(false);
-              }}
-            >
-              <Plus size={14} aria-hidden='true' /> Add mock
-            </Button>
-          </div>
-        </div>
-      </DialogContent>
-    </Dialog>
   );
 }
 

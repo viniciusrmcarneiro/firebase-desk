@@ -14,9 +14,20 @@ import {
   RunQueryRequestSchema,
 } from './firestore.ts';
 import { HealthCheckRequestSchema, HealthCheckResponseSchema } from './health.ts';
-import { ProjectAddInputSchema, ProjectSummarySchema } from './projects.ts';
+import {
+  PickServiceAccountFileResultSchema,
+  ProjectAddInputSchema,
+  ProjectSummarySchema,
+  ProjectUpdatePatchSchema,
+  ServiceAccountValidationResultSchema,
+} from './projects.ts';
 import { ScriptRunRequestSchema, ScriptRunResultSchema } from './script-runner.ts';
-import { HotkeyOverridesSchema, SettingsPatchSchema, SettingsSnapshotSchema } from './settings.ts';
+import {
+  DataModeSchema,
+  HotkeyOverridesSchema,
+  SettingsPatchSchema,
+  SettingsSnapshotSchema,
+} from './settings.ts';
 
 /**
  * Central registry of every IPC channel. Keys are channel names; values are
@@ -27,6 +38,14 @@ export const IPC_CHANNELS = {
   'health.check': {
     request: HealthCheckRequestSchema,
     response: HealthCheckResponseSchema,
+  },
+  'app.config': {
+    request: z.object({}),
+    response: z.object({ dataDirectory: z.string(), dataMode: DataModeSchema }),
+  },
+  'app.openDataDirectory': {
+    request: z.object({}),
+    response: z.void(),
   },
   'projects.list': {
     request: z.object({}),
@@ -40,9 +59,21 @@ export const IPC_CHANNELS = {
     request: ProjectAddInputSchema,
     response: ProjectSummarySchema,
   },
+  'projects.update': {
+    request: z.object({ id: z.string(), patch: ProjectUpdatePatchSchema }),
+    response: ProjectSummarySchema,
+  },
   'projects.remove': {
     request: z.object({ id: z.string() }),
     response: z.void(),
+  },
+  'projects.validateServiceAccount': {
+    request: z.object({ json: z.string() }),
+    response: ServiceAccountValidationResultSchema,
+  },
+  'projects.pickServiceAccountFile': {
+    request: z.object({}),
+    response: PickServiceAccountFileResultSchema,
   },
   'firestore.listRootCollections': {
     request: z.object({ projectId: z.string() }),
