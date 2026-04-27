@@ -142,7 +142,7 @@ Hard rules:
 2. `repo-contracts` + `repo-mocks` + `ui` skeletons; wire `apps/wireframe/` to consume them.
 3. Electron shell in `apps/desktop` (main + preload + renderer) wired to mocks via IPC.
 4. Mocked app contract hardening before real Firebase adapters.
-5. Build/release pipeline: package macOS/Windows/Linux on PRs, publish unsigned `main-latest` and tagged GitHub Release assets with SHA-256 checksums, download/install smoke checks, document package-manager distribution as later work.
+5. Build/release pipeline: package macOS/Windows/Linux on PRs, publish unsigned `latest` and tagged GitHub Release assets with SHA-256 checksums, download/install smoke checks, document package-manager distribution as later work.
 6. `repo-firebase` + project credential storage.
 7. Firestore read/query APIs.
 8. Firestore edit APIs.

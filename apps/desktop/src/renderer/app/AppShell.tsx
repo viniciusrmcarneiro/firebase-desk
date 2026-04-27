@@ -53,6 +53,7 @@ import {
   Sun,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import appIconUrl from '../assets/app-icon.png';
 import { useAuthTabState } from './hooks/useAuthTabState.ts';
 import { useFirestoreTabState } from './hooks/useFirestoreTabState.ts';
 import { useJsTabState } from './hooks/useJsTabState.ts';
@@ -724,8 +725,8 @@ function AppHeader(
         />
       </div>
       <div className='flex min-w-0 items-center gap-2'>
-        <span className='grid size-5 shrink-0 place-items-center rounded-md bg-action-selected text-action-primary'>
-          <Database size={15} aria-hidden='true' />
+        <span className='grid size-6 shrink-0 place-items-center overflow-hidden rounded-md border border-border-subtle bg-bg-surface shadow-sm'>
+          <img src={appIconUrl} alt='' className='size-full object-cover' />
         </span>
         <strong className='truncate text-sm font-semibold text-text-primary'>Firebase Desk</strong>
         <Badge>mock</Badge>
@@ -930,7 +931,8 @@ function AddProjectDialog({ onOpenChange, onSubmit, open }: AddProjectDialogProp
             <span className='text-xs font-semibold text-text-secondary'>Target</span>
             <select
               aria-label='Target'
-              className='h-[var(--density-compact-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
+              className='rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
+              style={{ height: 'var(--density-compact-control-height)' }}
               value={target}
               onChange={(event) => setTarget(event.currentTarget.value as AccountTargetOption)}
             >

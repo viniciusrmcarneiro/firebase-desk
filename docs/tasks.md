@@ -185,8 +185,8 @@ Move this ahead of real Firebase integration so packaging, artifacts, and instal
 - [x] Add GitHub Actions `release.yml`.
 - [x] Run `release.yml` packaging on PRs and fail the PR if packaging fails.
 - [x] Upload PR package outputs as temporary workflow artifacts only.
-- [x] Create or update a rolling published prerelease `main-latest` on every merge to `main`.
-- [x] Attach `main-latest` binaries as GitHub Release assets.
+- [x] Create or update a rolling published prerelease `latest` on every merge to `main`.
+- [x] Attach `latest` binaries as GitHub Release assets.
 - [x] Keep `v*.*.*` tags creating versioned published prereleases.
 - [x] Keep `workflow_dispatch` as an ad-hoc package smoke path.
 - [x] Name workflow artifacts and release assets by channel/version, OS, architecture, and target type.
@@ -198,12 +198,12 @@ Move this ahead of real Firebase integration so packaging, artifacts, and instal
 - [x] Add safety disclaimer to README before public binaries exist.
 - [x] Verify `pnpm package` locally on the current development OS.
 - [ ] Verify GitHub `release.yml` succeeds on PRs for macOS, Windows, and Linux.
-- [ ] Verify GitHub `release.yml` updates `main-latest` on merge to `main`.
+- [ ] Verify GitHub `release.yml` updates `latest` on merge to `main`.
 - [ ] Download every PR workflow artifact and confirm the archive/installer opens.
-- [ ] Download every `main-latest` release asset and confirm the archive/installer opens.
-- [ ] Install/open the macOS binary from PR artifacts and `main-latest` release assets.
-- [ ] Install/open the Windows binary from PR artifacts and `main-latest` release assets.
-- [ ] Install/open the Linux binary from PR artifacts and `main-latest` release assets.
+- [ ] Download every `latest` release asset and confirm the archive/installer opens.
+- [ ] Install/open the macOS binary from PR artifacts and `latest` release assets.
+- [ ] Install/open the Windows binary from PR artifacts and `latest` release assets.
+- [ ] Install/open the Linux binary from PR artifacts and `latest` release assets.
 - [x] Add a packaged-app smoke test or CI check that catches missing runtime files.
 - [ ] Create the first versioned published prerelease from a tag.
 - [x] Document no-signing decision and checksum-based verification.

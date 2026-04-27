@@ -66,15 +66,15 @@ Firebase Desk publishes unsigned development binaries with SHA-256 checksums. We
 | Event           | Output                                                                                                                   |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | PR to `main`    | CI, package Linux; package macOS/Windows when `package-all` or package paths change; upload temporary workflow artifacts |
-| Merge to `main` | CI, package macOS/Windows/Linux, publish/update prerelease `main-latest`                                                 |
+| Merge to `main` | CI, package macOS/Windows/Linux, publish/update prerelease `latest`                                                      |
 | Tag `v*.*.*`    | CI, package macOS/Windows/Linux, publish versioned prerelease                                                            |
 | Manual dispatch | Ad-hoc package smoke run with temporary workflow artifacts                                                               |
 
-Use PR artifacts to block broken packaging before merge. Use GitHub Release assets from `main-latest` and version tags as the long-lived download links.
+Use PR artifacts to block broken packaging before merge. Use GitHub Release assets from `latest` and version tags as the long-lived download links. The rolling `latest` tag is created once and kept stable; the release assets and notes are updated on each merge.
 
 ## Downloads
 
-- Rolling dev build: <https://github.com/viniciusrmcarneiro/firebase-desk/releases/tag/main-latest>
+- Rolling dev build: <https://github.com/viniciusrmcarneiro/firebase-desk/releases/tag/latest>
 - Versioned prereleases: <https://github.com/viniciusrmcarneiro/firebase-desk/releases>
 
 Artifact names include channel/version, OS, architecture, and target extension. PR and manual-dispatch artifacts are temporary workflow artifacts, not release assets. Each package artifact set includes a matching `SHA256SUMS*.txt` file.

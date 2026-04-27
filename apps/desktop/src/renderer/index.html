@@ -4,9 +4,87 @@
     <meta charset="UTF-8" />
     <title>Firebase Desk</title>
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <style>
+      html,
+      body,
+      #root {
+        height: 100%;
+        margin: 0;
+      }
+
+      body {
+        background: #f8fafc;
+      }
+
+      .boot-splash {
+        box-sizing: border-box;
+        display: grid;
+        min-height: 100%;
+        padding: 32px;
+        place-items: center;
+      }
+
+      .boot-splash__content {
+        align-items: center;
+        display: flex;
+        flex-direction: column;
+        width: min(34rem, 100%);
+      }
+
+      .boot-splash__logo {
+        display: block;
+        height: auto;
+        width: 100%;
+      }
+
+      .boot-splash__bar {
+        background: #e2e8f0;
+        border-radius: 999px;
+        height: 4px;
+        margin-top: 24px;
+        overflow: hidden;
+        width: 112px;
+      }
+
+      .boot-splash__bar::before {
+        animation: boot-splash-pulse 1.2s ease-in-out infinite;
+        background: #ff7a00;
+        border-radius: inherit;
+        content: '';
+        display: block;
+        height: 100%;
+        width: 40%;
+      }
+
+      @keyframes boot-splash-pulse {
+        0%,
+        100% {
+          opacity: 0.45;
+          transform: translateX(0);
+        }
+
+        50% {
+          opacity: 1;
+          transform: translateX(168%);
+        }
+      }
+
+      @media (prefers-reduced-motion: reduce) {
+        .boot-splash__bar::before {
+          animation: none;
+        }
+      }
+    </style>
   </head>
   <body>
-    <div id="root"></div>
+    <div id="root">
+      <section class="boot-splash" aria-label="Loading Firebase Desk">
+        <div class="boot-splash__content">
+          <img class="boot-splash__logo" src="./assets/splash-logo.png" alt="Firebase Desk" />
+          <div class="boot-splash__bar" aria-hidden="true"></div>
+        </div>
+      </section>
+    </div>
     <script type="module" src="./main.tsx"></script>
   </body>
 </html>

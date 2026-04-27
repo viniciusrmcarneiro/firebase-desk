@@ -17,10 +17,11 @@ Use this for unsigned development releases. Binaries are published as prerelease
 
 - [ ] Merge to `main`.
 - [ ] `release.yml` package job green on macOS, Windows, and Linux.
-- [ ] `main-latest` prerelease recreated.
+- [ ] `latest` tag exists.
+- [ ] `latest` prerelease created or updated.
 - [ ] Release assets attached for macOS, Windows, and Linux targets.
 - [ ] Matching `SHA256SUMS*.txt` assets attached for macOS, Windows, and Linux packages.
-- [ ] Download each `main-latest` asset.
+- [ ] Download each `latest` asset.
 - [ ] Verify every downloaded asset against the matching `SHA256SUMS*.txt` file.
 - [ ] Install/open macOS asset.
 - [ ] Install/open Windows asset.
@@ -28,7 +29,7 @@ Use this for unsigned development releases. Binaries are published as prerelease
 
 ## First Versioned Prerelease
 
-- [ ] Confirm `main-latest` artifacts open on each OS.
+- [ ] Confirm `latest` artifacts open on each OS.
 - [ ] Update package versions if needed.
 - [ ] Create tag: `git tag v0.0.1 && git push origin v0.0.1`.
 - [ ] Confirm `release.yml` creates a published GitHub prerelease for `v0.0.1`.

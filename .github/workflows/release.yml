@@ -76,7 +76,7 @@ jobs:
                           core.info(`PR package-all label: ${hasPackageAllLabel}`);
                           core.info(`PR touches package paths: ${touchesPackagePaths}`);
                       } else if (eventName === 'push' && ref === 'refs/heads/main') {
-                          releaseChannel = 'main-latest';
+                          releaseChannel = 'latest';
                           retentionDays = '90';
                           includeAllPlatforms = true;
                       } else if (eventName === 'push' && ref.startsWith('refs/tags/')) {
@@ -177,7 +177,7 @@ jobs:
                   if-no-files-found: error
                   retention-days: ${{ needs.prepare.outputs.retention_days }}
 
-    publish-main-latest:
+    publish-latest:
         needs: [ prepare, package ]
         runs-on: ubuntu-latest
         if: github.event_name == 'push' && github.ref == 'refs/heads/main'
@@ -187,18 +187,30 @@ jobs:
             - uses: actions/download-artifact@v7
               with:
                   path: artifacts
-            - name: Recreate rolling prerelease
+            - name: Publish rolling prerelease
               env:
                   GH_TOKEN: ${{ github.token }}
+                  ROLLING_RELEASE_TAG: latest
               run: |
-                  gh release delete main-latest --cleanup-tag --yes --repo "$GITHUB_REPOSITORY" || true
                   cat > release-notes.md <<'NOTES'
                   Rolling unsigned development build from the latest `main` commit.
 
                   These binaries are published intentionally for development smoke testing. They are unsigned, so OS warning prompts are expected. Verify downloads with the matching SHA256SUMS asset.
                   NOTES
-                  gh release create main-latest --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" --title "main-latest" --notes-file release-notes.md
-                  find artifacts -type f -print0 | xargs -0 -I {} gh release upload main-latest {} --repo "$GITHUB_REPOSITORY" --clobber
+                  echo "" >> release-notes.md
+                  echo "Source commit: \`$GITHUB_SHA\`" >> release-notes.md
+
+                  if gh release view "$ROLLING_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+                    # Update the release target to the current commit (note: the git tag itself will not move)
+                    gh release edit "$ROLLING_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --prerelease --title "$ROLLING_RELEASE_TAG" --notes-file release-notes.md --target "$GITHUB_SHA"
+                  else
+                    if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$ROLLING_RELEASE_TAG" >/dev/null 2>&1; then
+                      echo "::error::Missing required rolling release tag '$ROLLING_RELEASE_TAG'. Create it once, then rerun this workflow."
+                      exit 1
+                    fi
+                    gh release create "$ROLLING_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --prerelease --verify-tag --title "$ROLLING_RELEASE_TAG" --notes-file release-notes.md
+                  fi
+                  find artifacts -type f -print0 | xargs -0 -I {} gh release upload "$ROLLING_RELEASE_TAG" {} --repo "$GITHUB_REPOSITORY" --clobber
 
     publish-tag:
         needs: [ prepare, package ]
