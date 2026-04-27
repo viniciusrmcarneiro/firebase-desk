@@ -80,9 +80,9 @@ Renderer UI -> repo-contracts interface -> preload IPC client (ipc-schemas) -> m
 
 ## Data Storage
 
-- Project metadata: local app config.
-- Service account credentials: OS keychain when possible.
-- UI preferences: local config.
+- Project metadata: `${app.getPath('userData')}/projects.json`.
+- Service account credentials: `${app.getPath('userData')}/credentials/`, encrypted with Electron `safeStorage` when available, or `*.plain.json` with an in-app warning when OS encryption is unavailable.
+- UI preferences: `${app.getPath('userData')}/settings.json`.
 - No cloud sync in MVP.
 
 ## Firebase Integration

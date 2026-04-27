@@ -1,15 +1,12 @@
 import { HotkeysProvider } from '@firebase-desk/hotkeys';
 import { AppearanceProvider } from '@firebase-desk/product-ui';
-import type { SettingsSnapshot } from '@firebase-desk/repo-contracts';
+import type { DataMode, SettingsSnapshot } from '@firebase-desk/repo-contracts';
 import { QueryClientProvider } from '@tanstack/react-query';
-import { type CSSProperties, useEffect, useState } from 'react';
+import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'react';
 import splashLogoUrl from '../assets/splash-logo.png';
 import { AppShell } from './AppShell.tsx';
 import { createAppQueryClient } from './queryClient.ts';
-import { createMockRepositories, RepositoryProvider } from './RepositoryProvider.tsx';
-
-const repositories = createMockRepositories();
-const queryClient = createAppQueryClient();
+import { createRepositories, RepositoryProvider } from './RepositoryProvider.tsx';
 
 function SplashScreen() {
   return (
@@ -36,13 +33,46 @@ function SplashScreen() {
 }
 
 export function App() {
+  const [dataMode, setDataMode] = useState<DataMode | null>(null);
   const [snapshot, setSnapshot] = useState<SettingsSnapshot | null>(null);
+  const [queryClient, setQueryClient] = useState(() => createAppQueryClient());
 
-  useEffect(() => {
-    repositories.settings.load().then(setSnapshot);
+  const handleDataModeChange = useCallback((nextDataMode: DataMode) => {
+    setSnapshot(null);
+    setDataMode(nextDataMode);
+    setQueryClient(createAppQueryClient());
   }, []);
 
-  if (!snapshot) return <SplashScreen />;
+  const repositories = useMemo(
+    () =>
+      dataMode
+        ? createRepositories({ dataMode, onDataModeChange: handleDataModeChange })
+        : null,
+    [dataMode, handleDataModeChange],
+  );
+
+  useEffect(() => {
+    let cancelled = false;
+    loadInitialDataMode().then((config) => {
+      if (!cancelled) setDataMode(config.dataMode);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!repositories) return;
+    let cancelled = false;
+    repositories.settings.load().then((nextSnapshot) => {
+      if (!cancelled) setSnapshot(nextSnapshot);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [repositories]);
+
+  if (!repositories || !snapshot) return <SplashScreen />;
 
   return (
     <RepositoryProvider repositories={repositories}>
@@ -63,4 +93,11 @@ export function App() {
       </QueryClientProvider>
     </RepositoryProvider>
   );
+}
+
+async function loadInitialDataMode(): Promise<{ readonly dataMode: DataMode; }> {
+  if (typeof window !== 'undefined' && window.firebaseDesk?.app?.getConfig) {
+    return await window.firebaseDesk.app.getConfig();
+  }
+  return { dataMode: 'mock' };
 }

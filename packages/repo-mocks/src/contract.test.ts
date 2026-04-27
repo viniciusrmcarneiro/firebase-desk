@@ -18,8 +18,18 @@ describe('repo-mocks contract conformance', () => {
     const repo = new MockProjectsRepository();
     const initial = await repo.list();
     expect(initial.length).toBeGreaterThan(0);
-    const added = await repo.add({ name: 'Tmp', projectId: 'tmp', target: 'emulator' });
+    const added = await repo.add({
+      name: 'Tmp',
+      projectId: 'tmp',
+      target: 'emulator',
+      emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
+    });
     expect((await repo.get(added.id))?.id).toBe(added.id);
+    const updated = await repo.update(added.id, { name: 'Tmp Renamed' });
+    expect(updated.name).toBe('Tmp Renamed');
+    await expect(repo.update(added.id, { name: ' ' })).rejects.toThrow(
+      'Project display name is required.',
+    );
     await repo.remove(added.id);
     expect(await repo.get(added.id)).toBeNull();
   });

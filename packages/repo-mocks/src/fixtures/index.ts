@@ -8,14 +8,43 @@ import type { AuthUser, ProjectSummary } from '@firebase-desk/repo-contracts';
 export const MOCK_ACCOUNT_LOAD_ERROR_PROJECT_ID = 'mock-account-load-error';
 
 export const PROJECTS: ReadonlyArray<ProjectSummary> = [
-  { id: 'prod', name: 'Acme Prod', projectId: 'acme-prod', target: 'production' },
-  { id: 'stage', name: 'Acme Staging', projectId: 'acme-stage', target: 'production' },
-  { id: 'emu', name: 'Local Emulator', projectId: 'demo-local', target: 'emulator' },
+  {
+    id: 'prod',
+    name: 'Acme Prod',
+    projectId: 'acme-prod',
+    target: 'production',
+    hasCredential: true,
+    credentialEncrypted: true,
+    createdAt: '2026-04-20T10:00:00.000Z',
+  },
+  {
+    id: 'stage',
+    name: 'Acme Staging',
+    projectId: 'acme-stage',
+    target: 'production',
+    hasCredential: true,
+    credentialEncrypted: true,
+    createdAt: '2026-04-21T10:00:00.000Z',
+  },
+  {
+    id: 'emu',
+    name: 'Local Emulator',
+    projectId: 'demo-local',
+    target: 'emulator',
+    emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
+    hasCredential: false,
+    credentialEncrypted: null,
+    createdAt: '2026-04-22T10:00:00.000Z',
+  },
   {
     id: 'broken',
     name: 'Broken Account',
     projectId: MOCK_ACCOUNT_LOAD_ERROR_PROJECT_ID,
     target: 'emulator',
+    emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
+    hasCredential: false,
+    credentialEncrypted: null,
+    createdAt: '2026-04-23T10:00:00.000Z',
   },
 ];
 

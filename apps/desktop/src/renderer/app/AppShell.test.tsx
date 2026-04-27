@@ -2,7 +2,7 @@ import { HotkeysProvider } from '@firebase-desk/hotkeys';
 import { AppearanceProvider } from '@firebase-desk/product-ui';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from './AppShell.tsx';
 import { createAppQueryClient } from './queryClient.ts';
 import {
@@ -50,6 +50,10 @@ vi.mock('@monaco-editor/react', () => ({
     />
   ),
 }));
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 type InitialTab = Parameters<typeof tabActions.openTab>[0];
 
@@ -108,17 +112,25 @@ describe('desktop AppShell', () => {
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('dark'));
   });
 
-  it('matches the wireframe add account fields', async () => {
+  it('shows real add account fields for service accounts and emulator profiles', async () => {
     renderShell();
     fireEvent.click(screen.getByRole('button', { name: 'Add account' }));
 
     expect(screen.getByRole('dialog', { name: 'Add Firebase Account' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Service account' })).toBeTruthy();
+    expect(screen.getByRole('tab', { name: 'Local emulator' })).toBeTruthy();
     expect(screen.getByRole('textbox', { name: 'Display name' })).toBeTruthy();
-    expect(screen.getByRole('combobox', { name: 'Target' })).toBeTruthy();
-    expect(screen.getByText('service-account.json')).toBeTruthy();
-    expect(screen.getByText('Wireframe only. No credentials are read.')).toBeTruthy();
-    expect(screen.getByRole('button', { name: 'Add mock' })).toBeTruthy();
-    expect(screen.queryByRole('textbox', { name: 'Firebase project id' })).toBeNull();
+    expect(screen.getByRole('textbox', { name: 'Service account JSON' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Select JSON' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'Add account' })).toBeTruthy();
+  });
+
+  it('shows the active project name, id, and target in the status bar', async () => {
+    renderShell({ initialTab: { kind: 'auth-users', projectId: 'emu' } });
+
+    expect((await screen.findAllByText('Local Emulator')).length).toBeGreaterThan(0);
+    expect(screen.getByText('demo-local')).toBeTruthy();
+    expect(screen.getAllByText('emulator').length).toBeGreaterThan(0);
   });
 
   it('confirms before closing a tab', async () => {
@@ -186,6 +198,47 @@ describe('desktop AppShell', () => {
     expect(await screen.findByRole('dialog', { name: 'Settings' })).toBeTruthy();
     expect(await screen.findByText('Credential storage')).toBeTruthy();
     expect(screen.getByText('About')).toBeTruthy();
+  });
+
+  it('shows and opens the desktop data location from settings', async () => {
+    const openDataDirectory = vi.fn(async () => {});
+    vi.stubGlobal('firebaseDesk', {
+      app: {
+        getConfig: vi.fn(async () => ({
+          dataDirectory: '/Users/vini/Library/Application Support/@firebase-desk/desktop',
+          dataMode: 'mock',
+        })),
+        openDataDirectory,
+      },
+    });
+    renderShell();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+
+    expect(
+      await screen.findByText('/Users/vini/Library/Application Support/@firebase-desk/desktop'),
+    ).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Open location' }));
+
+    await waitFor(() => expect(openDataDirectory).toHaveBeenCalledTimes(1));
+    await waitFor(() => expect(screen.getByText('Opened data location')).toBeTruthy());
+  });
+
+  it('marks the desktop data location unavailable when config loading fails', async () => {
+    vi.stubGlobal('firebaseDesk', {
+      app: {
+        getConfig: vi.fn(async () => Promise.reject(new Error('No config'))),
+        openDataDirectory: vi.fn(async () => {}),
+      },
+    });
+    renderShell();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+
+    expect(await screen.findByText('Unavailable')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Open location' }) as HTMLButtonElement).disabled)
+      .toBe(true);
   });
 
   it('clears firestore results when changing the tab account', async () => {

@@ -155,8 +155,25 @@ vi.mock('@firebase-desk/ui', async (importOriginal) => {
 });
 
 const projects: ReadonlyArray<ProjectSummary> = [
-  { id: 'emu', name: 'Local Emulator', projectId: 'demo-local', target: 'emulator' },
-  { id: 'prod', name: 'Acme Prod', projectId: 'acme-prod', target: 'production' },
+  {
+    id: 'emu',
+    name: 'Local Emulator',
+    projectId: 'demo-local',
+    target: 'emulator',
+    emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
+    hasCredential: false,
+    credentialEncrypted: null,
+    createdAt: '2026-04-27T00:00:00.000Z',
+  },
+  {
+    id: 'prod',
+    name: 'Acme Prod',
+    projectId: 'acme-prod',
+    target: 'production',
+    hasCredential: true,
+    credentialEncrypted: true,
+    createdAt: '2026-04-27T00:00:00.000Z',
+  },
 ];
 
 const nestedEvent: FirestoreDocumentResult = {

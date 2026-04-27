@@ -12,12 +12,29 @@ import {
 } from '@firebase-desk/product-ui';
 import { AUTH_USERS, COLLECTIONS, MockSettingsRepository } from '@firebase-desk/repo-mocks';
 import type { Meta, StoryObj } from '@storybook/react';
-import { useState } from 'react';
+import { type ComponentProps, useState } from 'react';
 
 const settings = new MockSettingsRepository();
-const projects = [
-  { id: 'emu', name: 'Local Emulator', projectId: 'demo-local', target: 'emulator' as const },
-  { id: 'prod', name: 'Acme Prod', projectId: 'acme-prod', target: 'production' as const },
+const projects: ComponentProps<typeof WorkspaceTabStrip>['projects'] = [
+  {
+    id: 'emu',
+    name: 'Local Emulator',
+    projectId: 'demo-local',
+    target: 'emulator',
+    emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
+    hasCredential: false,
+    credentialEncrypted: null,
+    createdAt: '2026-04-27T00:00:00.000Z',
+  },
+  {
+    id: 'prod',
+    name: 'Acme Prod',
+    projectId: 'acme-prod',
+    target: 'production',
+    hasCredential: true,
+    credentialEncrypted: true,
+    createdAt: '2026-04-27T00:00:00.000Z',
+  },
 ];
 
 interface StoryDocument {
