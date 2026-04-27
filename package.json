@@ -19,6 +19,9 @@
     "coverage:summary": "node scripts/coverage-summary.mjs",
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
+    "icons:generate": "node scripts/generate-icons.mjs",
+    "package:checksums": "node scripts/write-package-checksums.mjs",
+    "package:linux:docker": "docker build --platform linux/amd64 -f docker/linux-package.Dockerfile -t firebase-desk-linux-package . && docker run --rm --platform linux/amd64 --cap-add=SYS_ADMIN firebase-desk-linux-package",
     "storybook": "pnpm --filter @firebase-desk/storybook dev",
     "test:e2e": "pnpm --filter @firebase-desk/e2e test:e2e",
     "package": "pnpm --filter @firebase-desk/desktop package"

@@ -4,6 +4,7 @@
   "private": true,
   "license": "MIT",
   "description": "Firebase Desk Electron application.",
+  "homepage": "https://github.com/viniciusrmcarneiro/firebase-desk",
   "type": "module",
   "main": ".build/out/main/index.js",
   "scripts": {
@@ -14,7 +15,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
-    "package": "pnpm run build && electron-builder --config electron-builder.yml"
+    "package": "node ../../scripts/package-desktop.mjs"
   },
   "dependencies": {
     "@firebase-desk/data-format": "workspace:*",

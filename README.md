@@ -4,6 +4,8 @@ A free, open-source desktop Firebase admin client for developers: browse, query,
 
 Status: mocked app. Current priority is release packaging so GitHub can produce downloadable desktop binaries before real Firebase integration continues.
 
+Safety note: binaries are published as unsigned development builds with SHA-256 checksums. Expect OS warning prompts, and do not use production Firebase credentials yet; real Firebase integration is not enabled.
+
 ## MVP
 
 - Manage multiple Firebase projects from service account JSON files.
@@ -49,15 +51,48 @@ Every workflow has an identical local pnpm command:
 | `e2e.yml`     | `pnpm install && pnpm build && pnpm --filter @firebase-desk/e2e test:withEmulators`                    |
 | `release.yml` | `pnpm install && pnpm package` (per-OS)                                                                |
 
+Linux package smoke can be reproduced from macOS with Docker:
+
+```sh
+pnpm package:linux:docker
+```
+
+The Docker wrapper runs the Ubuntu image as `linux/amd64` and grants the Chromium sandbox capability needed by packaged Electron apps.
+
 ## Release Workflow
 
-Early binaries are unsigned development builds.
+Firebase Desk publishes unsigned development binaries with SHA-256 checksums. We do not plan to sign binaries; package-manager distribution can come later.
 
-| Event           | Output                                                                    |
-| --------------- | ------------------------------------------------------------------------- |
-| PR to `main`    | CI, e2e, package macOS/Windows/Linux, upload temporary workflow artifacts |
-| Merge to `main` | CI, package macOS/Windows/Linux, update draft prerelease `main-latest`    |
-| Tag `v*.*.*`    | CI, package macOS/Windows/Linux, create versioned draft release           |
-| Manual dispatch | Ad-hoc package smoke run with temporary workflow artifacts                |
+| Event           | Output                                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| PR to `main`    | CI, package Linux; package macOS/Windows when `package-all` or package paths change; upload temporary workflow artifacts |
+| Merge to `main` | CI, package macOS/Windows/Linux, publish/update prerelease `main-latest`                                                 |
+| Tag `v*.*.*`    | CI, package macOS/Windows/Linux, publish versioned prerelease                                                            |
+| Manual dispatch | Ad-hoc package smoke run with temporary workflow artifacts                                                               |
 
 Use PR artifacts to block broken packaging before merge. Use GitHub Release assets from `main-latest` and version tags as the long-lived download links.
+
+## Downloads
+
+- Rolling dev build: <https://github.com/viniciusrmcarneiro/firebase-desk/releases/tag/main-latest>
+- Versioned prereleases: <https://github.com/viniciusrmcarneiro/firebase-desk/releases>
+
+Artifact names include channel/version, OS, architecture, and target extension. PR and manual-dispatch artifacts are temporary workflow artifacts, not release assets. Each package artifact set includes a matching `SHA256SUMS*.txt` file.
+
+## Checksums
+
+Release assets include matching `SHA256SUMS*.txt` files. Verify downloads before opening them:
+
+```sh
+shasum -a 256 -c SHA256SUMS*.txt
+```
+
+Run that command in the directory containing the downloaded binary and matching checksum file.
+
+## Unsigned App Warnings
+
+- macOS: Gatekeeper may block the app. For local smoke testing, remove quarantine with `xattr -dr com.apple.quarantine "Firebase Desk.app"`, then open from Finder.
+- Windows: SmartScreen may warn on the installer or zip app. For local smoke testing, use `More info > Run anyway`.
+- Linux: AppImage builds may need `chmod +x Firebase\ Desk-*.AppImage`; `.deb` builds can be installed with `sudo apt install ./Firebase\ Desk-*.deb`.
+
+Signing, notarization, and Windows code-signing are intentionally out of scope. Package-manager distribution is a later improvement. See [docs/release-checklist.md](docs/release-checklist.md).

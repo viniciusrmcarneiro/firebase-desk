@@ -1,22 +1,38 @@
 appId: dev.firebase-desk.app
 productName: Firebase Desk
+artifactName: ${productName}-${env.RELEASE_CHANNEL}-${version}-${os}-${arch}.${ext}
 directories:
   output: release
   buildResources: build
+electronLanguages:
+  - en-US
 files:
   - .build/out/**
   - package.json
 mac:
+  icon: build/icon.icns
+  identity: null
   target:
     - dmg
     - zip
   category: public.app-category.developer-tools
 win:
+  icon: build/icon.ico
   target:
     - nsis
     - zip
+nsis:
+  oneClick: false
+  allowToChangeInstallationDirectory: true
+deb:
+  packageName: firebase-desk
 linux:
+  icon: build/icon.png
+  executableName: firebase-desk
   target:
     - AppImage
     - deb
   category: Development
+  maintainer: Firebase Desk contributors
+  synopsis: Firebase desktop admin client
+  description: Firebase Desk is an open-source desktop Firebase admin client for local development and emulator-backed workflows.
