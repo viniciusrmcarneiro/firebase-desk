@@ -190,6 +190,7 @@ Move this ahead of real Firebase integration so packaging, artifacts, and instal
 - [x] Keep `v*.*.*` tags creating versioned published prereleases.
 - [x] Keep `workflow_dispatch` as an ad-hoc package smoke path.
 - [x] Name workflow artifacts and release assets by channel/version, OS, architecture, and target type.
+- [x] Add SHA-256 checksum files to package artifacts and release assets.
 - [x] Set artifact retention for PR and ad-hoc package smoke builds.
 - [x] Add app icons and builder resources for macOS, Windows, and Linux.
 - [x] Add first unsigned/dev-build download notes to README.
@@ -205,7 +206,8 @@ Move this ahead of real Firebase integration so packaging, artifacts, and instal
 - [ ] Install/open the Linux binary from PR artifacts and `main-latest` release assets.
 - [x] Add a packaged-app smoke test or CI check that catches missing runtime files.
 - [ ] Create the first versioned published prerelease from a tag.
-- [x] Document signing/notarization/code-signing as deferred while publishing unsigned dev binaries.
+- [x] Document no-signing decision and checksum-based verification.
+- [x] Document package-manager distribution as later work.
 - [x] Create first release checklist.
 
 ## Phase 6: Project Management

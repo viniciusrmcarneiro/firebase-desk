@@ -125,6 +125,10 @@ jobs:
                   sudo apt-get install -y xvfb libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2t64
             - run: pnpm install --frozen-lockfile
             - run: pnpm package
+            - run: pnpm package:checksums
+              env:
+                  CHECKSUM_FILE_NAME: SHA256SUMS-${{ needs.prepare.outputs.release_channel }}-${{
+                      matrix.platform }}-${{ runner.arch }}.txt
             - name: Smoke packaged app with emulators (Linux)
               if: matrix.platform == 'linux'
               run: |
@@ -153,6 +157,7 @@ jobs:
                       apps/desktop/release/*.exe
                       apps/desktop/release/*.AppImage
                       apps/desktop/release/*.deb
+                      apps/desktop/release/SHA256SUMS*.txt
                   if-no-files-found: error
                   retention-days: ${{ needs.prepare.outputs.retention_days }}
 
@@ -174,7 +179,7 @@ jobs:
                   cat > release-notes.md <<'NOTES'
                   Rolling unsigned development build from the latest `main` commit.
 
-                  These binaries are published intentionally for development smoke testing. They are unsigned, so OS warning prompts are expected.
+                  These binaries are published intentionally for development smoke testing. They are unsigned, so OS warning prompts are expected. Verify downloads with the matching SHA256SUMS asset.
                   NOTES
                   gh release create main-latest --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" --title "main-latest" --notes-file release-notes.md
                   find artifacts -type f -print0 | xargs -0 -I {} gh release upload main-latest {} --repo "$GITHUB_REPOSITORY" --clobber
@@ -194,5 +199,5 @@ jobs:
                   draft: false
                   prerelease: true
                   body: |
-                      Unsigned development build. OS warning prompts are expected.
+                      Unsigned development build. OS warning prompts are expected. Verify downloads with the matching SHA256SUMS asset.
                   files: artifacts/**/*

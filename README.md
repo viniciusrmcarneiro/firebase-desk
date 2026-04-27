@@ -4,7 +4,7 @@ A free, open-source desktop Firebase admin client for developers: browse, query,
 
 Status: mocked app. Current priority is release packaging so GitHub can produce downloadable desktop binaries before real Firebase integration continues.
 
-Safety note: early binaries are published as unsigned development builds. Expect OS warning prompts, and do not use production Firebase credentials yet; real Firebase integration is not enabled.
+Safety note: binaries are published as unsigned development builds with SHA-256 checksums. Expect OS warning prompts, and do not use production Firebase credentials yet; real Firebase integration is not enabled.
 
 ## MVP
 
@@ -53,7 +53,7 @@ Every workflow has an identical local pnpm command:
 
 ## Release Workflow
 
-Early binaries are unsigned development builds. Signing is not required to publish them; it only removes OS trust warnings later.
+Firebase Desk publishes unsigned development binaries with SHA-256 checksums. We do not plan to sign binaries; package-manager distribution can come later.
 
 | Event           | Output                                                                                                                   |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------ |
@@ -69,7 +69,17 @@ Use PR artifacts to block broken packaging before merge. Use GitHub Release asse
 - Rolling dev build: <https://github.com/viniciusrmcarneiro/firebase-desk/releases/tag/main-latest>
 - Versioned prereleases: <https://github.com/viniciusrmcarneiro/firebase-desk/releases>
 
-Artifact names include channel/version, OS, architecture, and target extension. PR and manual-dispatch artifacts are temporary workflow artifacts, not release assets.
+Artifact names include channel/version, OS, architecture, and target extension. PR and manual-dispatch artifacts are temporary workflow artifacts, not release assets. Each package artifact set includes a matching `SHA256SUMS*.txt` file.
+
+## Checksums
+
+Release assets include matching `SHA256SUMS*.txt` files. Verify downloads before opening them:
+
+```sh
+shasum -a 256 -c SHA256SUMS*.txt
+```
+
+Run that command in the directory containing the downloaded binary and matching checksum file.
 
 ## Unsigned App Warnings
 
@@ -77,4 +87,4 @@ Artifact names include channel/version, OS, architecture, and target extension. 
 - Windows: SmartScreen may warn on the installer or zip app. For local smoke testing, use `More info > Run anyway`.
 - Linux: AppImage builds may need `chmod +x Firebase\ Desk-*.AppImage`; `.deb` builds can be installed with `sudo apt install ./Firebase\ Desk-*.deb`.
 
-Signing, notarization, and Windows code-signing are deferred while unsigned development binaries are published. See [docs/release-checklist.md](docs/release-checklist.md).
+Signing, notarization, and Windows code-signing are intentionally out of scope. Package-manager distribution is a later improvement. See [docs/release-checklist.md](docs/release-checklist.md).
