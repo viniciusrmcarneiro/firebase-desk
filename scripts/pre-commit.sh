@@ -17,7 +17,7 @@ run pnpm install --frozen-lockfile
 run pnpm format:check
 run pnpm lint
 run pnpm typecheck
-run pnpm test
+run pnpm test:coverage
 run pnpm build
 run pnpm --filter @firebase-desk/e2e typecheck
 run pnpm --filter @firebase-desk/e2e exec playwright install chromium

@@ -29,7 +29,7 @@
 
 ### Required Workflows
 
-- `ci.yml`: install (pnpm), run `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
+- `ci.yml`: install (pnpm), run `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:coverage`, publish the coverage summary, then `pnpm build`.
 - `e2e.yml`: install, build affected workspaces, start Firebase emulators, seed data, run `pnpm test:e2e`, upload traces/screenshots on failure.
 - `release.yml`: on PR, merge to `main`, tag, or ad-hoc dispatch, run CI checks and `pnpm package` for the desktop app on macOS/Windows/Linux. PR and ad-hoc runs upload temporary workflow artifacts with retention. Merges to `main` create or update the rolling draft prerelease `main-latest` with release assets. Version tags create versioned draft GitHub Releases with release assets.
 
@@ -40,6 +40,7 @@
 - `pnpm lint`
 - `pnpm typecheck`
 - `pnpm test`
+- `pnpm test:coverage`
 - `pnpm test:e2e`
 - `pnpm build`
 - `pnpm package`

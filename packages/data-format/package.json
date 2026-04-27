@@ -13,6 +13,7 @@
     "lint": "oxlint --config ../config-oxlint/oxlintrc.base.json src",
     "typecheck": "tsc -b",
     "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
     "build": "tsc -b"
   },
   "devDependencies": {

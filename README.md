@@ -43,11 +43,11 @@ Status: mocked app. Current priority is release packaging so GitHub can produce 
 
 Every workflow has an identical local pnpm command:
 
-| Workflow      | Local equivalent                                                                              |
-| ------------- | --------------------------------------------------------------------------------------------- |
-| `ci.yml`      | `pnpm install && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build` |
-| `e2e.yml`     | `pnpm install && pnpm build && pnpm --filter @firebase-desk/e2e test:withEmulators`           |
-| `release.yml` | `pnpm install && pnpm package` (per-OS)                                                       |
+| Workflow      | Local equivalent                                                                                       |
+| ------------- | ------------------------------------------------------------------------------------------------------ |
+| `ci.yml`      | `pnpm install && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build` |
+| `e2e.yml`     | `pnpm install && pnpm build && pnpm --filter @firebase-desk/e2e test:withEmulators`                    |
+| `release.yml` | `pnpm install && pnpm package` (per-OS)                                                                |
 
 ## Release Workflow
 

@@ -165,6 +165,7 @@ Root `package.json` exposes thin wrappers; turbo fans out:
 - `pnpm format:check` -> `dprint check`
 - `pnpm typecheck` -> `turbo run typecheck`
 - `pnpm test` -> `turbo run test`
+- `pnpm test:coverage` -> `turbo run test:coverage`
 - `pnpm build` -> `turbo run build`
 - `pnpm dev` -> `turbo run dev --parallel` (desktop + wireframe)
 - `pnpm storybook` -> `pnpm --filter @firebase-desk/storybook dev`
