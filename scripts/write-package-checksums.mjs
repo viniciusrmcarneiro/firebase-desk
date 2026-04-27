@@ -1,5 +1,5 @@
 import { createHash } from 'node:crypto';
-import { readdirSync, readFileSync, writeFileSync } from 'node:fs';
+import { createReadStream, readdirSync, writeFileSync } from 'node:fs';
 import { basename, dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -38,6 +38,16 @@ function insertArtifactName(sortedNames, artifactName) {
   ];
 }
 
+async function createArtifactDigest(artifactPath) {
+  const hash = createHash('sha256');
+
+  for await (const chunk of createReadStream(artifactPath)) {
+    hash.update(chunk);
+  }
+
+  return hash.digest('hex');
+}
+
 const artifactNames = readdirSync(releaseDirectory)
   .filter(hasArtifactExtension)
   .reduce(insertArtifactName, []);
@@ -46,11 +56,14 @@ if (artifactNames.length === 0) {
   throw new Error(`No package artifacts found in ${releaseDirectory}`);
 }
 
-const checksumLines = artifactNames.map((artifactName) => {
+const checksumLines = [];
+
+for (const artifactName of artifactNames) {
   const artifactPath = resolve(releaseDirectory, artifactName);
-  const digest = createHash('sha256').update(readFileSync(artifactPath)).digest('hex');
-  return `${digest}  ${basename(artifactPath)}`;
-});
+  const digest = await createArtifactDigest(artifactPath);
+
+  checksumLines.push(`${digest}  ${basename(artifactPath)}`);
+}
 
 writeFileSync(outputPath, `${checksumLines.join('\n')}\n`);
 console.log(`Wrote ${outputPath}`);

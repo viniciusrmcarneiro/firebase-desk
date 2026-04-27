@@ -45,6 +45,7 @@ jobs:
                           'pnpm-lock.yaml',
                           'scripts/generate-icons.mjs',
                           'scripts/package-desktop.mjs',
+                          'scripts/write-package-checksums.mjs',
                       ]);
 
                       const eventName = context.eventName;
