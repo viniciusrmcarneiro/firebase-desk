@@ -71,9 +71,9 @@ function unfilterScanline(filterType, encodedScanline, previousScanline, bytesPe
   return scanline;
 }
 
-function parsePng(buffer) {
+function parsePng(buffer, inputPath = sourcePngPath) {
   if (!buffer.subarray(0, pngSignature.length).equals(pngSignature)) {
-    throw new Error(`${sourcePngPath} is not a PNG file`);
+    throw new Error(`${inputPath} is not a PNG file`);
   }
 
   let readOffset = pngSignature.length;
@@ -309,9 +309,9 @@ function createIcns(createPngForSize) {
 mkdirSync(buildDirectory, { recursive: true });
 mkdirSync(rendererAssetDirectory, { recursive: true });
 
-const sourceImage = parsePng(readFileSync(sourcePngPath));
+const sourceImage = parsePng(readFileSync(sourcePngPath), sourcePngPath);
 const createPngForSize = createPngFactory(sourceImage);
-const splashImage = parsePng(readFileSync(sourceSplashPath));
+const splashImage = parsePng(readFileSync(sourceSplashPath), sourceSplashPath);
 
 copyFileSync(sourceSvgPath, resolve(buildDirectory, 'icon.svg'));
 writeFileSync(resolve(buildDirectory, 'icon.png'), createPngForSize(1024));

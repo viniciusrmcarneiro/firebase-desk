@@ -931,7 +931,8 @@ function AddProjectDialog({ onOpenChange, onSubmit, open }: AddProjectDialogProp
             <span className='text-xs font-semibold text-text-secondary'>Target</span>
             <select
               aria-label='Target'
-              className='h-(--density-compact-control-height) rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
+              className='rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
+              style={{ height: 'var(--density-compact-control-height)' }}
               value={target}
               onChange={(event) => setTarget(event.currentTarget.value as AccountTargetOption)}
             >
