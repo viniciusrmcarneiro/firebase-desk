@@ -55,13 +55,13 @@ export function DataTable<TData>(
 
   const virtualColumns = useMemo<ReadonlyArray<VirtualTableColumn<Row<TData>>>>(
     () =>
-      table.getAllLeafColumns().map((column) => {
+      table.getAllLeafColumns().map((column, columnIndex) => {
         const width = (column.columnDef as DataTableColumn<TData>).width;
         const tableColumn = {
           id: column.id,
           header: renderHeader(table, column),
           cell: (row: Row<TData>) => {
-            const cell = row.getVisibleCells().find((item) => item.column.id === column.id);
+            const cell = row.getAllCells()[columnIndex];
             return cell ? flexRender(column.columnDef.cell, cell.getContext()) : null;
           },
         };

@@ -29,7 +29,7 @@ export function SettingsDialog(
     return () => {
       cancelled = true;
     };
-  }, [appearance.settings, appearance.mode, open]);
+  }, [appearance.settings, open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>

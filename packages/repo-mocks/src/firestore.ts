@@ -246,6 +246,8 @@ function matchesFilter(data: Record<string, unknown>, filter: FirestoreFilter): 
     case 'array-contains':
       return Array.isArray(actual) && actual.includes(expected);
     case 'array-contains-any':
+      return Array.isArray(actual) && Array.isArray(expected)
+        && expected.some((value) => actual.includes(value));
     case 'in':
       return Array.isArray(expected) && expected.includes(actual);
     case 'not-in':

@@ -1,6 +1,6 @@
 import { density as densityTokens, type DensityName } from '@firebase-desk/design-tokens';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { type Key, type ReactNode, useRef } from 'react';
+import { Fragment, type Key, type ReactNode, useRef } from 'react';
 import { cn } from './cn.ts';
 
 export interface VirtualTableColumn<T> {
@@ -70,9 +70,9 @@ export function VirtualTable<T>(
         {virtualizer.getVirtualItems().map((row) => {
           const item = rows[row.index];
           if (item === undefined) return null;
+          const rowKey = getRowKey?.(item, row.index) ?? row.key;
           const rowElement = (
             <div
-              key={getRowKey?.(item, row.index) ?? row.key}
               className={cn(
                 'flex border-b border-border-subtle text-sm text-text-primary hover:bg-action-ghost-hover',
                 onRowClick && 'cursor-pointer',
@@ -101,7 +101,8 @@ export function VirtualTable<T>(
               ))}
             </div>
           );
-          return rowWrapper ? rowWrapper(rowElement, item, row.index) : rowElement;
+          const wrapped = rowWrapper ? rowWrapper(rowElement, item, row.index) : rowElement;
+          return <Fragment key={rowKey}>{wrapped}</Fragment>;
         })}
       </div>
     </div>
