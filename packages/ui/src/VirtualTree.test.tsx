@@ -83,6 +83,25 @@ describe('VirtualTree', () => {
     expect(onToggle).toHaveBeenNthCalledWith(2, 'b');
   });
 
+  it('selects a leaf node when Enter or Space is pressed', () => {
+    const onSelect = vi.fn();
+    const onToggle = vi.fn();
+    render(
+      <VirtualTree
+        flattenedNodes={nodes}
+        rowHeight={20}
+        onSelect={onSelect}
+        onToggle={onToggle}
+      />,
+    );
+    fireEvent.keyDown(screen.getAllByRole('treeitem')[1]!, { key: 'Enter' });
+    fireEvent.keyDown(screen.getAllByRole('treeitem')[1]!, { key: ' ' });
+
+    expect(onSelect).toHaveBeenNthCalledWith(1, 'a.1');
+    expect(onSelect).toHaveBeenNthCalledWith(2, 'a.1');
+    expect(onToggle).not.toHaveBeenCalled();
+  });
+
   it('moves focus with ArrowDown / ArrowUp', () => {
     render(<VirtualTree flattenedNodes={nodes} rowHeight={20} onToggle={() => {}} />);
     fireEvent.keyDown(screen.getAllByRole('treeitem')[0]!, { key: 'ArrowDown' });

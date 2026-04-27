@@ -44,12 +44,14 @@ export function VirtualTree(
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setFocusedIndex(Math.max(index - 1, 0));
-      } else if ((e.key === 'Enter' || e.key === ' ') && node.hasChildren) {
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        if (!node.hasChildren && !onSelect) return;
         e.preventDefault();
-        onToggle(node.id);
+        onSelect?.(node.id);
+        if (node.hasChildren) onToggle(node.id);
       }
     },
-    [flattenedNodes.length, onToggle],
+    [flattenedNodes.length, onSelect, onToggle],
   );
 
   return (
