@@ -67,6 +67,13 @@ describe('VirtualTree', () => {
     expect(onToggle).not.toHaveBeenCalled();
   });
 
+  it('shows leaf nodes as interactive when selection is enabled', () => {
+    render(
+      <VirtualTree flattenedNodes={nodes} rowHeight={20} onToggle={() => {}} onSelect={() => {}} />,
+    );
+    expect(screen.getAllByRole('treeitem')[1]?.style.cursor).toBe('pointer');
+  });
+
   it('toggles when Enter or Space is pressed on a parent', () => {
     const onToggle = vi.fn();
     render(<VirtualTree flattenedNodes={nodes} rowHeight={20} onToggle={onToggle} />);
@@ -74,6 +81,25 @@ describe('VirtualTree', () => {
     fireEvent.keyDown(screen.getAllByRole('treeitem')[2]!, { key: ' ' });
     expect(onToggle).toHaveBeenNthCalledWith(1, 'a');
     expect(onToggle).toHaveBeenNthCalledWith(2, 'b');
+  });
+
+  it('selects a leaf node when Enter or Space is pressed', () => {
+    const onSelect = vi.fn();
+    const onToggle = vi.fn();
+    render(
+      <VirtualTree
+        flattenedNodes={nodes}
+        rowHeight={20}
+        onSelect={onSelect}
+        onToggle={onToggle}
+      />,
+    );
+    fireEvent.keyDown(screen.getAllByRole('treeitem')[1]!, { key: 'Enter' });
+    fireEvent.keyDown(screen.getAllByRole('treeitem')[1]!, { key: ' ' });
+
+    expect(onSelect).toHaveBeenNthCalledWith(1, 'a.1');
+    expect(onSelect).toHaveBeenNthCalledWith(2, 'a.1');
+    expect(onToggle).not.toHaveBeenCalled();
   });
 
   it('moves focus with ArrowDown / ArrowUp', () => {

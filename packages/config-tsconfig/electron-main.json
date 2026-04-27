@@ -6,6 +6,9 @@
     ],
     "types": [],
     "module": "ESNext",
-    "moduleResolution": "Bundler"
+    "moduleResolution": "Bundler",
+    "rootDir": "${configDir}/src/main",
+    "outDir": "${configDir}/.build/out/main",
+    "tsBuildInfoFile": "${configDir}/.build/out/.tsbuildinfo-main"
   }
 }

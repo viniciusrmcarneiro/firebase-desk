@@ -26,7 +26,17 @@
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
-    "incremental": true
+    "incremental": true,
+    "rootDir": "${configDir}/src",
+    "outDir": "${configDir}/.build/dist",
+    "tsBuildInfoFile": "${configDir}/.build/.tsbuildinfo"
   },
-  "exclude": ["node_modules", "dist", "out", "build", "coverage"]
+  "exclude": [
+    "${configDir}/node_modules",
+    "${configDir}/dist",
+    "${configDir}/out",
+    "${configDir}/build",
+    "${configDir}/.build",
+    "${configDir}/coverage"
+  ]
 }

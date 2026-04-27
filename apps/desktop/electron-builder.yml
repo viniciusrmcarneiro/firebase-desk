@@ -4,7 +4,7 @@ directories:
   output: release
   buildResources: build
 files:
-  - out/**
+  - .build/out/**
   - package.json
 mac:
   target:

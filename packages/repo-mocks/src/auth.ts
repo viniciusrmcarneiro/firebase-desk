@@ -3,12 +3,17 @@ import { AUTH_USERS } from './fixtures/index.ts';
 
 export class MockAuthRepository implements AuthRepository {
   async listUsers(_projectId: string, request?: PageRequest): Promise<Page<AuthUser>> {
+    const offset = Number.parseInt(request?.cursor?.token ?? '0', 10) || 0;
     const limit = request?.limit ?? AUTH_USERS.length;
-    const items = AUTH_USERS.slice(0, limit).map((u) => ({
+    const nextOffset = offset + limit;
+    const items = AUTH_USERS.slice(offset, nextOffset).map((u) => ({
       ...u,
       customClaims: { ...u.customClaims },
     }));
-    return { items, nextCursor: null };
+    return {
+      items,
+      nextCursor: nextOffset < AUTH_USERS.length ? { token: String(nextOffset) } : null,
+    };
   }
 
   async getUser(_projectId: string, uid: string): Promise<AuthUser | null> {

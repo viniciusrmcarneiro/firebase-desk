@@ -13,18 +13,20 @@ export function AppShell({ className, sidebar, statusBar, titlebar, workspace }:
   return (
     <div
       className={cn(
-        'grid h-full grid-rows-[auto_minmax(0,1fr)_auto] bg-bg-app text-text-primary',
+        'flex h-full flex-col bg-bg-app text-text-primary',
         className,
       )}
     >
       {titlebar
-        ? <div className='border-b border-border-subtle bg-bg-panel'>{titlebar}</div>
+        ? <div className='shrink-0 border-b border-border-subtle bg-bg-panel'>{titlebar}</div>
         : null}
-      <div className='grid min-h-0 grid-cols-[var(--sidebar-width,280px)_minmax(0,1fr)]'>
+      <div className='grid min-h-0 flex-1 grid-cols-[var(--sidebar-width,280px)_minmax(0,1fr)]'>
         {sidebar}
-        {workspace}
+        <div className='grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto]'>
+          {workspace}
+          {statusBar}
+        </div>
       </div>
-      {statusBar}
     </div>
   );
 }

@@ -2,6 +2,7 @@ export * from './badge/index.ts';
 export * from './button/index.ts';
 export * from './cn.ts';
 export * from './context-menu/index.ts';
+export * from './data-table/index.ts';
 export * from './dialog/index.ts';
 export * from './dropdown-menu/index.ts';
 export * from './empty-state/index.ts';

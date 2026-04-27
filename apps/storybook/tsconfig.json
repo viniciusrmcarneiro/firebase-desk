@@ -1,6 +1,7 @@
 {
   "extends": "../../packages/config-tsconfig/react.json",
   "compilerOptions": {
+    "rootDir": "${configDir}",
     "noEmit": true,
     "types": ["vite/client"]
   },

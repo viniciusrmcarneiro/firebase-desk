@@ -4,6 +4,7 @@ export interface AuthUser {
   readonly uid: string;
   readonly email: string | null;
   readonly displayName: string | null;
+  readonly provider: string;
   readonly disabled: boolean;
   readonly customClaims: Record<string, unknown>;
 }

@@ -1,5 +1,5 @@
 import { density as densityTokens, type DensityName } from '@firebase-desk/design-tokens';
-import { type KeyboardEvent, useCallback, useState } from 'react';
+import { type KeyboardEvent, type ReactNode, useCallback, useState } from 'react';
 import { VirtualList } from './VirtualList.tsx';
 
 export interface VirtualTreeNode {
@@ -15,11 +15,23 @@ export interface VirtualTreeProps {
   readonly density?: DensityName;
   readonly rowHeight?: number;
   readonly onToggle: (id: string) => void;
+  readonly onOpen?: (id: string) => void;
+  readonly onSelect?: (id: string) => void;
+  readonly renderNode?: (node: VirtualTreeNode) => ReactNode;
   readonly ariaLabel?: string;
 }
 
 export function VirtualTree(
-  { ariaLabel, density = 'compact', flattenedNodes, onToggle, rowHeight }: VirtualTreeProps,
+  {
+    ariaLabel,
+    density = 'compact',
+    flattenedNodes,
+    onOpen,
+    onSelect,
+    onToggle,
+    renderNode,
+    rowHeight,
+  }: VirtualTreeProps,
 ) {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const resolvedRowHeight = rowHeight ?? densityTokens[density].treeRowHeight;
@@ -32,12 +44,14 @@ export function VirtualTree(
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
         setFocusedIndex(Math.max(index - 1, 0));
-      } else if ((e.key === 'Enter' || e.key === ' ') && node.hasChildren) {
+      } else if (e.key === 'Enter' || e.key === ' ') {
+        if (!node.hasChildren && !onSelect) return;
         e.preventDefault();
-        onToggle(node.id);
+        onSelect?.(node.id);
+        if (node.hasChildren) onToggle(node.id);
       }
     },
-    [flattenedNodes.length, onToggle],
+    [flattenedNodes.length, onSelect, onToggle],
   );
 
   return (
@@ -65,15 +79,19 @@ export function VirtualTree(
               height: resolvedRowHeight,
               display: 'flex',
               alignItems: 'center',
-              cursor: node.hasChildren ? 'pointer' : 'default',
+              cursor: node.hasChildren || onSelect ? 'pointer' : 'default',
             }}
             onClick={() => {
               setFocusedIndex(index);
+              onSelect?.(node.id);
               if (node.hasChildren) onToggle(node.id);
             }}
+            onDoubleClick={() => onOpen?.(node.id)}
             onKeyDown={(e) => handleKeyDown(e, index, node)}
           >
-            {node.hasChildren ? (node.expanded ? '▾' : '▸') : ' '} {node.label}
+            {renderNode
+              ? renderNode(node)
+              : `${node.hasChildren ? (node.expanded ? '▾' : '▸') : ' '} ${node.label}`}
           </div>
         )}
       />

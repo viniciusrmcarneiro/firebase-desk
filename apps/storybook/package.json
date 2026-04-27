@@ -7,7 +7,7 @@
   "scripts": {
     "dev": "storybook dev -p 6006 --host 127.0.0.1",
     "storybook": "storybook dev -p 6006 --host 127.0.0.1",
-    "build": "storybook build",
+    "build": "storybook build --output-dir .build/storybook-static",
     "lint": "oxlint --config oxlintrc.json .storybook src",
     "typecheck": "tsc --noEmit",
     "test": "vitest run --passWithNoTests"

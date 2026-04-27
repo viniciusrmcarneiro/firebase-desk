@@ -5,6 +5,7 @@ export const AuthUserSchema = z.object({
   uid: z.string(),
   email: z.string().nullable(),
   displayName: z.string().nullable(),
+  provider: z.string(),
   disabled: z.boolean(),
   customClaims: z.record(z.string(), z.unknown()),
 });

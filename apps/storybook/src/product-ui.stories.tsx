@@ -1,3 +1,4 @@
+import { type DensityName } from '@firebase-desk/design-tokens';
 import { HotkeysProvider } from '@firebase-desk/hotkeys';
 import {
   AppearanceProvider,
@@ -15,6 +16,7 @@ import {
 import { MockSettingsRepository } from '@firebase-desk/repo-mocks';
 import { Button, Panel, PanelBody, PanelHeader, Toolbar } from '@firebase-desk/ui';
 import type { Meta, StoryObj } from '@storybook/react';
+import { useState } from 'react';
 
 const settings = new MockSettingsRepository();
 
@@ -83,8 +85,20 @@ export const TargetModeBadgeProduction: Story = {
 export const TargetModeBadgeEmulator: Story = { render: () => <TargetModeBadge mode='emulator' /> };
 export const ProductionWarningDefault: Story = { render: () => <ProductionWarning /> };
 export const SettingsDialogOpen: Story = {
-  render: () => <SettingsDialog open onOpenChange={() => {}} />,
+  render: () => <SettingsDialogStory />,
 };
+
+function SettingsDialogStory() {
+  const [density, setDensity] = useState<DensityName>('compact');
+  return (
+    <SettingsDialog
+      density={density}
+      open
+      onDensityChange={setDensity}
+      onOpenChange={() => {}}
+    />
+  );
+}
 export const CommandPaletteOpen: Story = {
   render: () => (
     <CommandPalette

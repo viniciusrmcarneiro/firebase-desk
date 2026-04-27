@@ -48,7 +48,7 @@ async function seedFirestore(): Promise<void> {
   for (const collection of COLLECTIONS) {
     for (const doc of collection.docs) {
       await db
-        .collection(collection.name)
+        .collection(collection.path)
         .doc(doc.id)
         .set(toAdminValue(doc.data) as Record<string, unknown>);
     }

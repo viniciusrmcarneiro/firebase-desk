@@ -1,9 +1,6 @@
 {
   "extends": "../../packages/config-tsconfig/electron-renderer.json",
   "compilerOptions": {
-    "outDir": "out/renderer",
-    "rootDir": "src/renderer",
-    "tsBuildInfoFile": "out/.tsbuildinfo-renderer",
     "types": ["vite/client"]
   },
   "include": ["src/renderer/**/*"],

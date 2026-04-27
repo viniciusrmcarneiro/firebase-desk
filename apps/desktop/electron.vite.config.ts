@@ -12,7 +12,7 @@ const monacoEditorPluginFactory =
 export default defineConfig({
   main: {
     build: {
-      outDir: 'out/main',
+      outDir: '.build/out/main',
       lib: { entry: resolve(__dirname, 'src/main/index.ts'), formats: ['es'] },
       rollupOptions: {
         external: ['electron', /^node:/],
@@ -22,7 +22,7 @@ export default defineConfig({
   preload: {
     build: {
       externalizeDeps: false,
-      outDir: 'out/preload',
+      outDir: '.build/out/preload',
       lib: { entry: resolve(__dirname, 'src/preload/index.ts'), formats: ['cjs'] },
       rollupOptions: {
         external: ['electron'],
@@ -38,6 +38,8 @@ export default defineConfig({
       react(),
       monacoEditorPluginFactory({
         languageWorkers: [],
+        publicPath: 'monacoeditorwork',
+        customDistPath: (_root, buildOutDir) => resolve(buildOutDir, 'monacoeditorwork'),
         customWorkers: [
           { label: 'editorWorkerService', entry: 'monaco-editor/esm/vs/editor/editor.worker.js' },
           { label: 'json', entry: 'monaco-editor/esm/vs/language/json/json.worker.js' },
@@ -46,7 +48,7 @@ export default defineConfig({
       }),
     ],
     build: {
-      outDir: resolve(__dirname, 'out/renderer'),
+      outDir: resolve(__dirname, '.build/out/renderer'),
       rollupOptions: {
         input: resolve(__dirname, 'src/renderer/index.html'),
       },

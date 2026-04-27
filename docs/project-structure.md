@@ -141,12 +141,13 @@ Hard rules:
 1. Monorepo + CI foundation (pnpm workspaces, turbo, shared configs, GitHub Actions).
 2. `repo-contracts` + `repo-mocks` + `ui` skeletons; wire `apps/wireframe/` to consume them.
 3. Electron shell in `apps/desktop` (main + preload + renderer) wired to mocks via IPC.
-4. `repo-firebase` + project credential storage.
-5. Firestore read/query APIs.
-6. Firestore edit APIs.
-7. `script-runner` package + JS Query feature.
-8. Auth user APIs.
-9. Packaging and release docs.
+4. Mocked app contract hardening before real Firebase adapters.
+5. Build/release pipeline: package macOS/Windows/Linux on PRs, publish `main-latest` and tagged GitHub Release assets, download/install smoke checks, document unsigned builds.
+6. `repo-firebase` + project credential storage.
+7. Firestore read/query APIs.
+8. Firestore edit APIs.
+9. `script-runner` package + JS Query feature.
+10. Auth user APIs.
 
 ## Testing Layout
 
@@ -164,6 +165,7 @@ Root `package.json` exposes thin wrappers; turbo fans out:
 - `pnpm format:check` -> `dprint check`
 - `pnpm typecheck` -> `turbo run typecheck`
 - `pnpm test` -> `turbo run test`
+- `pnpm test:coverage` -> `turbo run test:coverage`
 - `pnpm build` -> `turbo run build`
 - `pnpm dev` -> `turbo run dev --parallel` (desktop + wireframe)
 - `pnpm storybook` -> `pnpm --filter @firebase-desk/storybook dev`
@@ -173,6 +175,6 @@ Root `package.json` exposes thin wrappers; turbo fans out:
 ## Migration Notes (current repo -> target layout)
 
 - [x] `wireframes/` moved to `apps/wireframe/`.
-- [ ] Add `pnpm-workspace.yaml`, `turbo.json`, `tsconfig.base.json`, root `package.json` with workspace scripts.
-- [ ] Add `apps/wireframe/package.json` (`@firebase-desk/wireframe`).
+- [x] Add `pnpm-workspace.yaml`, `turbo.json`, `tsconfig.base.json`, root `package.json` with workspace scripts.
+- [x] Add `apps/wireframe/package.json` (`@firebase-desk/wireframe`).
 - Existing `docs/` and `LICENSE` stay at the root.

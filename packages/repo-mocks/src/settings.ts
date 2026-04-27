@@ -5,7 +5,7 @@ import type {
 } from '@firebase-desk/repo-contracts';
 
 const DEFAULT_SNAPSHOT: SettingsSnapshot = {
-  sidebarWidth: 280,
+  sidebarWidth: 320,
   inspectorWidth: 360,
   theme: 'system',
   hotkeyOverrides: {},

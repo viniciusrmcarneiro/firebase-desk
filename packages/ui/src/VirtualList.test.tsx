@@ -40,6 +40,21 @@ describe('VirtualList', () => {
     expect(screen.getAllByTestId('row').map((r) => r.textContent)).toEqual(['0:x', '1:y']);
   });
 
+  it('applies container and item classes', () => {
+    const { container } = render(
+      <VirtualList
+        className='outer-list'
+        itemClassName={(item) => `row-${item}`}
+        items={['x']}
+        estimateSize={() => 20}
+        renderItem={(item) => <span>{item}</span>}
+      />,
+    );
+
+    expect(container.querySelector('.outer-list')).toBeTruthy();
+    expect(container.querySelector('.row-x')).toBeTruthy();
+  });
+
   it('renders nothing for an empty list', () => {
     render(
       <VirtualList

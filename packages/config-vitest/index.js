@@ -13,7 +13,7 @@ export function baseVitestConfig() {
       reporters: ['default'],
       coverage: {
         provider: 'v8',
-        reporter: ['text', 'lcov'],
+        reporter: ['text', 'json-summary', 'lcov'],
       },
     },
   });
