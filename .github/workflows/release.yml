@@ -136,6 +136,12 @@ jobs:
             - run: pnpm package:checksums
               env:
                   CHECKSUM_FILE_NAME: ${{ steps.package_names.outputs.checksums }}
+            - name: Configure Linux sandbox helper
+              if: matrix.platform == 'linux'
+              run: |
+                  sudo chown root:root apps/desktop/release/linux-unpacked/chrome-sandbox
+                  sudo chmod 4755 apps/desktop/release/linux-unpacked/chrome-sandbox
+                  ls -l apps/desktop/release/linux-unpacked/chrome-sandbox
             - name: Smoke packaged app with emulators (Linux)
               if: matrix.platform == 'linux'
               run: |

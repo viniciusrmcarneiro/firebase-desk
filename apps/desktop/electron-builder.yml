@@ -24,6 +24,8 @@ win:
 nsis:
   oneClick: false
   allowToChangeInstallationDirectory: true
+deb:
+  packageName: firebase-desk
 linux:
   icon: build/icon.png
   executableName: firebase-desk

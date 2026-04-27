@@ -51,6 +51,14 @@ Every workflow has an identical local pnpm command:
 | `e2e.yml`     | `pnpm install && pnpm build && pnpm --filter @firebase-desk/e2e test:withEmulators`                    |
 | `release.yml` | `pnpm install && pnpm package` (per-OS)                                                                |
 
+Linux package smoke can be reproduced from macOS with Docker:
+
+```sh
+pnpm package:linux:docker
+```
+
+The Docker wrapper runs the Ubuntu image as `linux/amd64` and grants the Chromium sandbox capability needed by packaged Electron apps.
+
 ## Release Workflow
 
 Firebase Desk publishes unsigned development binaries with SHA-256 checksums. We do not plan to sign binaries; package-manager distribution can come later.

@@ -44,6 +44,7 @@
 - `pnpm test:e2e`
 - `pnpm build`
 - `pnpm package`
+- `pnpm package:linux:docker` for local Docker reproduction of the Linux release package smoke. The wrapper uses `linux/amd64` and the Docker capability required by Chromium's sandbox.
 - `pnpm dev` (parallel: desktop + wireframe)
 
 ### Policy
