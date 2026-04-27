@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DESKTOP_DIR = resolve(__dirname, '../../apps/desktop');
-const MAIN_ENTRY = resolve(DESKTOP_DIR, 'out/main/index.js');
+const MAIN_ENTRY = resolve(DESKTOP_DIR, '.build/out/main/index.js');
 
 export async function launchDesktop(): Promise<ElectronApplication> {
   const env: Record<string, string> = {};
