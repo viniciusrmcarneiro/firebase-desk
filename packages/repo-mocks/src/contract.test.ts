@@ -25,8 +25,15 @@ describe('repo-mocks contract conformance', () => {
       emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
     });
     expect((await repo.get(added.id))?.id).toBe(added.id);
-    const updated = await repo.update(added.id, { name: 'Tmp Renamed' });
+    const updated = await repo.update(added.id, {
+      name: 'Tmp Renamed',
+      projectId: 'tmp-renamed',
+    });
     expect(updated.name).toBe('Tmp Renamed');
+    expect(updated.projectId).toBe('tmp-renamed');
+    await expect(repo.update('prod', { projectId: 'other-prod' })).rejects.toThrow(
+      'Production project ID comes from the service account JSON.',
+    );
     await expect(repo.update(added.id, { name: ' ' })).rejects.toThrow(
       'Project display name is required.',
     );

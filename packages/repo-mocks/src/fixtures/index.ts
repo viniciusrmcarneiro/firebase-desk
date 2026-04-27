@@ -37,9 +37,9 @@ export const PROJECTS: ReadonlyArray<ProjectSummary> = [
     createdAt: '2026-04-22T10:00:00.000Z',
   },
   {
-    id: 'broken',
+    id: MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID,
     name: 'Broken Connection',
-    projectId: MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID,
+    projectId: 'demo-broken',
     target: 'emulator',
     emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
     hasCredential: false,
