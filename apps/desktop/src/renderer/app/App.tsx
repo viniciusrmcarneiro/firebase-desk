@@ -17,7 +17,7 @@ function SplashScreen() {
       aria-label='Loading Firebase Desk'
       className='grid h-screen place-items-center bg-slate-50 px-8'
     >
-      <div className='flex w-full max-w-136 flex-col items-center'>
+      <div className='flex w-full max-w-[34rem] flex-col items-center'>
         <img
           src={splashLogoUrl}
           alt='Firebase Desk'

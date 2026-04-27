@@ -201,7 +201,8 @@ jobs:
                   echo "Source commit: \`$GITHUB_SHA\`" >> release-notes.md
 
                   if gh release view "$ROLLING_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
-                    gh release edit "$ROLLING_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --prerelease --title "$ROLLING_RELEASE_TAG" --notes-file release-notes.md
+                    # Update the release target to the current commit (note: the git tag itself will not move)
+                    gh release edit "$ROLLING_RELEASE_TAG" --repo "$GITHUB_REPOSITORY" --prerelease --title "$ROLLING_RELEASE_TAG" --notes-file release-notes.md --target "$GITHUB_SHA"
                   else
                     if ! gh api "repos/$GITHUB_REPOSITORY/git/ref/tags/$ROLLING_RELEASE_TAG" >/dev/null 2>&1; then
                       echo "::error::Missing required rolling release tag '$ROLLING_RELEASE_TAG'. Create it once, then rerun this workflow."
