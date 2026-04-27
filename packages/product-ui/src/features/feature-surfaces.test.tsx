@@ -317,29 +317,35 @@ describe('feature surfaces', () => {
   it('WorkspaceTabStrip switches and closes tabs', () => {
     const onSelectTab = vi.fn();
     const onCloseTab = vi.fn();
+    const onPointerDown = vi.fn();
     render(
-      <WorkspaceTabStrip
-        activeTabId='tab-firestore'
-        projects={projects}
-        tabs={[
-          { id: 'tab-firestore', kind: 'firestore-query', title: 'orders', projectId: 'emu' },
-          { id: 'tab-auth', kind: 'auth-users', title: 'Auth', projectId: 'emu' },
-        ]}
-        onCloseAllTabs={() => {}}
-        onCloseOtherTabs={() => {}}
-        onCloseTab={onCloseTab}
-        onCloseTabsToLeft={() => {}}
-        onCloseTabsToRight={() => {}}
-        onReorderTabs={() => {}}
-        onSelectTab={onSelectTab}
-        onSortByProject={() => {}}
-      />,
+      <div onPointerDown={onPointerDown}>
+        <WorkspaceTabStrip
+          activeTabId='tab-firestore'
+          projects={projects}
+          tabs={[
+            { id: 'tab-firestore', kind: 'firestore-query', title: 'orders', projectId: 'emu' },
+            { id: 'tab-auth', kind: 'auth-users', title: 'Auth', projectId: 'emu' },
+          ]}
+          onCloseAllTabs={() => {}}
+          onCloseOtherTabs={() => {}}
+          onCloseTab={onCloseTab}
+          onCloseTabsToLeft={() => {}}
+          onCloseTabsToRight={() => {}}
+          onReorderTabs={() => {}}
+          onSelectTab={onSelectTab}
+          onSortByProject={() => {}}
+        />
+      </div>,
     );
 
     fireEvent.click(screen.getByText('Auth'));
-    fireEvent.click(screen.getByRole('button', { name: 'Close Auth' }));
+    const closeAuthButton = screen.getByRole('button', { name: 'Close Auth' });
+    fireEvent.pointerDown(closeAuthButton);
+    fireEvent.click(closeAuthButton);
 
     expect(onSelectTab).toHaveBeenCalledWith('tab-auth');
+    expect(onPointerDown).not.toHaveBeenCalled();
     expect(onCloseTab).toHaveBeenCalledWith('tab-auth');
   });
 

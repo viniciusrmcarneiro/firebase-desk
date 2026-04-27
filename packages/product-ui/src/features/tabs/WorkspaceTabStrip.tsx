@@ -157,6 +157,7 @@ function SortableTab(
             label={`Close ${tab.title}`}
             size='xs'
             variant='ghost'
+            onPointerDown={(event) => event.stopPropagation()}
             onClick={(event) => {
               event.stopPropagation();
               onCloseTab(tab.id);

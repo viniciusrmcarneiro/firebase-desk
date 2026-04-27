@@ -292,8 +292,9 @@ function compare(left: unknown, right: unknown): number {
 function comparable(value: unknown): string | number {
   if (typeof value === 'number' || typeof value === 'string') return value;
   if (value instanceof Date) return value.getTime();
-  if (value && typeof value === 'object' && 'toJSON' in value) {
-    return JSON.stringify((value as { toJSON: () => unknown; }).toJSON());
+  if (value && typeof value === 'object') {
+    const toJSON = (value as { readonly toJSON?: () => unknown; }).toJSON;
+    if (typeof toJSON === 'function') return JSON.stringify(toJSON.call(value));
   }
   return JSON.stringify(value);
 }

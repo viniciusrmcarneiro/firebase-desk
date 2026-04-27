@@ -77,7 +77,7 @@ export function VirtualTree(
               height: resolvedRowHeight,
               display: 'flex',
               alignItems: 'center',
-              cursor: node.hasChildren ? 'pointer' : 'default',
+              cursor: node.hasChildren || onSelect ? 'pointer' : 'default',
             }}
             onClick={() => {
               setFocusedIndex(index);

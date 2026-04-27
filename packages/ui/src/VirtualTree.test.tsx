@@ -67,6 +67,13 @@ describe('VirtualTree', () => {
     expect(onToggle).not.toHaveBeenCalled();
   });
 
+  it('shows leaf nodes as interactive when selection is enabled', () => {
+    render(
+      <VirtualTree flattenedNodes={nodes} rowHeight={20} onToggle={() => {}} onSelect={() => {}} />,
+    );
+    expect(screen.getAllByRole('treeitem')[1]?.style.cursor).toBe('pointer');
+  });
+
   it('toggles when Enter or Space is pressed on a parent', () => {
     const onToggle = vi.fn();
     render(<VirtualTree flattenedNodes={nodes} rowHeight={20} onToggle={onToggle} />);
