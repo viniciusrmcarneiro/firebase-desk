@@ -4,6 +4,8 @@ A free, open-source desktop Firebase admin client for developers: browse, query,
 
 Status: mocked app. Current priority is release packaging so GitHub can produce downloadable desktop binaries before real Firebase integration continues.
 
+Safety note: early binaries are published as unsigned development builds. Expect OS warning prompts, and do not use production Firebase credentials yet; real Firebase integration is not enabled.
+
 ## MVP
 
 - Manage multiple Firebase projects from service account JSON files.
@@ -51,13 +53,28 @@ Every workflow has an identical local pnpm command:
 
 ## Release Workflow
 
-Early binaries are unsigned development builds.
+Early binaries are unsigned development builds. Signing is not required to publish them; it only removes OS trust warnings later.
 
-| Event           | Output                                                                    |
-| --------------- | ------------------------------------------------------------------------- |
-| PR to `main`    | CI, e2e, package macOS/Windows/Linux, upload temporary workflow artifacts |
-| Merge to `main` | CI, package macOS/Windows/Linux, update draft prerelease `main-latest`    |
-| Tag `v*.*.*`    | CI, package macOS/Windows/Linux, create versioned draft release           |
-| Manual dispatch | Ad-hoc package smoke run with temporary workflow artifacts                |
+| Event           | Output                                                                                                                   |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
+| PR to `main`    | CI, package Linux; package macOS/Windows when `package-all` or package paths change; upload temporary workflow artifacts |
+| Merge to `main` | CI, package macOS/Windows/Linux, publish/update prerelease `main-latest`                                                 |
+| Tag `v*.*.*`    | CI, package macOS/Windows/Linux, publish versioned prerelease                                                            |
+| Manual dispatch | Ad-hoc package smoke run with temporary workflow artifacts                                                               |
 
 Use PR artifacts to block broken packaging before merge. Use GitHub Release assets from `main-latest` and version tags as the long-lived download links.
+
+## Downloads
+
+- Rolling dev build: <https://github.com/viniciusrmcarneiro/firebase-desk/releases/tag/main-latest>
+- Versioned prereleases: <https://github.com/viniciusrmcarneiro/firebase-desk/releases>
+
+Artifact names include channel/version, OS, architecture, and target extension. PR and manual-dispatch artifacts are temporary workflow artifacts, not release assets.
+
+## Unsigned App Warnings
+
+- macOS: Gatekeeper may block the app. For local smoke testing, remove quarantine with `xattr -dr com.apple.quarantine "Firebase Desk.app"`, then open from Finder.
+- Windows: SmartScreen may warn on the installer or zip app. For local smoke testing, use `More info > Run anyway`.
+- Linux: AppImage builds may need `chmod +x Firebase\ Desk-*.AppImage`; `.deb` builds can be installed with `sudo apt install ./Firebase\ Desk-*.deb`.
+
+Signing, notarization, and Windows code-signing are deferred while unsigned development binaries are published. See [docs/release-checklist.md](docs/release-checklist.md).

@@ -3,38 +3,186 @@ name: release
 on:
     workflow_dispatch:
     push:
+        branches: [ main ]
         tags:
             - "v*.*.*"
+    pull_request:
+        branches: [ main ]
+        types: [ opened, synchronize, reopened, labeled, unlabeled ]
+
+permissions:
+    contents: read
 
 jobs:
+    prepare:
+        runs-on: ubuntu-latest
+        permissions:
+            contents: read
+            pull-requests: read
+        outputs:
+            matrix: ${{ steps.plan.outputs.matrix }}
+            release_channel: ${{ steps.plan.outputs.release_channel }}
+            retention_days: ${{ steps.plan.outputs.retention_days }}
+        steps:
+            - uses: actions/github-script@v7
+              id: plan
+              with:
+                  script: |
+                      const allPlatforms = [
+                          { os: 'ubuntu-latest', platform: 'linux', smoke: 'packaged' },
+                          { os: 'macos-latest', platform: 'macos', smoke: 'packaged' },
+                          { os: 'windows-latest', platform: 'windows', smoke: 'files' },
+                      ];
+
+                      const packagePathPrefixes = [
+                          'apps/desktop/',
+                          'e2e/',
+                      ];
+                      const packagePaths = new Set([
+                          '.github/workflows/ci.yml',
+                          '.github/workflows/release.yml',
+                          'package.json',
+                          'pnpm-lock.yaml',
+                          'scripts/generate-icons.mjs',
+                          'scripts/package-desktop.mjs',
+                      ]);
+
+                      const eventName = context.eventName;
+                      const ref = context.ref;
+                      let releaseChannel = `dispatch-${context.runId}`;
+                      let retentionDays = '14';
+                      let includeAllPlatforms = eventName === 'workflow_dispatch';
+
+                      if (eventName === 'pull_request') {
+                          const pullRequest = context.payload.pull_request;
+                          releaseChannel = `pr-${pullRequest.number}`;
+                          const labels = pullRequest.labels.map((label) => label.name);
+                          const hasPackageAllLabel = labels.includes('package-all');
+                          const files = await github.paginate(github.rest.pulls.listFiles, {
+                              owner: context.repo.owner,
+                              repo: context.repo.repo,
+                              pull_number: pullRequest.number,
+                              per_page: 100,
+                          });
+                          const touchesPackagePaths = files.some((file) => {
+                              return packagePaths.has(file.filename)
+                                  || packagePathPrefixes.some((prefix) => file.filename.startsWith(prefix));
+                          });
+                          includeAllPlatforms = hasPackageAllLabel || touchesPackagePaths;
+                          core.info(`PR package-all label: ${hasPackageAllLabel}`);
+                          core.info(`PR touches package paths: ${touchesPackagePaths}`);
+                      } else if (eventName === 'push' && ref === 'refs/heads/main') {
+                          releaseChannel = 'main-latest';
+                          retentionDays = '90';
+                          includeAllPlatforms = true;
+                      } else if (eventName === 'push' && ref.startsWith('refs/tags/')) {
+                          releaseChannel = ref.replace('refs/tags/', '');
+                          retentionDays = '90';
+                          includeAllPlatforms = true;
+                      }
+
+                      const matrix = {
+                          include: includeAllPlatforms ? allPlatforms : [allPlatforms[0]],
+                      };
+
+                      core.info(`Release channel: ${releaseChannel}`);
+                      core.info(`Retention days: ${retentionDays}`);
+                      core.info(`Package matrix: ${JSON.stringify(matrix)}`);
+                      core.setOutput('matrix', JSON.stringify(matrix));
+                      core.setOutput('release_channel', releaseChannel);
+                      core.setOutput('retention_days', retentionDays);
+
     ci:
         uses: ./.github/workflows/ci.yml
 
     package:
-        needs: ci
+        needs: [ prepare, ci ]
+        runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
-            matrix:
-                os: [ macos-latest, windows-latest, ubuntu-latest ]
-        runs-on: ${{ matrix.os }}
+            matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
+        env:
+            GCLOUD_PROJECT: demo-local
+            RELEASE_CHANNEL: ${{ needs.prepare.outputs.release_channel }}
         steps:
             - uses: actions/checkout@v4
             - uses: pnpm/action-setup@v4
+              with:
+                  version: 10.33.2
             - uses: actions/setup-node@v4
               with:
                   node-version: 24
                   cache: pnpm
+            - uses: actions/setup-java@v4
+              if: matrix.smoke == 'packaged'
+              with:
+                  distribution: temurin
+                  java-version: 21
+            - name: Install Electron runtime deps
+              if: matrix.platform == 'linux'
+              run: |
+                  sudo apt-get update
+                  sudo apt-get install -y xvfb libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2t64
             - run: pnpm install --frozen-lockfile
             - run: pnpm package
+            - name: Smoke packaged app with emulators (Linux)
+              if: matrix.platform == 'linux'
+              run: |
+                  xvfb-run --auto-servernum -- pnpm dlx firebase-tools@15.15.0 --project demo-local emulators:exec --only auth,firestore --config firebase/emulator/firebase.json "pnpm --filter @firebase-desk/emulator-tools seed && pnpm --filter @firebase-desk/e2e test:packaged"
+            - name: Smoke packaged app with emulators (macOS)
+              if: matrix.platform == 'macos'
+              run: |
+                  pnpm dlx firebase-tools@15.15.0 --project demo-local emulators:exec --only auth,firestore --config firebase/emulator/firebase.json "pnpm --filter @firebase-desk/emulator-tools seed && pnpm --filter @firebase-desk/e2e test:packaged"
+            - name: Check Windows unpacked app exists
+              if: matrix.platform == 'windows'
+              shell: pwsh
+              run: |
+                  $match = Get-ChildItem -Path "apps/desktop/release" -Recurse -Filter "Firebase Desk.exe" | Select-Object -First 1
+                  if (-not $match) {
+                    Get-ChildItem -Path "apps/desktop/release" -Recurse
+                    exit 1
+                  }
+                  Write-Host "Found packaged app: $($match.FullName)"
             - uses: actions/upload-artifact@v4
               with:
-                  name: firebase-desk-${{ matrix.os }}
-                  path: apps/desktop/release/**
+                  name: firebase-desk-${{ needs.prepare.outputs.release_channel }}-${{
+                      matrix.platform }}-${{ runner.arch }}
+                  path: |
+                      apps/desktop/release/*.dmg
+                      apps/desktop/release/*.zip
+                      apps/desktop/release/*.exe
+                      apps/desktop/release/*.AppImage
+                      apps/desktop/release/*.deb
+                  if-no-files-found: error
+                  retention-days: ${{ needs.prepare.outputs.retention_days }}
 
-    release:
-        needs: package
+    publish-main-latest:
+        needs: [ prepare, package ]
         runs-on: ubuntu-latest
-        if: startsWith(github.ref, 'refs/tags/')
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        permissions:
+            contents: write
+        steps:
+            - uses: actions/download-artifact@v4
+              with:
+                  path: artifacts
+            - name: Recreate rolling prerelease
+              env:
+                  GH_TOKEN: ${{ github.token }}
+              run: |
+                  gh release delete main-latest --cleanup-tag --yes --repo "$GITHUB_REPOSITORY" || true
+                  cat > release-notes.md <<'NOTES'
+                  Rolling unsigned development build from the latest `main` commit.
+
+                  These binaries are published intentionally for development smoke testing. They are unsigned, so OS warning prompts are expected.
+                  NOTES
+                  gh release create main-latest --repo "$GITHUB_REPOSITORY" --prerelease --target "$GITHUB_SHA" --title "main-latest" --notes-file release-notes.md
+                  find artifacts -type f -print0 | xargs -0 -I {} gh release upload main-latest {} --repo "$GITHUB_REPOSITORY" --clobber
+
+    publish-tag:
+        needs: [ prepare, package ]
+        runs-on: ubuntu-latest
+        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
         permissions:
             contents: write
         steps:
@@ -43,5 +191,8 @@ jobs:
                   path: artifacts
             - uses: softprops/action-gh-release@v2
               with:
-                  draft: true
+                  draft: false
+                  prerelease: true
+                  body: |
+                      Unsigned development build. OS warning prompts are expected.
                   files: artifacts/**/*

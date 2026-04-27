@@ -19,6 +19,7 @@
     "coverage:summary": "node scripts/coverage-summary.mjs",
     "build": "turbo run build",
     "dev": "turbo run dev --parallel",
+    "icons:generate": "node scripts/generate-icons.mjs",
     "storybook": "pnpm --filter @firebase-desk/storybook dev",
     "test:e2e": "pnpm --filter @firebase-desk/e2e test:e2e",
     "package": "pnpm --filter @firebase-desk/desktop package"

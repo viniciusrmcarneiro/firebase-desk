@@ -14,7 +14,7 @@
     "typecheck": "tsc -b",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
-    "package": "pnpm run build && electron-builder --config electron-builder.yml"
+    "package": "node ../../scripts/package-desktop.mjs"
   },
   "dependencies": {
     "@firebase-desk/data-format": "workspace:*",

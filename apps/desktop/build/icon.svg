@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1024 1024" role="img" aria-label="Firebase Desk icon">
+  <defs>
+    <linearGradient id="bg" x1="120" x2="904" y1="96" y2="928" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#091a2d"/>
+      <stop offset="0.58" stop-color="#149aa7"/>
+      <stop offset="1" stop-color="#f9923e"/>
+    </linearGradient>
+  </defs>
+  <rect width="1024" height="1024" rx="196" fill="url(#bg)"/>
+  <rect x="184" y="196" width="656" height="82" rx="32" fill="#fff" fill-opacity="0.9"/>
+  <rect x="205" y="348" width="174" height="266" rx="36" fill="#5ce0e6"/>
+  <rect x="425" y="307" width="174" height="307" rx="36" fill="#fff"/>
+  <rect x="645" y="399" width="174" height="215" rx="36" fill="#ffbd59"/>
+  <rect x="184" y="676" width="656" height="88" rx="36" fill="#fff" fill-opacity="0.92"/>
+  <rect x="256" y="756" width="82" height="174" rx="26" fill="#fff" fill-opacity="0.86"/>
+  <rect x="686" y="756" width="82" height="174" rx="26" fill="#fff" fill-opacity="0.86"/>
+  <rect x="461" y="768" width="102" height="92" rx="26" fill="#091a2d" fill-opacity="0.82"/>
+</svg>

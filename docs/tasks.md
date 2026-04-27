@@ -3,6 +3,7 @@
 Detailed feature tasks and per-page/per-tab specs should be finalized after the live wireframe is reviewed.
 
 ## Context
+
 Before starting on any engineering work please read all the docs files in the `docs/` directory
 
 ## Phase 0: Planning
@@ -182,19 +183,19 @@ Move this ahead of real Firebase integration so packaging, artifacts, and instal
 - [x] Add desktop `package` script using `electron-builder`.
 - [x] Add `apps/desktop/electron-builder.yml` with macOS, Windows, and Linux targets.
 - [x] Add GitHub Actions `release.yml`.
-- [ ] Run `release.yml` packaging on PRs and fail the PR if packaging fails.
-- [ ] Upload PR package outputs as temporary workflow artifacts only.
-- [ ] Create or update a rolling draft prerelease `main-latest` on every merge to `main`.
-- [ ] Attach `main-latest` binaries as GitHub Release assets.
-- [ ] Keep `v*.*.*` tags creating versioned draft GitHub Releases.
-- [ ] Keep `workflow_dispatch` as an ad-hoc package smoke path.
-- [ ] Name workflow artifacts and release assets by channel/version, OS, architecture, and target type.
-- [ ] Set artifact retention for PR and ad-hoc package smoke builds.
-- [ ] Add app icons and builder resources for macOS, Windows, and Linux.
-- [ ] Add first unsigned/dev-build download notes to README.
-- [ ] Document expected unsigned app warnings per OS.
-- [ ] Add safety disclaimer to README before public binaries exist.
-- [ ] Verify `pnpm package` locally on the current development OS.
+- [x] Run `release.yml` packaging on PRs and fail the PR if packaging fails.
+- [x] Upload PR package outputs as temporary workflow artifacts only.
+- [x] Create or update a rolling published prerelease `main-latest` on every merge to `main`.
+- [x] Attach `main-latest` binaries as GitHub Release assets.
+- [x] Keep `v*.*.*` tags creating versioned published prereleases.
+- [x] Keep `workflow_dispatch` as an ad-hoc package smoke path.
+- [x] Name workflow artifacts and release assets by channel/version, OS, architecture, and target type.
+- [x] Set artifact retention for PR and ad-hoc package smoke builds.
+- [x] Add app icons and builder resources for macOS, Windows, and Linux.
+- [x] Add first unsigned/dev-build download notes to README.
+- [x] Document expected unsigned app warnings per OS.
+- [x] Add safety disclaimer to README before public binaries exist.
+- [x] Verify `pnpm package` locally on the current development OS.
 - [ ] Verify GitHub `release.yml` succeeds on PRs for macOS, Windows, and Linux.
 - [ ] Verify GitHub `release.yml` updates `main-latest` on merge to `main`.
 - [ ] Download every PR workflow artifact and confirm the archive/installer opens.
@@ -202,10 +203,10 @@ Move this ahead of real Firebase integration so packaging, artifacts, and instal
 - [ ] Install/open the macOS binary from PR artifacts and `main-latest` release assets.
 - [ ] Install/open the Windows binary from PR artifacts and `main-latest` release assets.
 - [ ] Install/open the Linux binary from PR artifacts and `main-latest` release assets.
-- [ ] Add a packaged-app smoke test or CI check that catches missing runtime files.
-- [ ] Create the first versioned draft GitHub Release from a tag.
-- [ ] Document signing/notarization/code-signing as deferred or required before public release.
-- [ ] Create first release checklist.
+- [x] Add a packaged-app smoke test or CI check that catches missing runtime files.
+- [ ] Create the first versioned published prerelease from a tag.
+- [x] Document signing/notarization/code-signing as deferred while publishing unsigned dev binaries.
+- [x] Create first release checklist.
 
 ## Phase 6: Project Management
 
