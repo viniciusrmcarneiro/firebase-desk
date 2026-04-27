@@ -43,7 +43,7 @@ Before starting any engineering work, please read all files in the `docs/` direc
 - [x] Replace inspector dropdown collapse with vertical strip exposing always-visible expand button.
 - [x] Add draggable splitters between sidebar/workspace and stack/inspector.
 - [x] Add baseline keyboard shortcuts and `?` help overlay in wireframe.
-- [x] Open account-bound tabs from tree clicks.
+- [x] Open connection-bound tabs from tree clicks.
 - [x] Add account/project dropdown to each tab toolbar.
 - [x] Allow same view open against different accounts.
 - [x] Build project add dialog mock.
@@ -224,17 +224,17 @@ Move this ahead of real Firebase integration so packaging, artifacts, and instal
 
 ## Phase 7: Firestore Read And Query
 
-- [ ] Initialize Firebase Admin app per project.
-- [ ] Initialize Firebase Admin app for emulator target.
-- [ ] List root collections.
-- [ ] Load document IDs for collection tree.
-- [ ] Load subcollections.
-- [ ] Run collection query with filters.
-- [ ] Run sort clauses.
-- [ ] Apply limit.
-- [ ] Implement cursor pagination.
-- [ ] Normalize snapshots for renderer.
-- [ ] Render loading, empty, and error states.
+- [x] Initialize Firebase Admin app per project.
+- [x] Initialize Firebase Admin app for emulator target.
+- [x] List root collections.
+- [x] Load document IDs for query result views.
+- [x] Load subcollections from result views.
+- [x] Run collection query with filters.
+- [x] Run sort clauses.
+- [x] Apply limit.
+- [x] Implement cursor pagination.
+- [x] Normalize snapshots for renderer.
+- [x] Render loading, empty, and error states.
 
 ## Phase 8: Firestore Editing
 

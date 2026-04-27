@@ -8,6 +8,12 @@ const MAIN_ENTRY = resolve(DESKTOP_DIR, '.build/out/main/index.js');
 
 export { DESKTOP_DIR };
 
+export interface LaunchDesktopOptions {
+  readonly args?: ReadonlyArray<string>;
+  readonly env?: Readonly<Record<string, string | undefined>>;
+  readonly userDataDir?: string;
+}
+
 export function createDesktopEnv(): Record<string, string> {
   const env: Record<string, string> = {};
   for (const [k, v] of Object.entries(process.env)) {
@@ -20,10 +26,19 @@ export function createDesktopEnv(): Record<string, string> {
   return env;
 }
 
-export async function launchDesktop(): Promise<ElectronApplication> {
+export async function launchDesktop(
+  options: LaunchDesktopOptions = {},
+): Promise<ElectronApplication> {
+  const env = { ...createDesktopEnv() };
+  if (options.userDataDir) env['FIREBASE_DESK_USER_DATA_DIR'] = options.userDataDir;
+  for (const [key, value] of Object.entries(options.env ?? {})) {
+    if (value === undefined) delete env[key];
+    else env[key] = value;
+  }
+
   return electron.launch({
-    args: [MAIN_ENTRY],
+    args: [MAIN_ENTRY, ...(options.args ?? [])],
     cwd: DESKTOP_DIR,
-    env: createDesktopEnv(),
+    env,
   });
 }

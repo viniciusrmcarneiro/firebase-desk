@@ -84,7 +84,7 @@ describe('MainProjectsRepository', () => {
     ]);
   });
 
-  it('updates project names and emulator hosts', async () => {
+  it('updates project names, emulator project ids, and emulator hosts', async () => {
     const repo = createRepo(await makeTempDir(), plainTextEncryption);
     const project = await repo.add({
       name: 'Local',
@@ -95,13 +95,29 @@ describe('MainProjectsRepository', () => {
 
     const updated = await repo.update(project.id, {
       name: 'Local Renamed',
+      projectId: 'demo-firebase-lite',
       emulator: { firestoreHost: 'localhost:8081', authHost: 'localhost:9098' },
     });
 
     expect(updated).toMatchObject({
       name: 'Local Renamed',
+      projectId: 'demo-firebase-lite',
       emulator: { firestoreHost: 'localhost:8081', authHost: 'localhost:9098' },
     });
+  });
+
+  it('keeps production project ids tied to service account JSON', async () => {
+    const repo = createRepo(await makeTempDir(), plainTextEncryption);
+    const project = await repo.add({
+      name: 'Prod',
+      projectId: 'demo-prod',
+      target: 'production',
+      credentialJson: serviceAccountJson('demo-prod'),
+    });
+
+    await expect(repo.update(project.id, { projectId: 'other-prod' })).rejects.toThrow(
+      'Production project ID comes from the service account JSON.',
+    );
   });
 
   it('rejects empty project names on update', async () => {

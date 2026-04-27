@@ -4,6 +4,7 @@ import { pageOf, PageRequestSchema } from './pagination.ts';
 export const FirestoreCollectionNodeSchema = z.object({
   path: z.string(),
   id: z.string(),
+  documentCount: z.number().int().nonnegative().optional(),
 });
 
 export const FirestoreDocumentNodeSchema = z.object({
@@ -37,7 +38,7 @@ export const FirestoreSortSchema = z.object({
 });
 
 export const FirestoreQuerySchema = z.object({
-  projectId: z.string(),
+  connectionId: z.string(),
   path: z.string(),
   filters: z.array(FirestoreFilterSchema).optional(),
   sorts: z.array(FirestoreSortSchema).optional(),
@@ -48,10 +49,11 @@ export const FirestoreDocumentResultSchema = z.object({
   path: z.string(),
   data: z.record(z.string(), z.unknown()),
   hasSubcollections: z.boolean(),
+  subcollections: z.array(FirestoreCollectionNodeSchema).optional(),
 });
 
 export const ListDocumentsRequestSchema = z.object({
-  projectId: z.string(),
+  connectionId: z.string(),
   collectionPath: z.string(),
   request: PageRequestSchema.optional(),
 });

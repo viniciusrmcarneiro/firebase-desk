@@ -27,7 +27,7 @@ const tab: WorkspaceTab = {
   id: 'tab-firestore-query-1',
   kind: 'firestore-query',
   title: 'orders',
-  projectId: 'emu',
+  connectionId: 'emu',
   history: ['orders'],
   historyIndex: 0,
   inspectorWidth: 360,
@@ -67,6 +67,7 @@ describe('useFirestoreTabState', () => {
     const recordInteraction = vi.spyOn(tabActions, 'recordInteraction').mockImplementation(
       () => {},
     );
+    const runQueryHook = vi.mocked(useRunQuery);
     const { result } = renderHook(() =>
       useFirestoreTabState({
         activeProject: project,
@@ -81,12 +82,61 @@ describe('useFirestoreTabState', () => {
     });
 
     expect(path).toBe('orders');
+    expect(runQueryHook).toHaveBeenLastCalledWith(
+      expect.objectContaining({ connectionId: 'emu', path: 'orders' }),
+      25,
+      1,
+      true,
+    );
     expect(pushHistory).toHaveBeenCalledWith(tab.id, 'orders');
     expect(recordInteraction).toHaveBeenCalledWith({
       activeTabId: tab.id,
       path: 'orders',
       selectedTreeItemId: 'collection:emu:orders',
     });
+  });
+
+  it('increments query run IDs so repeated runs do not reuse cached pages', () => {
+    const runQueryHook = vi.mocked(useRunQuery);
+    const { result } = renderHook(() =>
+      useFirestoreTabState({
+        activeProject: project,
+        activeTab: tab,
+        selectedTreeItemId: 'collection:emu:orders',
+      })
+    );
+
+    act(() => {
+      result.current.runQuery();
+    });
+    act(() => {
+      result.current.runQuery();
+    });
+
+    expect(runQueryHook).toHaveBeenLastCalledWith(
+      expect.objectContaining({ connectionId: 'emu', path: 'orders' }),
+      25,
+      2,
+      true,
+    );
+  });
+
+  it('uses query run IDs for document path loads too', () => {
+    const getDocumentHook = vi.mocked(useGetDocument);
+    const { result } = renderHook(() =>
+      useFirestoreTabState({
+        activeProject: project,
+        activeTab: tab,
+        selectedTreeItemId: 'collection:emu:orders',
+      })
+    );
+
+    act(() => result.current.setDraft({ ...DEFAULT_FIRESTORE_DRAFT, path: 'orders/ord_1024' }));
+    act(() => {
+      result.current.runQuery();
+    });
+
+    expect(getDocumentHook).toHaveBeenLastCalledWith('emu', 'orders/ord_1024', 1);
   });
 
   it('keeps selected document scoped to current query rows', () => {

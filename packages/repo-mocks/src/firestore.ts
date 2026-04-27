@@ -10,7 +10,7 @@ import type {
   Page,
   PageRequest,
 } from '@firebase-desk/repo-contracts';
-import { COLLECTIONS, MOCK_ACCOUNT_LOAD_ERROR_PROJECT_ID } from './fixtures/index.ts';
+import { COLLECTIONS, MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID } from './fixtures/index.ts';
 
 type FixtureDoc = (typeof COLLECTIONS)[number]['docs'][number];
 type FixtureCollection = (typeof COLLECTIONS)[number];
@@ -30,29 +30,29 @@ export class MockFirebaseError extends Error {
 export class MockFirestoreRepository implements FirestoreRepository {
   private readonly collections: FixtureCollection[] = cloneCollections(COLLECTIONS);
 
-  async listRootCollections(projectId: string): Promise<ReadonlyArray<FirestoreCollectionNode>> {
-    assertProjectAvailable(projectId);
+  async listRootCollections(connectionId: string): Promise<ReadonlyArray<FirestoreCollectionNode>> {
+    assertConnectionAvailable(connectionId);
     return this.collections
       .filter((collection) => !collection.path.includes('/'))
       .map((collection) => collectionNode(this.collections, collection.path));
   }
 
   async listDocuments(
-    projectId: string,
+    connectionId: string,
     collectionPath: string,
     request?: PageRequest,
   ): Promise<Page<FirestoreDocumentNode>> {
-    assertProjectAvailable(projectId);
+    assertConnectionAvailable(connectionId);
     const collection = this.collections.find((c) => c.path === collectionPath);
     const docs = collection?.docs ?? [];
     return pageDocuments(this.collections, collectionPath, docs, request);
   }
 
   async listSubcollections(
-    projectId: string,
+    connectionId: string,
     documentPath: string,
   ): Promise<ReadonlyArray<FirestoreCollectionNode>> {
-    assertProjectAvailable(projectId);
+    assertConnectionAvailable(connectionId);
     return subcollectionsFor(this.collections, documentPath);
   }
 
@@ -60,17 +60,17 @@ export class MockFirestoreRepository implements FirestoreRepository {
     query: FirestoreQuery,
     request?: PageRequest,
   ): Promise<Page<FirestoreDocumentResult>> {
-    assertProjectAvailable(query.projectId);
+    assertConnectionAvailable(query.connectionId);
     const collection = this.collections.find((c) => c.path === query.path);
     const docs = sortDocs(filterDocs(collection?.docs ?? [], query.filters), query.sorts);
     return pageResults(this.collections, query.path, docs, request);
   }
 
   async getDocument(
-    projectId: string,
+    connectionId: string,
     documentPath: string,
   ): Promise<FirestoreDocumentResult | null> {
-    assertProjectAvailable(projectId);
+    assertConnectionAvailable(connectionId);
     const parts = documentPath.split('/');
     const docId = parts.at(-1);
     const collectionPath = parts.slice(0, -1).join('/');
@@ -88,11 +88,11 @@ export class MockFirestoreRepository implements FirestoreRepository {
   }
 
   async saveDocument(
-    projectId: string,
+    connectionId: string,
     documentPath: string,
     data: Record<string, unknown>,
   ): Promise<FirestoreDocumentResult> {
-    assertProjectAvailable(projectId);
+    assertConnectionAvailable(connectionId);
     const { collectionPath, docId } = splitDocumentPath(documentPath);
     let collection = this.collections.find((item) => item.path === collectionPath);
     if (!collection) {
@@ -105,13 +105,13 @@ export class MockFirestoreRepository implements FirestoreRepository {
     if (existingIndex >= 0) docs.splice(existingIndex, 1, nextDoc);
     else docs.push(nextDoc);
     this.replaceCollection(collectionPath, docs);
-    const saved = await this.getDocument(projectId, documentPath);
+    const saved = await this.getDocument(connectionId, documentPath);
     if (!saved) throw new MockFirebaseError('not-found', `Document ${documentPath} not found`);
     return saved;
   }
 
-  async deleteDocument(projectId: string, documentPath: string): Promise<void> {
-    assertProjectAvailable(projectId);
+  async deleteDocument(connectionId: string, documentPath: string): Promise<void> {
+    assertConnectionAvailable(connectionId);
     const { collectionPath, docId } = splitDocumentPath(documentPath);
     const collection = this.collections.find((item) => item.path === collectionPath);
     if (!collection) return;
@@ -299,11 +299,11 @@ function comparable(value: unknown): string | number {
   return JSON.stringify(value);
 }
 
-function assertProjectAvailable(projectId: string) {
-  if (projectId === MOCK_ACCOUNT_LOAD_ERROR_PROJECT_ID) {
+function assertConnectionAvailable(connectionId: string) {
+  if (connectionId === MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID) {
     throw new MockFirebaseError(
       'permission-denied',
-      'Mock account failed to load. Check credentials or retry.',
+      'Mock connection failed to load. Check credentials or retry.',
     );
   }
 }

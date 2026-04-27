@@ -1,7 +1,6 @@
 /**
  * Seed script that pushes repo-mocks fixtures into the running Firebase Emulator.
- * Expects FIRESTORE_EMULATOR_HOST + FIREBASE_AUTH_EMULATOR_HOST to be set
- * (firebase emulators:exec sets both automatically).
+ * Defaults to the repo's local emulator ports. firebase emulators:exec also sets these values.
  */
 import {
   FirestoreBytes,
@@ -14,7 +13,10 @@ import { initializeApp } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { GeoPoint, getFirestore } from 'firebase-admin/firestore';
 
-const projectId = process.env['GCLOUD_PROJECT'] ?? 'demo-local';
+process.env['FIRESTORE_EMULATOR_HOST'] ??= '127.0.0.1:8080';
+process.env['FIREBASE_AUTH_EMULATOR_HOST'] ??= '127.0.0.1:9099';
+
+const projectId = seedProjectId();
 
 const app = initializeApp({ projectId });
 const db = getFirestore(app);
@@ -75,9 +77,41 @@ async function seedAuth(): Promise<void> {
 
 async function main(): Promise<void> {
   console.log(`[seed] using project ${projectId}`);
+  console.log('[seed] override with GCLOUD_PROJECT=<project-id> pnpm seed');
   await seedFirestore();
-  await seedAuth();
+  try {
+    await seedAuth();
+  } catch (err) {
+    if (!isConnectionRefused(err)) throw err;
+    console.warn('[seed] auth emulator unavailable; skipped auth users');
+  }
   console.log('[seed] done');
+}
+
+function seedProjectId(): string {
+  return (
+    process.env['GCLOUD_PROJECT']
+      ?? process.env['FIREBASE_PROJECT_ID']
+      ?? projectIdFromFirebaseConfig()
+      ?? 'demo-local'
+  );
+}
+
+function projectIdFromFirebaseConfig(): string | undefined {
+  const raw = process.env['FIREBASE_CONFIG'];
+  if (!raw?.trim() || raw.trim().startsWith('{') === false) return undefined;
+  try {
+    const parsed = JSON.parse(raw) as Record<string, unknown>;
+    const projectId = parsed['projectId'] ?? parsed['project_id'];
+    return typeof projectId === 'string' && projectId.trim() ? projectId.trim() : undefined;
+  } catch {
+    return undefined;
+  }
+}
+
+function isConnectionRefused(err: unknown): boolean {
+  const error = err as { readonly code?: string; readonly message?: string; } | null;
+  return error?.code === 'app/network-error' && error.message?.includes('ECONNREFUSED') === true;
 }
 
 main().catch((err) => {

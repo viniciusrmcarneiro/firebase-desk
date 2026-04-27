@@ -341,8 +341,8 @@ describe('feature surfaces', () => {
           activeTabId='tab-firestore'
           projects={projects}
           tabs={[
-            { id: 'tab-firestore', kind: 'firestore-query', title: 'orders', projectId: 'emu' },
-            { id: 'tab-auth', kind: 'auth-users', title: 'Auth', projectId: 'emu' },
+            { id: 'tab-firestore', kind: 'firestore-query', title: 'orders', connectionId: 'emu' },
+            { id: 'tab-auth', kind: 'auth-users', title: 'Auth', connectionId: 'emu' },
           ]}
           onCloseAllTabs={() => {}}
           onCloseOtherTabs={() => {}}
@@ -415,9 +415,17 @@ describe('feature surfaces', () => {
 
     const treeTab = screen.getByRole('tab', { name: /Tree/ });
     fireEvent.mouseDown(treeTab, { button: 0, ctrlKey: false });
+    expect(screen.queryByText('evt_created')).toBeNull();
+    fireEvent.click(screen.getByText('orders'));
+    fireEvent.click(screen.getByText('ord_1024'));
+    fireEvent.click(screen.getByText('events'));
     expect(await screen.findByText('evt_created')).toBeTruthy();
 
     const tableTab = screen.getByRole('tab', { name: /Table/ });
+    fireEvent.mouseDown(tableTab, { button: 0, ctrlKey: false });
+    fireEvent.mouseDown(treeTab, { button: 0, ctrlKey: false });
+    expect(await screen.findByText('evt_created')).toBeTruthy();
+
     fireEvent.mouseDown(tableTab, { button: 0, ctrlKey: false });
     fireEvent.doubleClick(screen.getAllByText('ord_1024')[0]!);
     expect(await screen.findByRole('dialog', { name: 'Document editor' })).toBeTruthy();
@@ -450,6 +458,40 @@ describe('feature surfaces', () => {
     expect(screen.getByText('ref')).toBeTruthy();
     expect(screen.getByText('customers/cus_ada')).toBeTruthy();
     expect(screen.queryByText(/__type__/)).toBeNull();
+  });
+
+  it('FirestoreQuerySurface disables query controls and shows running state while loading', () => {
+    renderWithAppearance(
+      <FirestoreQuerySurface
+        draft={draft}
+        hasMore={false}
+        isLoading
+        rows={documents}
+        onDraftChange={() => {}}
+        onLoadMore={() => {}}
+        onOpenDocumentInNewTab={() => {}}
+        onReset={() => {}}
+        onRun={() => {}}
+        onSelectDocument={() => {}}
+      />,
+    );
+
+    expect((screen.getByLabelText('Query path') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Result limit') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Filter 1 field') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Filter 1 operator') as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Filter 1 value') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Sort field') as HTMLInputElement).disabled).toBe(true);
+    expect((screen.getByLabelText('Sort direction') as HTMLSelectElement).disabled).toBe(true);
+    expect((screen.getByRole('button', { name: 'Run' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect((screen.getByRole('button', { name: 'Filter' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
+    expect((screen.getByRole('button', { name: 'Reset' }) as HTMLButtonElement).disabled).toBe(
+      true,
+    );
   });
 
   it('JsQuerySurface renders run action, editor, logs, and streamed result cards', async () => {

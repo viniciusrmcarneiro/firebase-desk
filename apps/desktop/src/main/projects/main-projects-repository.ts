@@ -64,9 +64,13 @@ export class MainProjectsRepository implements ProjectsRepository {
     if (index < 0) throw new Error(`Project not found: ${id}`);
 
     const current = projects[index]!;
+    if (patch.projectId !== undefined && current.target !== 'emulator') {
+      throw new Error('Production project ID comes from the service account JSON.');
+    }
     const next: ProjectSummary = {
       ...current,
       ...(patch.name !== undefined ? { name: normalizeName(patch.name) } : {}),
+      ...(patch.projectId !== undefined ? { projectId: normalizeProjectId(patch.projectId) } : {}),
       ...(patch.emulator !== undefined ? { emulator: normalizeEmulator(patch.emulator) } : {}),
     };
 
@@ -89,8 +93,7 @@ export class MainProjectsRepository implements ProjectsRepository {
 
 function normalizeAddInput(input: ProjectAddInput): ProjectAddInput {
   const name = normalizeName(input.name);
-  const projectId = input.projectId.trim();
-  if (!projectId) throw new Error('Project ID is required.');
+  const projectId = normalizeProjectId(input.projectId);
 
   if (input.target === 'production') {
     if (!input.credentialJson) throw new Error('Service account JSON is required.');
@@ -107,6 +110,12 @@ function normalizeAddInput(input: ProjectAddInput): ProjectAddInput {
     target: 'emulator',
     emulator: normalizeEmulator(input.emulator ?? defaultEmulator()),
   };
+}
+
+function normalizeProjectId(projectId: string): string {
+  const value = projectId.trim();
+  if (!value) throw new Error('Project ID is required.');
+  return value;
 }
 
 function normalizeName(name: string): string {

@@ -17,6 +17,7 @@ import {
   MockSettingsRepository,
 } from '@firebase-desk/repo-mocks';
 import { createContext, type ReactNode, useContext } from 'react';
+import { IpcFirestoreRepository } from './repositories/ipc-firestore-repository.ts';
 import { IpcProjectsRepository } from './repositories/ipc-projects-repository.ts';
 import { IpcSettingsRepository } from './repositories/ipc-settings-repository.ts';
 
@@ -58,7 +59,9 @@ export function createRepositories(
   const liveCapable = dataMode === 'live' && desktopApiAvailable;
   const repositories: RepositorySet = {
     ...mockRepositories,
-    ...(liveCapable ? { projects: new IpcProjectsRepository() } : {}),
+    ...(liveCapable
+      ? { firestore: new IpcFirestoreRepository(), projects: new IpcProjectsRepository() }
+      : {}),
     ...(desktopApiAvailable ? { settings: new IpcSettingsRepository() } : {}),
   };
 

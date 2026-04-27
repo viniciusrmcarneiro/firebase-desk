@@ -36,7 +36,7 @@ export interface FirestoreSort {
 }
 
 export interface FirestoreQuery {
-  readonly projectId: string;
+  readonly connectionId: string;
   readonly path: string;
   readonly filters?: ReadonlyArray<FirestoreFilter>;
   readonly sorts?: ReadonlyArray<FirestoreSort>;
@@ -51,25 +51,25 @@ export interface FirestoreDocumentResult {
 }
 
 export interface FirestoreRepository {
-  listRootCollections(projectId: string): Promise<ReadonlyArray<FirestoreCollectionNode>>;
+  listRootCollections(connectionId: string): Promise<ReadonlyArray<FirestoreCollectionNode>>;
   listDocuments(
-    projectId: string,
+    connectionId: string,
     collectionPath: string,
     request?: PageRequest,
   ): Promise<Page<FirestoreDocumentNode>>;
   listSubcollections(
-    projectId: string,
+    connectionId: string,
     documentPath: string,
   ): Promise<ReadonlyArray<FirestoreCollectionNode>>;
   runQuery(
     query: FirestoreQuery,
     request?: PageRequest,
   ): Promise<Page<FirestoreDocumentResult>>;
-  getDocument(projectId: string, documentPath: string): Promise<FirestoreDocumentResult | null>;
+  getDocument(connectionId: string, documentPath: string): Promise<FirestoreDocumentResult | null>;
   saveDocument(
-    projectId: string,
+    connectionId: string,
     documentPath: string,
     data: Record<string, unknown>,
   ): Promise<FirestoreDocumentResult>;
-  deleteDocument(projectId: string, documentPath: string): Promise<void>;
+  deleteDocument(connectionId: string, documentPath: string): Promise<void>;
 }

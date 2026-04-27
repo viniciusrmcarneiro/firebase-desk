@@ -15,6 +15,7 @@ export type LoadStatus = 'idle' | 'loading' | 'success' | 'error';
 export interface LoadState<T> {
   readonly status: LoadStatus;
   readonly items: ReadonlyArray<T>;
+  readonly errorMessage?: string;
 }
 
 export interface TreeCache {
@@ -25,10 +26,10 @@ export interface TreeCache {
 export interface ParsedTreeId {
   readonly kind: string;
   readonly path?: string;
-  readonly projectId?: string;
+  readonly connectionId?: string;
 }
 
-export type AccountTargetOption =
+export type ConnectionTargetOption =
   | 'local-emulator'
   | 'mock-service-account'
   | 'production-service-account';
@@ -44,17 +45,17 @@ export const DEFAULT_FIRESTORE_DRAFT: FirestoreQueryDraft = {
   filterField: '',
   filterOp: '==',
   filterValue: '',
-  sortField: 'updatedAt',
+  sortField: '',
   sortDirection: 'desc',
   limit: 25,
 };
 
-export function projectIdForAccount(name: string): string {
+export function projectIdForConnection(name: string): string {
   const slug = name.trim().toLowerCase().replace(/[^a-z0-9]+/g, '-').replace(/^-|-$/g, '');
-  return slug || 'mock-account';
+  return slug || 'mock-connection';
 }
 
-export function projectTargetForOption(option: AccountTargetOption): ProjectSummary['target'] {
+export function projectTargetForOption(option: ConnectionTargetOption): ProjectSummary['target'] {
   return option === 'production-service-account' ? 'production' : 'emulator';
 }
 
@@ -99,6 +100,9 @@ export function buildTreeItems(
     });
     if (expandedIds.has(firestoreId)) {
       appendStatus(items, rootState, firestoreId, 2);
+      if (rootState.status === 'success' && rootState.items.length === 0) {
+        appendEmptyRootState(items, firestoreId, project.projectId, 2);
+      }
       for (const collection of rootState.items) {
         appendCollection(items, project.id, collection, 2, selectedId);
       }
@@ -142,11 +146,11 @@ export function getDraft(
   };
 }
 
-export function draftToQuery(projectId: string, draft: FirestoreQueryDraft): FirestoreQuery {
+export function draftToQuery(connectionId: string, draft: FirestoreQueryDraft): FirestoreQuery {
   const path = normalizePath(draft.path);
-  const useQueryControls = isRootCollectionPath(path);
+  const useQueryControls = isCollectionPath(path);
   return {
-    projectId,
+    connectionId,
     path,
     filters: useQueryControls ? queryFiltersForDraft(draft) : [],
     sorts: useQueryControls && draft.sortField.trim()
@@ -189,21 +193,22 @@ export function isDocumentPath(path: string): boolean {
   return parts.length > 0 && parts.length % 2 === 0;
 }
 
-export function isRootCollectionPath(path: string): boolean {
-  return path.split('/').filter(Boolean).length === 1;
+export function isCollectionPath(path: string): boolean {
+  const parts = path.split('/').filter(Boolean);
+  return parts.length > 0 && parts.length % 2 === 1;
 }
 
 export function resolveProject(
   projects: ReadonlyArray<ProjectSummary>,
-  projectId?: string | null,
+  connectionId?: string | null,
 ): ProjectSummary | null {
-  return projects.find((project) => project.id === projectId) ?? null;
+  return projects.find((project) => project.id === connectionId) ?? null;
 }
 
 export function treeItemIdForTab(tab: WorkspaceTab): string {
-  if (tab.kind === 'auth-users') return authNodeId(tab.projectId);
-  if (tab.kind === 'js-query') return scriptNodeId(tab.projectId);
-  return collectionNodeId(tab.projectId, normalizePath(activePath(tab)));
+  if (tab.kind === 'auth-users') return authNodeId(tab.connectionId);
+  if (tab.kind === 'js-query') return scriptNodeId(tab.connectionId);
+  return collectionNodeId(tab.connectionId, normalizePath(activePath(tab)));
 }
 
 export function omitKey<T>(
@@ -239,11 +244,11 @@ export function collectionNodeId(projectId: string, path: string): string {
 }
 
 export function parseTreeId(id: string): ParsedTreeId {
-  const [kind, projectId, ...pathParts] = id.split(':');
+  const [kind, connectionId, ...pathParts] = id.split(':');
   const path = pathParts.join(':');
   return {
     kind: kind ?? '',
-    ...(projectId ? { projectId } : {}),
+    ...(connectionId ? { connectionId } : {}),
     ...(path ? { path } : {}),
   };
 }
@@ -295,6 +300,24 @@ function appendCollection(
   });
 }
 
+function appendEmptyRootState(
+  items: AccountTreeItem[],
+  parentId: string,
+  projectId: string,
+  depth: number,
+) {
+  items.push({
+    id: `status:${parentId}`,
+    kind: 'status',
+    label: 'No root collections',
+    depth,
+    hasChildren: false,
+    expanded: false,
+    canRefresh: true,
+    secondary: projectId,
+  });
+}
+
 function appendStatus<T>(
   items: AccountTreeItem[],
   state: LoadState<T>,
@@ -305,11 +328,12 @@ function appendStatus<T>(
   items.push({
     id: `status:${parentId}`,
     kind: 'status',
-    label: state.status === 'loading' ? 'Loading' : 'Retry',
+    label: state.status === 'loading' ? 'Loading' : 'Load failed',
     depth,
     hasChildren: false,
     expanded: false,
     canRefresh: state.status === 'error',
+    ...(state.errorMessage ? { secondary: state.errorMessage } : {}),
     status: state.status,
   });
 }

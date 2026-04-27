@@ -23,10 +23,10 @@ import {
 
 interface UseWorkspaceTreeInput {
   readonly activeTab: WorkspaceTab | undefined;
-  readonly openFirestoreTab: (projectId: string, path: string) => string;
+  readonly openFirestoreTab: (connectionId: string, path: string) => string;
   readonly openToolTab: (
     kind: Exclude<WorkspaceTabKind, 'firestore-query'>,
-    projectId: string,
+    connectionId: string,
   ) => string;
   readonly projects: ReadonlyArray<ProjectSummary>;
   readonly selectedTreeItemId: string | null;
@@ -56,16 +56,23 @@ export function useWorkspaceTree(
   async function loadRoots(project: ProjectSummary, refresh = false) {
     const key = project.id;
     setRootState(key, { status: 'loading', items: [] });
-    const queryKey = ['firestore', project.projectId, 'rootCollections'];
+    const queryKey = ['firestore', project.id, 'rootCollections'];
     if (refresh) await queryClient.invalidateQueries({ queryKey });
     try {
       const items = await queryClient.fetchQuery({
         queryKey,
-        queryFn: () => repositories.firestore.listRootCollections(project.projectId),
+        queryFn: () => repositories.firestore.listRootCollections(project.id),
       });
       setRootState(key, { status: 'success', items });
-    } catch {
-      setRootState(key, { status: 'error', items: [] });
+      setLastAction(
+        `Loaded ${items.length} root collection${
+          items.length === 1 ? '' : 's'
+        } from ${project.projectId}`,
+      );
+    } catch (error) {
+      const errorMessage = messageFromError(error);
+      setRootState(key, { status: 'error', items: [], errorMessage });
+      setLastAction(`Firestore load failed: ${errorMessage}`);
     }
   }
 
@@ -91,7 +98,7 @@ export function useWorkspaceTree(
     const willExpand = !expandedTreeIds.has(id);
     setExpandedTreeIds((current) => toggleSet(current, id));
     if (!willExpand) return;
-    const project = projects.find((item) => item.id === parsed.projectId);
+    const project = projects.find((item) => item.id === parsed.connectionId);
     if (!project) return;
     if (parsed.kind === 'project') void loadProjectTools(project);
     if (parsed.kind === 'firestore') void loadRoots(project);
@@ -100,7 +107,7 @@ export function useWorkspaceTree(
   function handleRefreshItem(id: string) {
     const retryParentId = parentIdForStatus(id) ?? id;
     const parsed = parseTreeId(retryParentId);
-    const project = projects.find((item) => item.id === parsed.projectId);
+    const project = projects.find((item) => item.id === parsed.connectionId);
     if (!project) return;
     if (parsed.kind === 'project') void loadProjectTools(project, true);
     if (parsed.kind === 'firestore') void loadRoots(project, true);
@@ -118,16 +125,16 @@ export function useWorkspaceTree(
     if (parsed.kind === 'status') return;
     let nextTabId = activeTab?.id ?? tabsStore.state.activeTabId;
     let nextPath = activeTab ? activePath(activeTab) : undefined;
-    if (parsed.kind === 'auth' && parsed.projectId) {
-      nextTabId = openToolTab('auth-users', parsed.projectId);
+    if (parsed.kind === 'auth' && parsed.connectionId) {
+      nextTabId = openToolTab('auth-users', parsed.connectionId);
       nextPath = 'auth/users';
     }
-    if (parsed.kind === 'script' && parsed.projectId) {
-      nextTabId = openToolTab('js-query', parsed.projectId);
+    if (parsed.kind === 'script' && parsed.connectionId) {
+      nextTabId = openToolTab('js-query', parsed.connectionId);
       nextPath = 'scripts/default';
     }
-    if (parsed.kind === 'collection' && parsed.projectId && parsed.path) {
-      nextTabId = openFirestoreTab(parsed.projectId, parsed.path);
+    if (parsed.kind === 'collection' && parsed.connectionId && parsed.path) {
+      nextTabId = openFirestoreTab(parsed.connectionId, parsed.path);
       nextPath = parsed.path;
     }
     if (nextTabId) {
@@ -142,8 +149,8 @@ export function useWorkspaceTree(
 
   function handleOpenItem(id: string) {
     const parsed = parseTreeId(id);
-    if (parsed.kind === 'auth' && parsed.projectId) {
-      const tabId = openToolTab('auth-users', parsed.projectId);
+    if (parsed.kind === 'auth' && parsed.connectionId) {
+      const tabId = openToolTab('auth-users', parsed.connectionId);
       tabActions.recordInteraction({
         activeTabId: tabId,
         path: 'auth/users',
@@ -151,8 +158,8 @@ export function useWorkspaceTree(
       });
       return;
     }
-    if (parsed.kind === 'script' && parsed.projectId) {
-      const tabId = openToolTab('js-query', parsed.projectId);
+    if (parsed.kind === 'script' && parsed.connectionId) {
+      const tabId = openToolTab('js-query', parsed.connectionId);
       tabActions.recordInteraction({
         activeTabId: tabId,
         path: 'scripts/default',
@@ -160,8 +167,8 @@ export function useWorkspaceTree(
       });
       return;
     }
-    if (!parsed.projectId || !parsed.path) return;
-    const tabId = openFirestoreTab(parsed.projectId, parsed.path);
+    if (!parsed.connectionId || !parsed.path) return;
+    const tabId = openFirestoreTab(parsed.connectionId, parsed.path);
     tabActions.recordInteraction({ activeTabId: tabId, path: parsed.path, selectedTreeItemId: id });
   }
 
@@ -182,4 +189,9 @@ export function useWorkspaceTree(
     handleToggleItem,
     setTreeFilter,
   };
+}
+
+function messageFromError(error: unknown): string {
+  if (error instanceof Error) return error.message;
+  return 'Could not load Firestore collections.';
 }

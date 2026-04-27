@@ -28,6 +28,7 @@ export const ProjectAddInputSchema = z.object({
 
 export const ProjectUpdatePatchSchema = z.object({
   name: z.string().optional(),
+  projectId: z.string().optional(),
   emulator: EmulatorConnectionProfileSchema.optional(),
 });
 

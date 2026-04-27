@@ -8,7 +8,7 @@ export interface WorkspaceTab {
   readonly id: string;
   readonly kind: WorkspaceTabKind;
   readonly title: string;
-  readonly projectId: string;
+  readonly connectionId: string;
   readonly history: ReadonlyArray<string>;
   readonly historyIndex: number;
   readonly inspectorWidth: number;
@@ -29,7 +29,7 @@ export interface TabsState {
 
 export interface OpenTabInput {
   readonly kind: WorkspaceTabKind;
-  readonly projectId: string;
+  readonly connectionId: string;
   readonly path?: string;
 }
 
@@ -39,9 +39,9 @@ let tabCounter = 0;
 export const tabsStore = new Store<TabsState>(createEmptyState());
 
 export const tabActions = {
-  reset(projectId?: string) {
+  reset(connectionId?: string) {
     tabCounter = 0;
-    tabsStore.setState(() => projectId ? createInitialState(projectId) : createEmptyState());
+    tabsStore.setState(() => connectionId ? createInitialState(connectionId) : createEmptyState());
   },
   restore(state: TabsState) {
     const tabs = state.tabs.map(normalizeTab);
@@ -68,7 +68,7 @@ export const tabActions = {
   openOrSelectTab(input: OpenTabInput): string {
     const path = input.path ?? defaultPathFor(input.kind);
     const existing = tabsStore.state.tabs.find((tab) =>
-      tab.kind === input.kind && tab.projectId === input.projectId && activePath(tab) === path
+      tab.kind === input.kind && tab.connectionId === input.connectionId && activePath(tab) === path
     );
     if (existing) {
       tabActions.selectTab(existing.id);
@@ -145,8 +145,8 @@ export const tabActions = {
       return { ...state, tabs };
     });
   },
-  updateProject(tabId: string, projectId: string) {
-    updateTab(tabId, (tab) => ({ ...tab, projectId }));
+  updateConnection(tabId: string, connectionId: string) {
+    updateTab(tabId, (tab) => ({ ...tab, connectionId }));
   },
   pushHistory(tabId: string, path: string) {
     updateTab(tabId, (tab) => {
@@ -238,7 +238,7 @@ function createEmptyState(): TabsState {
   };
 }
 
-function createInitialState(projectId: string): TabsState {
+function createInitialState(connectionId: string): TabsState {
   return {
     activeTabId: 'tab-firestore',
     interactionHistory: [{
@@ -248,9 +248,9 @@ function createInitialState(projectId: string): TabsState {
     }],
     interactionHistoryIndex: 0,
     tabs: [
-      createFixedTab('tab-firestore', 'firestore-query', projectId, 'orders'),
-      createFixedTab('tab-auth', 'auth-users', projectId, 'auth/users'),
-      createFixedTab('tab-js', 'js-query', projectId, 'scripts/default'),
+      createFixedTab('tab-firestore', 'firestore-query', connectionId, 'orders'),
+      createFixedTab('tab-auth', 'auth-users', connectionId, 'auth/users'),
+      createFixedTab('tab-js', 'js-query', connectionId, 'scripts/default'),
     ],
   };
 }
@@ -261,7 +261,7 @@ function keepActiveTab(activeTabId: string, tabs: ReadonlyArray<WorkspaceTab>): 
 }
 
 function compareTabsByProject(left: WorkspaceTab, right: WorkspaceTab): number {
-  const project = left.projectId.localeCompare(right.projectId);
+  const project = left.connectionId.localeCompare(right.connectionId);
   if (project !== 0) return project;
   return left.title.localeCompare(right.title);
 }
@@ -269,19 +269,19 @@ function compareTabsByProject(left: WorkspaceTab, right: WorkspaceTab): number {
 function createTab(input: OpenTabInput): WorkspaceTab {
   tabCounter += 1;
   const path = input.path ?? defaultPathFor(input.kind);
-  return createFixedTab(`tab-${input.kind}-${tabCounter}`, input.kind, input.projectId, path);
+  return createFixedTab(`tab-${input.kind}-${tabCounter}`, input.kind, input.connectionId, path);
 }
 
 function createFixedTab(
   id: string,
   kind: WorkspaceTabKind,
-  projectId: string,
+  connectionId: string,
   path: string,
 ): WorkspaceTab {
   return {
     id,
     kind,
-    projectId,
+    connectionId,
     title: titleFor(kind, path),
     history: [path],
     historyIndex: 0,

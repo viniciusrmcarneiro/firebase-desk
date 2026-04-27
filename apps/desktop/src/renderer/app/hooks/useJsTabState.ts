@@ -45,14 +45,14 @@ export function useJsTabState(
   function runScript(): boolean {
     if (!activeTab || activeTab.kind !== 'js-query' || !activeProject) return false;
     const tabId = activeTab.id;
-    const accountId = activeTab.projectId;
+    const connectionId = activeTab.connectionId;
     setScriptResults((current) => omitKey(current, tabId));
     runScriptMutation.mutate(
       { projectId: activeProject.projectId, source: scriptSource },
       {
         onSuccess: (result) => {
           const tab = tabsStore.state.tabs.find((item) => item.id === tabId);
-          if (tab?.projectId !== accountId) return;
+          if (tab?.connectionId !== connectionId) return;
           setScriptResults((current) => ({ ...current, [tabId]: result }));
         },
       },

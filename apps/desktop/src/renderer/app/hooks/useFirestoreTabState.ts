@@ -4,7 +4,7 @@ import type {
   FirestoreQuery,
   ProjectSummary,
 } from '@firebase-desk/repo-contracts';
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { selectionActions } from '../stores/selectionStore.ts';
 import { activePath, tabActions, tabsStore, type WorkspaceTab } from '../stores/tabsStore.ts';
 import {
@@ -19,6 +19,7 @@ import { useGetDocument, useRunQuery } from './useRepositoriesData.ts';
 interface SubmittedFirestoreQuery {
   readonly limit: number;
   readonly query: FirestoreQuery;
+  readonly runId: number;
 }
 
 interface UseFirestoreTabStateInput {
@@ -31,6 +32,7 @@ interface UseFirestoreTabStateInput {
 export interface FirestoreTabState {
   readonly drafts: Readonly<Record<string, FirestoreQueryDraft>>;
   readonly activeDraft: FirestoreQueryDraft;
+  readonly errorMessage: string | null;
   readonly hasMore: boolean;
   readonly isFetchingMore: boolean;
   readonly isLoading: boolean;
@@ -39,8 +41,8 @@ export interface FirestoreTabState {
   readonly selectedDocumentPath: string | null;
   readonly clearTab: (tabId: string) => void;
   readonly loadMore: () => void;
-  readonly openTab: (projectId: string, path: string) => string;
-  readonly openTabInNewTab: (projectId: string, path: string) => string;
+  readonly openTab: (connectionId: string, path: string) => string;
+  readonly openTabInNewTab: (connectionId: string, path: string) => string;
   readonly resetDraft: () => void;
   readonly runQuery: () => string | null;
   readonly selectDocument: (tabId: string, path: string | null) => void;
@@ -59,12 +61,13 @@ export function useFirestoreTabState(
   const [selectedDocumentPaths, setSelectedDocumentPaths] = useState<
     Readonly<Record<string, string>>
   >({});
+  const nextRunId = useRef(1);
 
   const activeDraft = getDraft(activeTab, drafts);
   const queryRequest = activeTab?.kind === 'firestore-query'
     ? queryRequests[activeTab.id] ?? null
     : null;
-  const activeQueryRequest = queryRequest?.query.projectId === activeProject?.projectId
+  const activeQueryRequest = queryRequest?.query.connectionId === activeProject?.id
     ? queryRequest
     : null;
   const submittedQuery = activeQueryRequest?.query ?? null;
@@ -72,11 +75,13 @@ export function useFirestoreTabState(
   const queryResult = useRunQuery(
     queryRequestIsDocument ? null : submittedQuery,
     activeQueryRequest?.limit ?? activeDraft.limit,
+    activeQueryRequest?.runId ?? 0,
     activeTab?.kind === 'firestore-query' && Boolean(submittedQuery) && !queryRequestIsDocument,
   );
   const queryDocumentResult = useGetDocument(
-    queryRequestIsDocument ? submittedQuery?.projectId : null,
+    queryRequestIsDocument ? submittedQuery?.connectionId : null,
     queryRequestIsDocument ? submittedQuery?.path : null,
+    activeQueryRequest?.runId ?? 0,
   );
   const queryRows = queryRequestIsDocument
     ? queryDocumentResult.data ? [queryDocumentResult.data] : []
@@ -86,6 +91,9 @@ export function useFirestoreTabState(
     : null;
   const selectedDocument = queryRows.find((row) => row.path === activeSelectedDocumentPath) ?? null;
   const selectedDocumentPath = selectedDocument?.path ?? null;
+  const errorMessage = queryRequestIsDocument
+    ? messageFromError(queryDocumentResult.error)
+    : messageFromError(queryResult.error);
 
   function setDraft(draft: FirestoreQueryDraft) {
     if (!activeTab) return;
@@ -105,11 +113,11 @@ export function useFirestoreTabState(
 
   function runQuery(): string | null {
     if (!activeTab || activeTab.kind !== 'firestore-query' || !activeProject) return null;
-    const nextQuery = draftToQuery(activeProject.projectId, activeDraft);
+    const nextQuery = draftToQuery(activeProject.id, activeDraft);
     selectDocument(activeTab.id, null);
     setQueryRequests((current) => ({
       ...current,
-      [activeTab.id]: { limit: activeDraft.limit, query: nextQuery },
+      [activeTab.id]: { limit: activeDraft.limit, query: nextQuery, runId: nextRunId.current++ },
     }));
     tabActions.pushHistory(activeTab.id, activeDraft.path);
     tabActions.recordInteraction({
@@ -120,16 +128,16 @@ export function useFirestoreTabState(
     return activeDraft.path;
   }
 
-  function openTab(projectId: string, path: string): string {
-    const id = tabActions.openOrSelectTab({ kind: 'firestore-query', projectId, path });
+  function openTab(connectionId: string, path: string): string {
+    const id = tabActions.openOrSelectTab({ kind: 'firestore-query', connectionId, path });
     setDrafts((current) =>
       current[id] ? current : { ...current, [id]: { ...DEFAULT_FIRESTORE_DRAFT, path } }
     );
     return id;
   }
 
-  function openTabInNewTab(projectId: string, path: string): string {
-    const id = tabActions.openTab({ kind: 'firestore-query', projectId, path });
+  function openTabInNewTab(connectionId: string, path: string): string {
+    const id = tabActions.openTab({ kind: 'firestore-query', connectionId, path });
     setDrafts((current) => ({ ...current, [id]: { ...DEFAULT_FIRESTORE_DRAFT, path } }));
     return id;
   }
@@ -153,6 +161,7 @@ export function useFirestoreTabState(
   return {
     drafts,
     activeDraft,
+    errorMessage,
     hasMore: !queryRequestIsDocument && Boolean(queryResult.hasNextPage),
     isFetchingMore: !queryRequestIsDocument && queryResult.isFetchingNextPage,
     isLoading: queryRequestIsDocument
@@ -170,4 +179,10 @@ export function useFirestoreTabState(
     selectDocument,
     setDraft,
   };
+}
+
+function messageFromError(error: unknown): string | null {
+  if (!error) return null;
+  if (error instanceof Error) return error.message;
+  return 'Could not load Firestore data.';
 }

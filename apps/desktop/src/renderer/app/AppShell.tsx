@@ -119,7 +119,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
   const projects = projectsQuery.data ?? [];
   const activeTab = tabsState.tabs.find((tab) => tab.id === tabsState.activeTabId)
     ?? tabsState.tabs[0];
-  const activeProject = activeTab ? resolveProject(projects, activeTab.projectId) : null;
+  const activeProject = activeTab ? resolveProject(projects, activeTab.connectionId) : null;
   const runtimeProjectId = activeProject?.projectId ?? null;
 
   const [density, setDensity] = useState<DensityName>('compact');
@@ -204,7 +204,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
         id: tab.id,
         kind: tab.kind,
         title: tab.title,
-        projectId: tab.projectId,
+        connectionId: tab.connectionId,
         canGoBack: tab.historyIndex > 0,
         canGoForward: tab.historyIndex < tab.history.length - 1,
       })),
@@ -380,14 +380,14 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
 
   function handleRemoveTreeItem(id: string) {
     const parsed = parseTreeId(id);
-    if (parsed.kind !== 'project' || !parsed.projectId) return;
-    const projectId = parsed.projectId;
-    const project = projects.find((item) => item.id === projectId);
+    if (parsed.kind !== 'project' || !parsed.connectionId) return;
+    const connectionId = parsed.connectionId;
+    const project = projects.find((item) => item.id === connectionId);
     requestDestructiveAction({
       confirmLabel: 'Remove',
       description: `Remove ${project?.name ?? 'this project'} from the workspace tree?`,
       onConfirm: () => {
-        void repositories.projects.remove(projectId).then(() =>
+        void repositories.projects.remove(connectionId).then(() =>
           queryClient.invalidateQueries({ queryKey: ['projects'] })
         );
         setLastAction(`Removed ${project?.name ?? 'project'}`);
@@ -398,8 +398,8 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
 
   function handleEditTreeItem(id: string) {
     const parsed = parseTreeId(id);
-    if (parsed.kind !== 'project' || !parsed.projectId) return;
-    setEditingProjectId(parsed.projectId);
+    if (parsed.kind !== 'project' || !parsed.connectionId) return;
+    setEditingProjectId(parsed.connectionId);
   }
 
   async function handleAddProject(input: ProjectAddInput): Promise<ProjectSummary> {
@@ -430,22 +430,22 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
 
   function openTab(kind: WorkspaceTabKind) {
     if (!activeTab || !activeProject) {
-      setLastAction('Choose an account item first');
+      setLastAction('Choose a connection item first');
       return null;
     }
-    return tabActions.openTab({ kind, projectId: activeTab.projectId });
+    return tabActions.openTab({ kind, connectionId: activeTab.connectionId });
   }
 
-  function openToolTab(kind: Exclude<WorkspaceTabKind, 'firestore-query'>, projectId: string) {
-    return tabActions.openOrSelectTab({ kind, projectId });
+  function openToolTab(kind: Exclude<WorkspaceTabKind, 'firestore-query'>, connectionId: string) {
+    return tabActions.openOrSelectTab({ kind, connectionId });
   }
 
-  function openFirestoreTab(projectId: string, path: string) {
-    return firestoreTab.openTab(projectId, path);
+  function openFirestoreTab(connectionId: string, path: string) {
+    return firestoreTab.openTab(connectionId, path);
   }
 
-  function openFirestoreTabInNewTab(projectId: string, path: string) {
-    return firestoreTab.openTabInNewTab(projectId, path);
+  function openFirestoreTabInNewTab(connectionId: string, path: string) {
+    return firestoreTab.openTabInNewTab(connectionId, path);
   }
 
   const activeView = activeTab
@@ -454,6 +454,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
         activeTab={activeTab}
         authFilter={authTab.authFilter}
         draft={firestoreTab.activeDraft}
+        firestoreErrorMessage={firestoreTab.errorMessage}
         hasMore={firestoreTab.hasMore}
         isFetchingMore={firestoreTab.isFetchingMore}
         isLoading={firestoreTab.isLoading}
@@ -475,7 +476,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
         onLoadMore={firestoreTab.loadMore}
         onLoadMoreUsers={authTab.loadMore}
         onOpenDocumentInNewTab={(path) => {
-          const tabId = openFirestoreTabInNewTab(activeTab.projectId, path);
+          const tabId = openFirestoreTabInNewTab(activeTab.connectionId, path);
           tabActions.recordInteraction({
             activeTabId: tabId,
             path,
@@ -507,12 +508,12 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
     setLastAction(`Switched to ${tab?.title ?? 'tab'}`);
   }
 
-  function handleActiveProjectChange(projectId: string) {
+  function handleActiveProjectChange(connectionId: string) {
     if (!activeTab) return;
-    if (activeTab.projectId === projectId) return;
-    tabActions.updateProject(activeTab.id, projectId);
-    clearAccountScopedTabState(activeTab.id);
-    const nextTreeItemId = treeItemIdForTab({ ...activeTab, projectId });
+    if (activeTab.connectionId === connectionId) return;
+    tabActions.updateConnection(activeTab.id, connectionId);
+    clearConnectionScopedTabState(activeTab.id);
+    const nextTreeItemId = treeItemIdForTab({ ...activeTab, connectionId });
     selectionActions.selectTreeItem(nextTreeItemId);
     tabActions.recordInteraction({
       activeTabId: activeTab.id,
@@ -522,7 +523,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
     setLastAction('Changed tab account');
   }
 
-  function clearAccountScopedTabState(tabId: string) {
+  function clearConnectionScopedTabState(tabId: string) {
     firestoreTab.clearTab(tabId);
     jsTab.clearTab(tabId);
     selectionActions.selectAuthUser(null);
@@ -539,7 +540,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
 
   function handleSaveDocument(documentPath: string, data: Record<string, unknown>) {
     if (!activeProject) return;
-    void repositories.firestore.saveDocument(activeProject.projectId, documentPath, data).then(() =>
+    void repositories.firestore.saveDocument(activeProject.id, documentPath, data).then(() =>
       queryClient.invalidateQueries({ queryKey: ['firestore'] })
     );
     setLastAction(`Saved ${documentPath}`);
@@ -547,7 +548,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
 
   function handleDeleteDocument(documentPath: string) {
     if (!activeProject || !activeTab) return;
-    void repositories.firestore.deleteDocument(activeProject.projectId, documentPath).then(() =>
+    void repositories.firestore.deleteDocument(activeProject.id, documentPath).then(() =>
       queryClient.invalidateQueries({ queryKey: ['firestore'] })
     );
     firestoreTab.selectDocument(activeTab.id, null);
@@ -651,7 +652,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
                         <ProjectSwitcher
                           activeProject={activeProject}
                           projects={projects}
-                          onProjectChange={handleActiveProjectChange}
+                          onConnectionChange={handleActiveProjectChange}
                         />
                         <Badge variant={activeProject.target}>{activeProject.target}</Badge>
                         <IconButton
@@ -896,16 +897,20 @@ function ThemeSegment(
 
 interface ProjectSwitcherProps {
   readonly activeProject: ProjectSummary;
-  readonly onProjectChange: (projectId: string) => void;
+  readonly onConnectionChange: (connectionId: string) => void;
   readonly projects: ReadonlyArray<ProjectSummary>;
 }
 
-function ProjectSwitcher({ activeProject, onProjectChange, projects }: ProjectSwitcherProps) {
+function ProjectSwitcher({ activeProject, onConnectionChange, projects }: ProjectSwitcherProps) {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button aria-label='Select account' className='max-w-56 justify-start' variant='secondary'>
-          <span className='text-text-muted'>Account</span>
+        <Button
+          aria-label='Select connection'
+          className='max-w-56 justify-start'
+          variant='secondary'
+        >
+          <span className='text-text-muted'>Connection</span>
           <span className='truncate'>{activeProject.name}</span>
         </Button>
       </DropdownMenuTrigger>
@@ -913,7 +918,7 @@ function ProjectSwitcher({ activeProject, onProjectChange, projects }: ProjectSw
         {projects.map((project) => (
           <DropdownMenuItem
             key={project.id}
-            onSelect={() => onProjectChange(project.id)}
+            onSelect={() => onConnectionChange(project.id)}
           >
             <span className='min-w-0 flex-1 truncate'>{project.name}</span>
             <Badge variant={project.target}>{project.target}</Badge>
@@ -928,6 +933,7 @@ interface TabViewProps {
   readonly activeTab: WorkspaceTab;
   readonly authFilter: string;
   readonly draft: FirestoreQueryDraft;
+  readonly firestoreErrorMessage: string | null;
   readonly hasMore: boolean;
   readonly isFetchingMore: boolean;
   readonly isLoading: boolean;
@@ -989,6 +995,7 @@ function TabView(props: TabViewProps) {
   return (
     <FirestoreQuerySurface
       draft={props.draft}
+      errorMessage={props.firestoreErrorMessage}
       hasMore={props.hasMore}
       isFetchingMore={props.isFetchingMore}
       isLoading={props.isLoading}

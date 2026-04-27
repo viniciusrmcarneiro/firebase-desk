@@ -35,7 +35,7 @@ describe('useJsTabState', () => {
   });
 
   it('runs the active tab script and stores successful result', () => {
-    const tabId = tabActions.openTab({ kind: 'js-query', projectId: 'emu' });
+    const tabId = tabActions.openTab({ kind: 'js-query', connectionId: 'emu' });
     const tab = tabsStore.state.tabs.find((item) => item.id === tabId)!;
     const recordInteraction = vi.spyOn(tabActions, 'recordInteraction').mockImplementation(
       () => {},
@@ -66,7 +66,7 @@ describe('useJsTabState', () => {
   });
 
   it('does not run from a non-js tab', () => {
-    const tabId = tabActions.openTab({ kind: 'auth-users', projectId: 'emu' });
+    const tabId = tabActions.openTab({ kind: 'auth-users', connectionId: 'emu' });
     const tab = tabsStore.state.tabs.find((item) => item.id === tabId)!;
     const { result } = renderHook(() =>
       useJsTabState({

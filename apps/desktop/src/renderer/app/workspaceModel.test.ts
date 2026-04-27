@@ -11,7 +11,7 @@ import {
   normalizePath,
   omitKey,
   parseTreeId,
-  projectIdForAccount,
+  projectIdForConnection,
   projectNodeId,
   projectTargetForOption,
   queryFiltersForDraft,
@@ -19,6 +19,11 @@ import {
 } from './workspaceModel.ts';
 
 describe('workspaceModel', () => {
+  it('does not sort new collection queries by a field unless requested', () => {
+    expect(DEFAULT_FIRESTORE_DRAFT.sortField).toBe('');
+    expect(draftToQuery('demo-local', DEFAULT_FIRESTORE_DRAFT).sorts).toEqual([]);
+  });
+
   it('builds firestore query from root collection draft controls', () => {
     expect(draftToQuery('demo-local', {
       ...DEFAULT_FIRESTORE_DRAFT,
@@ -27,7 +32,7 @@ describe('workspaceModel', () => {
       sortField: ' updatedAt ',
       sortDirection: 'desc',
     })).toEqual({
-      projectId: 'demo-local',
+      connectionId: 'demo-local',
       path: 'orders',
       filters: [{ field: 'status', op: '==', value: 'paid' }],
       sorts: [{ field: 'updatedAt', direction: 'desc' }],
@@ -41,7 +46,7 @@ describe('workspaceModel', () => {
       filters: [{ id: 'filter-1', field: 'status', op: '==', value: '"paid"' }],
       sortField: 'updatedAt',
     })).toEqual({
-      projectId: 'demo-local',
+      connectionId: 'demo-local',
       path: 'orders/ord_1024',
       filters: [],
       sorts: [],
@@ -73,7 +78,7 @@ describe('workspaceModel', () => {
       id: 'tab-firestore-query-1',
       kind: 'firestore-query' as const,
       title: 'orders',
-      projectId: 'emu',
+      connectionId: 'emu',
       history: ['orders'],
       historyIndex: 0,
       inspectorWidth: 360,
@@ -82,7 +87,7 @@ describe('workspaceModel', () => {
     expect(treeItemIdForTab(tab)).toBe(collectionNodeId('emu', 'orders'));
     expect(parseTreeId('collection:emu:orders/ord_1024/events')).toEqual({
       kind: 'collection',
-      projectId: 'emu',
+      connectionId: 'emu',
       path: 'orders/ord_1024/events',
     });
     expect(authNodeId('emu')).toBe('auth:emu');
@@ -118,13 +123,42 @@ describe('workspaceModel', () => {
     ]);
   });
 
+  it('shows an empty root collections state with the Firebase project id', () => {
+    const items = buildTreeItems(
+      [{
+        id: 'emu',
+        name: 'Local Emulator',
+        projectId: 'demo-firebase-lite',
+        target: 'emulator',
+        emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
+        hasCredential: false,
+        credentialEncrypted: null,
+        createdAt: '2026-04-27T00:00:00.000Z',
+      }],
+      new Set([projectNodeId('emu'), 'firestore:emu']),
+      {
+        tools: { emu: { status: 'success', items: ['tools'] } },
+        roots: { emu: { status: 'success', items: [] } },
+      },
+      null,
+      '',
+    );
+
+    expect(items).toContainEqual(expect.objectContaining({
+      id: 'status:firestore:emu',
+      label: 'No root collections',
+      secondary: 'demo-firebase-lite',
+      canRefresh: true,
+    }));
+  });
+
   it('returns default drafts and immutable omitted records', () => {
     expect(getDraft(undefined, {})).toBe(DEFAULT_FIRESTORE_DRAFT);
     expect(omitKey({ a: 1, b: 2 }, 'a')).toEqual({ b: 2 });
   });
 
   it('formats account metadata and clamps sidebar width', () => {
-    expect(projectIdForAccount(' Client Dev ')).toBe('client-dev');
+    expect(projectIdForConnection(' Client Dev ')).toBe('client-dev');
     expect(projectTargetForOption('production-service-account')).toBe('production');
     expect(projectTargetForOption('local-emulator')).toBe('emulator');
     expect(clampSidebarWidth(999)).toBe(560);

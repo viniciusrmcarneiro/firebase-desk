@@ -17,6 +17,7 @@ import {
   DialogContent,
   EmptyState,
   IconButton,
+  InlineAlert,
   Input,
   Panel,
   PanelBody,
@@ -39,6 +40,7 @@ import {
   FileText,
   Folder,
   GitBranch,
+  Loader2,
   PanelRightClose,
   PanelRightOpen,
   Play,
@@ -77,6 +79,7 @@ export interface FirestoreQueryFilterDraft {
 
 export interface FirestoreQuerySurfaceProps {
   readonly draft: FirestoreQueryDraft;
+  readonly errorMessage?: string | null;
   readonly hasMore: boolean;
   readonly isFetchingMore?: boolean;
   readonly isLoading?: boolean;
@@ -115,7 +118,7 @@ const filterOps: ReadonlyArray<FirestoreFilterOp> = [
 ];
 
 const selectClassName =
-  'h-[var(--density-compact-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary';
+  'h-[var(--density-compact-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary disabled:cursor-not-allowed disabled:opacity-60';
 
 function createEmptyFilter(id = 'filter-1'): FirestoreQueryFilterDraft {
   return { id, field: '', op: '==', value: '' };
@@ -161,6 +164,7 @@ function nextFilterId(filters: ReadonlyArray<FirestoreQueryFilterDraft>): string
 export function FirestoreQuerySurface(
   {
     draft,
+    errorMessage = null,
     hasMore,
     isFetchingMore = false,
     isLoading = false,
@@ -193,6 +197,7 @@ export function FirestoreQuerySurface(
       />
       <ResultPanel
         hasMore={hasMore}
+        errorMessage={errorMessage}
         isFetchingMore={isFetchingMore}
         isLoading={isLoading}
         queryPath={draft.path}
@@ -294,7 +299,7 @@ interface ConfirmationRequest {
 }
 
 function QueryBuilder({ draft, isLoading, onDraftChange, onReset, onRun }: QueryBuilderProps) {
-  const supportsCollectionControls = isRootCollectionPath(draft.path);
+  const supportsCollectionControls = isCollectionPath(draft.path);
   const filters = filtersForDraft(draft);
   const [confirmation, setConfirmation] = useState<ConfirmationRequest | null>(null);
 
@@ -358,6 +363,7 @@ function QueryBuilder({ draft, isLoading, onDraftChange, onReset, onRun }: Query
             <Input
               aria-label='Query path'
               className='font-mono'
+              disabled={isLoading}
               placeholder='orders or orders/ord_1024'
               value={draft.path}
               onChange={(event) => onDraftChange({ ...draft, path: event.currentTarget.value })}
@@ -370,6 +376,7 @@ function QueryBuilder({ draft, isLoading, onDraftChange, onReset, onRun }: Query
                 <Input
                   aria-label='Result limit'
                   className='font-mono'
+                  disabled={isLoading}
                   min={1}
                   max={100}
                   type='number'
@@ -380,7 +387,10 @@ function QueryBuilder({ draft, isLoading, onDraftChange, onReset, onRun }: Query
               )
               : null}
             <Button disabled={isLoading} variant='primary' onClick={onRun}>
-              <Play size={14} aria-hidden='true' /> Run
+              {isLoading
+                ? <Loader2 className='animate-spin' size={14} aria-hidden='true' />
+                : <Play size={14} aria-hidden='true' />}
+              Run
             </Button>
           </div>
           {supportsCollectionControls
@@ -395,6 +405,7 @@ function QueryBuilder({ draft, isLoading, onDraftChange, onReset, onRun }: Query
                       <Input
                         aria-label={`Filter ${index + 1} field`}
                         className='font-mono'
+                        disabled={isLoading}
                         placeholder='status'
                         value={filter.field}
                         onChange={(event) =>
@@ -403,6 +414,7 @@ function QueryBuilder({ draft, isLoading, onDraftChange, onReset, onRun }: Query
                       <select
                         aria-label={`Filter ${index + 1} operator`}
                         className={selectClassName}
+                        disabled={isLoading}
                         value={filter.op}
                         onChange={(event) =>
                           updateFilter(index, {
@@ -414,13 +426,14 @@ function QueryBuilder({ draft, isLoading, onDraftChange, onReset, onRun }: Query
                       <Input
                         aria-label={`Filter ${index + 1} value`}
                         className='font-mono'
+                        disabled={isLoading}
                         placeholder='paid'
                         value={filter.value}
                         onChange={(event) =>
                           updateFilter(index, { value: event.currentTarget.value })}
                       />
                       <IconButton
-                        disabled={filters.length === 1}
+                        disabled={isLoading || filters.length === 1}
                         icon={<X size={14} aria-hidden='true' />}
                         label={`Remove filter ${index + 1}`}
                         size='xs'
@@ -430,10 +443,10 @@ function QueryBuilder({ draft, isLoading, onDraftChange, onReset, onRun }: Query
                     </div>
                   ))}
                   <div className='flex items-center justify-between gap-2'>
-                    <Button size='xs' variant='secondary' onClick={addFilter}>
+                    <Button disabled={isLoading} size='xs' variant='secondary' onClick={addFilter}>
                       <Plus size={14} aria-hidden='true' /> Filter
                     </Button>
-                    <Button size='xs' variant='ghost' onClick={confirmReset}>
+                    <Button disabled={isLoading} size='xs' variant='ghost' onClick={confirmReset}>
                       <RotateCcw size={14} aria-hidden='true' /> Reset
                     </Button>
                   </div>
@@ -442,7 +455,8 @@ function QueryBuilder({ draft, isLoading, onDraftChange, onReset, onRun }: Query
                   <Input
                     aria-label='Sort field'
                     className='font-mono'
-                    placeholder='updatedAt'
+                    disabled={isLoading}
+                    placeholder='field'
                     value={draft.sortField}
                     onChange={(event) =>
                       onDraftChange({ ...draft, sortField: event.currentTarget.value })}
@@ -450,6 +464,7 @@ function QueryBuilder({ draft, isLoading, onDraftChange, onReset, onRun }: Query
                   <select
                     aria-label='Sort direction'
                     className={selectClassName}
+                    disabled={isLoading}
                     value={draft.sortDirection}
                     onChange={(event) =>
                       onDraftChange({
@@ -485,6 +500,7 @@ function QueryBuilder({ draft, isLoading, onDraftChange, onReset, onRun }: Query
 }
 
 interface ResultPanelProps {
+  readonly errorMessage: string | null;
   readonly hasMore: boolean;
   readonly isFetchingMore: boolean;
   readonly isLoading: boolean;
@@ -502,6 +518,7 @@ interface ResultPanelProps {
 function ResultPanel(
   {
     hasMore,
+    errorMessage,
     isFetchingMore,
     isLoading,
     onEditDocument,
@@ -516,7 +533,12 @@ function ResultPanel(
   }: ResultPanelProps,
 ) {
   const jsonValue = useMemo(() => ({ path: queryPath, documents: rows }), [queryPath, rows]);
-  const showPagination = isRootCollectionPath(queryPath) && hasMore;
+  const showPagination = isCollectionPath(queryPath) && hasMore;
+  const [expandedTreeIds, setExpandedTreeIds] = useState<ReadonlySet<string>>(() => new Set());
+
+  function toggleTreeNode(id: string) {
+    setExpandedTreeIds((current) => toggleSet(current, id));
+  }
 
   return (
     <Tabs
@@ -548,41 +570,52 @@ function ResultPanel(
             <span className='truncate'>Results</span>
           </span>
         </PanelHeader>
-        <PanelBody className='grid min-h-0 grid-rows-[minmax(0,1fr)] overflow-hidden p-0'>
-          <TabsContent className='h-full min-h-0 overflow-hidden' value='table'>
-            <ResultTable
-              hasMore={showPagination}
-              isFetchingMore={isFetchingMore}
-              rows={rows}
-              selectedDocumentPath={selectedDocumentPath}
-              onEditDocument={onEditDocument}
-              onLoadMore={onLoadMore}
-              onOpenDocumentInNewTab={onOpenDocumentInNewTab}
-              onSelectDocument={onSelectDocument}
-            />
-          </TabsContent>
-          <TabsContent className='h-full min-h-0 overflow-auto' value='tree'>
-            {rows.length
-              ? (
-                <ResultTreeView
-                  queryPath={queryPath}
-                  hasMore={showPagination}
-                  isFetchingMore={isFetchingMore}
-                  rows={rows}
-                  onLoadMore={onLoadMore}
-                  onOpenDocumentInNewTab={onOpenDocumentInNewTab}
-                />
-              )
-              : <EmptyState title='No documents' />}
-          </TabsContent>
-          <TabsContent className='h-full min-h-0 overflow-hidden' value='json'>
-            <textarea
-              aria-label='JSON results'
-              className='h-full w-full resize-none border-0 bg-bg-panel p-3 font-mono text-xs text-text-secondary outline-none'
-              readOnly
-              value={JSON.stringify(jsonValue, null, 2)}
-            />
-          </TabsContent>
+        <PanelBody className='flex min-h-0 flex-col overflow-hidden p-0'>
+          {errorMessage
+            ? (
+              <div className='border-b border-border-subtle p-2'>
+                <InlineAlert variant='danger'>{errorMessage}</InlineAlert>
+              </div>
+            )
+            : null}
+          <div className='min-h-0 flex-1 overflow-hidden'>
+            <TabsContent className='h-full min-h-0 overflow-hidden' value='table'>
+              <ResultTable
+                hasMore={showPagination}
+                isFetchingMore={isFetchingMore}
+                rows={rows}
+                selectedDocumentPath={selectedDocumentPath}
+                onEditDocument={onEditDocument}
+                onLoadMore={onLoadMore}
+                onOpenDocumentInNewTab={onOpenDocumentInNewTab}
+                onSelectDocument={onSelectDocument}
+              />
+            </TabsContent>
+            <TabsContent className='h-full min-h-0 overflow-auto' value='tree'>
+              {rows.length
+                ? (
+                  <ResultTreeView
+                    queryPath={queryPath}
+                    expandedIds={expandedTreeIds}
+                    hasMore={showPagination}
+                    isFetchingMore={isFetchingMore}
+                    rows={rows}
+                    onLoadMore={onLoadMore}
+                    onOpenDocumentInNewTab={onOpenDocumentInNewTab}
+                    onToggleNode={toggleTreeNode}
+                  />
+                )
+                : <EmptyState title='No documents' />}
+            </TabsContent>
+            <TabsContent className='h-full min-h-0 overflow-hidden' value='json'>
+              <textarea
+                aria-label='JSON results'
+                className='h-full w-full resize-none border-0 bg-bg-panel p-3 font-mono text-xs text-text-secondary outline-none'
+                readOnly
+                value={JSON.stringify(jsonValue, null, 2)}
+              />
+            </TabsContent>
+          </div>
         </PanelBody>
       </Panel>
     </Tabs>
@@ -945,30 +978,29 @@ function DetailRow({ label, value }: { readonly label: string; readonly value: s
 
 function ResultTreeView(
   {
+    expandedIds,
     hasMore,
     isFetchingMore,
     onLoadMore,
     onOpenDocumentInNewTab,
+    onToggleNode,
     queryPath,
     rows,
   }: {
+    readonly expandedIds: ReadonlySet<string>;
     readonly hasMore: boolean;
     readonly isFetchingMore: boolean;
     readonly onLoadMore: () => void;
     readonly onOpenDocumentInNewTab: (documentPath: string) => void;
+    readonly onToggleNode: (id: string) => void;
     readonly queryPath: string;
     readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   },
 ) {
-  const [collapsedIds, setCollapsedIds] = useState<ReadonlySet<string>>(() => new Set());
   const treeRows = useMemo(
-    () => flattenResultTree(queryPath, rows, hasMore, collapsedIds),
-    [collapsedIds, hasMore, queryPath, rows],
+    () => flattenResultTree(queryPath, rows, hasMore, expandedIds),
+    [expandedIds, hasMore, queryPath, rows],
   );
-
-  function toggleNode(id: string) {
-    setCollapsedIds((current) => toggleSet(current, id));
-  }
 
   return (
     <div className='h-full min-w-[680px] font-mono text-xs' role='tree'>
@@ -982,7 +1014,7 @@ function ResultTreeView(
             node={item}
             onLoadMore={onLoadMore}
             onOpenDocumentInNewTab={onOpenDocumentInNewTab}
-            onToggle={toggleNode}
+            onToggle={onToggleNode}
           />
         )}
       />
@@ -1101,11 +1133,11 @@ function flattenResultTree(
   queryPath: string,
   rows: ReadonlyArray<FirestoreDocumentResult>,
   hasMore: boolean,
-  collapsedIds: ReadonlySet<string>,
+  expandedIds: ReadonlySet<string>,
 ): ReadonlyArray<ResultTreeRowModel> {
   const flattened: ResultTreeRowModel[] = [];
   const rootId = `root:${queryPath}`;
-  const rootExpanded = !collapsedIds.has(rootId);
+  const rootExpanded = expandedIds.has(rootId);
   flattened.push({
     id: rootId,
     icon: 'folder',
@@ -1117,7 +1149,7 @@ function flattenResultTree(
     expanded: rootExpanded,
   });
   if (!rootExpanded) return flattened;
-  for (const row of rows) appendDocumentTreeRows(flattened, row, 1, collapsedIds);
+  for (const row of rows) appendDocumentTreeRows(flattened, row, 1, expandedIds);
   if (hasMore) {
     flattened.push({
       id: `${rootId}:load-more`,
@@ -1135,10 +1167,10 @@ function appendDocumentTreeRows(
   flattened: ResultTreeRowModel[],
   row: FirestoreDocumentResult,
   level: number,
-  collapsedIds: ReadonlySet<string>,
+  expandedIds: ReadonlySet<string>,
 ) {
   const nodeId = `doc:${row.path}`;
-  const expanded = !collapsedIds.has(nodeId);
+  const expanded = expandedIds.has(nodeId);
   flattened.push({
     id: nodeId,
     icon: 'document',
@@ -1152,7 +1184,7 @@ function appendDocumentTreeRows(
   });
   if (!expanded) return;
   for (const [key, value] of Object.entries(row.data)) {
-    appendValueTreeRows(flattened, key, value, level + 1, `${nodeId}:field`, collapsedIds);
+    appendValueTreeRows(flattened, key, value, level + 1, `${nodeId}:field`, expandedIds);
   }
   if (!row.subcollections?.length) {
     flattened.push({
@@ -1168,7 +1200,7 @@ function appendDocumentTreeRows(
   }
   for (const collection of row.subcollections) {
     const collectionId = `collection:${collection.path}`;
-    const collectionExpanded = !collapsedIds.has(collectionId);
+    const collectionExpanded = expandedIds.has(collectionId);
     const documents = documentsForCollectionNode(collection);
     flattened.push({
       id: collectionId,
@@ -1183,7 +1215,7 @@ function appendDocumentTreeRows(
     });
     if (documents.length && collectionExpanded) {
       for (const document of documents) {
-        appendDocumentTreeRows(flattened, document, level + 2, collapsedIds);
+        appendDocumentTreeRows(flattened, document, level + 2, expandedIds);
       }
     } else {
       flattened.push({
@@ -1205,7 +1237,7 @@ function appendValueTreeRows(
   value: unknown,
   level: number,
   parentId: string,
-  collapsedIds: ReadonlySet<string>,
+  expandedIds: ReadonlySet<string>,
 ) {
   const nodeId = `${parentId}:${key}`;
   if (!isExpandableValue(value)) {
@@ -1223,7 +1255,7 @@ function appendValueTreeRows(
   const entries = Array.isArray(value)
     ? value.map((entry, index) => [`[${index}]`, entry] as const)
     : Object.entries(value as Record<string, unknown>);
-  const expanded = !collapsedIds.has(nodeId);
+  const expanded = expandedIds.has(nodeId);
   flattened.push({
     id: nodeId,
     icon: 'folder',
@@ -1236,7 +1268,7 @@ function appendValueTreeRows(
   });
   if (!expanded) return;
   for (const [childKey, childValue] of entries) {
-    appendValueTreeRows(flattened, childKey, childValue, level + 1, nodeId, collapsedIds);
+    appendValueTreeRows(flattened, childKey, childValue, level + 1, nodeId, expandedIds);
   }
 }
 
@@ -1547,10 +1579,6 @@ function renderSubcollectionButtons(
 function isCollectionPath(path: string): boolean {
   const parts = path.split('/').filter(Boolean);
   return parts.length % 2 === 1;
-}
-
-function isRootCollectionPath(path: string): boolean {
-  return path.split('/').filter(Boolean).length === 1;
 }
 
 function parseEditorJson(source: string): Record<string, unknown> {

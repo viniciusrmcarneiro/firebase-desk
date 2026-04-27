@@ -15,7 +15,11 @@ describe('tabsStore', () => {
   });
 
   it('opens and selects session-only tabs', () => {
-    const id = tabActions.openTab({ kind: 'firestore-query', projectId: 'emu', path: 'customers' });
+    const id = tabActions.openTab({
+      kind: 'firestore-query',
+      connectionId: 'emu',
+      path: 'customers',
+    });
     const state = tabsStore.state;
     expect(state.activeTabId).toBe(id);
     expect(state.tabs.at(-1)?.title).toBe('customers');
@@ -55,15 +59,15 @@ describe('tabsStore', () => {
     );
   });
 
-  it('selects an existing account-bound tab instead of duplicating it', () => {
+  it('selects an existing connection-bound tab instead of duplicating it', () => {
     const firstId = tabActions.openOrSelectTab({
       kind: 'firestore-query',
-      projectId: 'emu',
+      connectionId: 'emu',
       path: 'orders',
     });
     const secondId = tabActions.openOrSelectTab({
       kind: 'firestore-query',
-      projectId: 'emu',
+      connectionId: 'emu',
       path: 'orders',
     });
     expect(firstId).toBe('tab-firestore');
@@ -74,12 +78,12 @@ describe('tabsStore', () => {
   it('supports tab context bulk operations', () => {
     const extraId = tabActions.openTab({
       kind: 'firestore-query',
-      projectId: 'prod',
+      connectionId: 'prod',
       path: 'customers',
     });
     tabActions.closeTabsToLeft(extraId);
     expect(tabsStore.state.tabs[0]?.id).toBe(extraId);
-    tabActions.openTab({ kind: 'js-query', projectId: 'stage' });
+    tabActions.openTab({ kind: 'js-query', connectionId: 'stage' });
     tabActions.closeOtherTabs(extraId);
     expect(tabsStore.state.tabs.map((tab) => tab.id)).toEqual([extraId]);
   });
@@ -87,7 +91,7 @@ describe('tabsStore', () => {
   it('replays global interaction history without opening tabs', () => {
     const customersId = tabActions.openTab({
       kind: 'firestore-query',
-      projectId: 'emu',
+      connectionId: 'emu',
       path: 'customers',
     });
     tabActions.recordInteraction({

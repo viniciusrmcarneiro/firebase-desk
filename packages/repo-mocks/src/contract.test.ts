@@ -4,7 +4,7 @@ import {
   createFixtureCollection,
   createFixtureDocument,
   createProjectFixture,
-  MOCK_ACCOUNT_LOAD_ERROR_PROJECT_ID,
+  MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID,
   MockAuthRepository,
   MockFirebaseError,
   MockFirestoreRepository,
@@ -44,7 +44,7 @@ describe('repo-mocks contract conformance', () => {
     expect(docs.items).toHaveLength(1);
     expect(docs.nextCursor?.token).toBe('1');
 
-    const page = await repo.runQuery({ projectId: 'p', path: 'orders' }, { limit: 2 });
+    const page = await repo.runQuery({ connectionId: 'p', path: 'orders' }, { limit: 2 });
     expect(page.items).toHaveLength(2);
     expect(page.items[0]?.data).toBeDefined();
     expect(page.items[0]?.subcollections?.[0]?.path).toBe('orders/ord_1024/events');
@@ -62,7 +62,7 @@ describe('repo-mocks contract conformance', () => {
     await repo.saveDocument('p', 'objects/a', { value: { score: 2, toJSON: 'not callable' } });
     await repo.saveDocument('p', 'objects/b', { value: { score: 1 } });
     await expect(repo.runQuery({
-      projectId: 'p',
+      connectionId: 'p',
       path: 'objects',
       sorts: [{ field: 'value', direction: 'asc' }],
     })).resolves.toMatchObject({ items: expect.any(Array) });
@@ -70,7 +70,7 @@ describe('repo-mocks contract conformance', () => {
     await repo.deleteDocument('p', 'orders/ord_saved');
     expect(await repo.getDocument('p', 'orders/ord_saved')).toBeNull();
 
-    await expect(repo.listRootCollections(MOCK_ACCOUNT_LOAD_ERROR_PROJECT_ID)).rejects
+    await expect(repo.listRootCollections(MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID)).rejects
       .toBeInstanceOf(MockFirebaseError);
   });
 

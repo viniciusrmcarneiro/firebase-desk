@@ -11,7 +11,11 @@ interface SettingsStoreLike {
 }
 
 export class MainSettingsRepository implements SettingsRepository {
-  constructor(private readonly store: SettingsStoreLike) {}
+  private readonly store: SettingsStoreLike;
+
+  constructor(store: SettingsStoreLike) {
+    this.store = store;
+  }
 
   async load(): Promise<SettingsSnapshot> {
     return await this.store.load();

@@ -76,7 +76,7 @@ export const IPC_CHANNELS = {
     response: PickServiceAccountFileResultSchema,
   },
   'firestore.listRootCollections': {
-    request: z.object({ projectId: z.string() }),
+    request: z.object({ connectionId: z.string() }),
     response: z.array(FirestoreCollectionNodeSchema),
   },
   'firestore.listDocuments': {
@@ -84,7 +84,7 @@ export const IPC_CHANNELS = {
     response: FirestoreDocumentsPageSchema,
   },
   'firestore.listSubcollections': {
-    request: z.object({ projectId: z.string(), documentPath: z.string() }),
+    request: z.object({ connectionId: z.string(), documentPath: z.string() }),
     response: z.array(FirestoreCollectionNodeSchema),
   },
   'firestore.runQuery': {
@@ -92,7 +92,7 @@ export const IPC_CHANNELS = {
     response: FirestoreResultsPageSchema,
   },
   'firestore.getDocument': {
-    request: z.object({ projectId: z.string(), documentPath: z.string() }),
+    request: z.object({ connectionId: z.string(), documentPath: z.string() }),
     response: FirestoreDocumentResultSchema.nullable(),
   },
   'scriptRunner.run': {

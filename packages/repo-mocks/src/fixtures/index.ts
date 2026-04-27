@@ -5,7 +5,7 @@ import {
 } from '@firebase-desk/data-format';
 import type { AuthUser, ProjectSummary } from '@firebase-desk/repo-contracts';
 
-export const MOCK_ACCOUNT_LOAD_ERROR_PROJECT_ID = 'mock-account-load-error';
+export const MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID = 'mock-connection-load-error';
 
 export const PROJECTS: ReadonlyArray<ProjectSummary> = [
   {
@@ -38,8 +38,8 @@ export const PROJECTS: ReadonlyArray<ProjectSummary> = [
   },
   {
     id: 'broken',
-    name: 'Broken Account',
-    projectId: MOCK_ACCOUNT_LOAD_ERROR_PROJECT_ID,
+    name: 'Broken Connection',
+    projectId: MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID,
     target: 'emulator',
     emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
     hasCredential: false,
