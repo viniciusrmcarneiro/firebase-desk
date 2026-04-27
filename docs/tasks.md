@@ -171,7 +171,40 @@ Close the gap between mocks and the real MVP behavior before swapping in Firebas
 - [x] Add contract conformance tests covering every repository method used by the mocked app.
 - [x] Add fixture builder helpers so UI tests can create targeted mock states without duplicating data.
 
-## Phase 5: Project Management
+## Phase 5: Build And Release Pipeline
+
+Move this ahead of real Firebase integration so packaging, artifacts, and install friction are known while the app is still mocked. See [testing-ci.md](testing-ci.md), [project-structure.md](project-structure.md), and `apps/desktop/electron-builder.yml`.
+
+- [x] Add root `pnpm package` script.
+- [x] Add desktop `package` script using `electron-builder`.
+- [x] Add `apps/desktop/electron-builder.yml` with macOS, Windows, and Linux targets.
+- [x] Add GitHub Actions `release.yml`.
+- [ ] Run `release.yml` packaging on PRs and fail the PR if packaging fails.
+- [ ] Upload PR package outputs as temporary workflow artifacts only.
+- [ ] Create or update a rolling draft prerelease `main-latest` on every merge to `main`.
+- [ ] Attach `main-latest` binaries as GitHub Release assets.
+- [ ] Keep `v*.*.*` tags creating versioned draft GitHub Releases.
+- [ ] Keep `workflow_dispatch` as an ad-hoc package smoke path.
+- [ ] Name workflow artifacts and release assets by channel/version, OS, architecture, and target type.
+- [ ] Set artifact retention for PR and ad-hoc package smoke builds.
+- [ ] Add app icons and builder resources for macOS, Windows, and Linux.
+- [ ] Add first unsigned/dev-build download notes to README.
+- [ ] Document expected unsigned app warnings per OS.
+- [ ] Add safety disclaimer to README before public binaries exist.
+- [ ] Verify `pnpm package` locally on the current development OS.
+- [ ] Verify GitHub `release.yml` succeeds on PRs for macOS, Windows, and Linux.
+- [ ] Verify GitHub `release.yml` updates `main-latest` on merge to `main`.
+- [ ] Download every PR workflow artifact and confirm the archive/installer opens.
+- [ ] Download every `main-latest` release asset and confirm the archive/installer opens.
+- [ ] Install/open the macOS binary from PR artifacts and `main-latest` release assets.
+- [ ] Install/open the Windows binary from PR artifacts and `main-latest` release assets.
+- [ ] Install/open the Linux binary from PR artifacts and `main-latest` release assets.
+- [ ] Add a packaged-app smoke test or CI check that catches missing runtime files.
+- [ ] Create the first versioned draft GitHub Release from a tag.
+- [ ] Document signing/notarization/code-signing as deferred or required before public release.
+- [ ] Create first release checklist.
+
+## Phase 6: Project Management
 
 - [ ] Parse service account JSON.
 - [ ] Validate required service account fields.
@@ -183,7 +216,7 @@ Close the gap between mocks and the real MVP behavior before swapping in Firebas
 - [ ] Switch active target between production and emulator.
 - [ ] Show active project in status bar.
 
-## Phase 6: Firestore Read And Query
+## Phase 7: Firestore Read And Query
 
 - [ ] Initialize Firebase Admin app per project.
 - [ ] Initialize Firebase Admin app for emulator target.
@@ -197,7 +230,7 @@ Close the gap between mocks and the real MVP behavior before swapping in Firebas
 - [ ] Normalize snapshots for renderer.
 - [ ] Render loading, empty, and error states.
 
-## Phase 7: Firestore Editing
+## Phase 8: Firestore Editing
 
 - [ ] Load full document data.
 - [ ] Save full JSON document.
@@ -206,7 +239,7 @@ Close the gap between mocks and the real MVP behavior before swapping in Firebas
 - [ ] Confirm destructive actions.
 - [ ] Preserve unsaved editor state on failed save.
 
-## Phase 8: JavaScript Query
+## Phase 9: JavaScript Query
 
 - [ ] Define script context API in `packages/script-runner`.
 - [ ] Run script for active project.
@@ -220,7 +253,7 @@ Close the gap between mocks and the real MVP behavior before swapping in Firebas
 - [ ] Add execution timeout.
 - [ ] Move runner to isolated process before enabling real writes (within `packages/script-runner`).
 
-## Phase 9: Authentication
+## Phase 10: Authentication
 
 - [ ] List users with pagination.
 - [ ] List users from emulator target.
@@ -228,14 +261,3 @@ Close the gap between mocks and the real MVP behavior before swapping in Firebas
 - [ ] View selected user details.
 - [ ] View custom claims.
 - [ ] Decide whether MVP edits custom claims.
-
-## Phase 10: Release Readiness
-
-- [ ] Add README usage notes.
-- [ ] Add safety disclaimer.
-- [ ] Add build/package scripts.
-- [ ] Add app icons.
-- [ ] Package macOS build.
-- [ ] Package Windows build.
-- [ ] Package Linux build.
-- [ ] Create first release checklist.

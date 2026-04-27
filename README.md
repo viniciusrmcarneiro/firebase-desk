@@ -2,7 +2,7 @@
 
 A free, open-source desktop Firebase admin client for developers: browse, query, and edit Firestore data, inspect Authentication users, connect to emulators, and run JavaScript admin scripts locally.
 
-Status: planning. First implementation target is CI-tested project foundation, then a live wireframe app focused on the account tree, tab model, and core view layout before connecting Firebase.
+Status: mocked app. Current priority is release packaging so GitHub can produce downloadable desktop binaries before real Firebase integration continues.
 
 ## MVP
 
@@ -48,3 +48,16 @@ Every workflow has an identical local pnpm command:
 | `ci.yml`      | `pnpm install && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test && pnpm build` |
 | `e2e.yml`     | `pnpm install && pnpm build && pnpm --filter @firebase-desk/e2e test:withEmulators`           |
 | `release.yml` | `pnpm install && pnpm package` (per-OS)                                                       |
+
+## Release Workflow
+
+Early binaries are unsigned development builds.
+
+| Event           | Output                                                                    |
+| --------------- | ------------------------------------------------------------------------- |
+| PR to `main`    | CI, e2e, package macOS/Windows/Linux, upload temporary workflow artifacts |
+| Merge to `main` | CI, package macOS/Windows/Linux, update draft prerelease `main-latest`    |
+| Tag `v*.*.*`    | CI, package macOS/Windows/Linux, create versioned draft release           |
+| Manual dispatch | Ad-hoc package smoke run with temporary workflow artifacts                |
+
+Use PR artifacts to block broken packaging before merge. Use GitHub Release assets from `main-latest` and version tags as the long-lived download links.

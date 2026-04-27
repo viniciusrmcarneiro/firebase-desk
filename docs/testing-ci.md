@@ -31,7 +31,7 @@
 
 - `ci.yml`: install (pnpm), run `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test`, `pnpm build`.
 - `e2e.yml`: install, build affected workspaces, start Firebase emulators, seed data, run `pnpm test:e2e`, upload traces/screenshots on failure.
-- `release.yml`: on tag or manual dispatch, run CI checks, run `pnpm package` for the desktop app, package macOS/Windows/Linux artifacts, create draft release.
+- `release.yml`: on PR, merge to `main`, tag, or ad-hoc dispatch, run CI checks and `pnpm package` for the desktop app on macOS/Windows/Linux. PR and ad-hoc runs upload temporary workflow artifacts with retention. Merges to `main` create or update the rolling draft prerelease `main-latest` with release assets. Version tags create versioned draft GitHub Releases with release assets.
 
 ### Required Scripts (root `package.json`, delegated via turbo/pnpm filters)
 
@@ -49,5 +49,10 @@
 
 - Workflows are added before live wireframe UI work.
 - Pull requests must pass lint, typecheck, unit tests, and build.
+- Pull requests must also package macOS, Windows, and Linux apps before merge.
 - E2E emulator workflow must exist early, even if first specs are smoke tests.
 - Release workflow must exist before the first packaged build is considered done.
+- PR package outputs are workflow artifacts only, not GitHub Release assets.
+- Every merge to `main` updates the rolling draft prerelease `main-latest`.
+- Version tags create separate versioned draft GitHub Releases.
+- First release phase validates unsigned app warnings and install/open smoke on each OS before Firebase feature work continues.
