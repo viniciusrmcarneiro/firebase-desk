@@ -1,3 +1,4 @@
+import { SettingsFileSchema } from '@firebase-desk/ipc-schemas';
 import type { SettingsSnapshot } from '@firebase-desk/repo-contracts';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
@@ -10,11 +11,6 @@ export const DEFAULT_SETTINGS_SNAPSHOT: SettingsSnapshot = {
   dataMode: 'live',
   hotkeyOverrides: {},
 };
-
-interface SettingsFile {
-  readonly version: 1;
-  readonly snapshot: SettingsSnapshot;
-}
 
 export class SettingsStore {
   private readonly filePath: string;
@@ -39,22 +35,15 @@ export class SettingsStore {
   private async readFile(): Promise<SettingsSnapshot> {
     try {
       const raw = await readFile(this.filePath, 'utf8');
-      const parsed = JSON.parse(raw) as Partial<SettingsFile>;
-      if (parsed.version !== 1 || !parsed.snapshot) return cloneSnapshot(DEFAULT_SETTINGS_SNAPSHOT);
-      return normalizeSnapshot(parsed.snapshot);
+      const parsed = JSON.parse(raw) as unknown;
+      const settingsFile = SettingsFileSchema.safeParse(parsed);
+      if (!settingsFile.success) return cloneSnapshot(DEFAULT_SETTINGS_SNAPSHOT);
+      return cloneSnapshot(settingsFile.data.snapshot);
     } catch (error) {
       if (isNotFound(error)) return cloneSnapshot(DEFAULT_SETTINGS_SNAPSHOT);
       throw error;
     }
   }
-}
-
-function normalizeSnapshot(snapshot: Partial<SettingsSnapshot>): SettingsSnapshot {
-  return {
-    ...DEFAULT_SETTINGS_SNAPSHOT,
-    ...snapshot,
-    hotkeyOverrides: snapshot.hotkeyOverrides ? { ...snapshot.hotkeyOverrides } : {},
-  };
 }
 
 function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {

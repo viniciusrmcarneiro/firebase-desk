@@ -13,3 +13,8 @@ export const SettingsSnapshotSchema = z.object({
 });
 
 export const SettingsPatchSchema = SettingsSnapshotSchema.partial();
+
+export const SettingsFileSchema = z.object({
+  version: z.literal(1),
+  snapshot: SettingsSnapshotSchema,
+});

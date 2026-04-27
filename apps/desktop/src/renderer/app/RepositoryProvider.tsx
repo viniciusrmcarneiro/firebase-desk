@@ -54,14 +54,13 @@ export function createRepositories(
   { dataMode, onDataModeChange }: CreateRepositoriesOptions,
 ): RepositorySet {
   const mockRepositories = createMockRepositories();
-  const liveCapable = dataMode === 'live' && hasDesktopApi();
-  const repositories: RepositorySet = liveCapable
-    ? {
-      ...mockRepositories,
-      projects: new IpcProjectsRepository(),
-      settings: new IpcSettingsRepository(),
-    }
-    : mockRepositories;
+  const desktopApiAvailable = hasDesktopApi();
+  const liveCapable = dataMode === 'live' && desktopApiAvailable;
+  const repositories: RepositorySet = {
+    ...mockRepositories,
+    ...(liveCapable ? { projects: new IpcProjectsRepository() } : {}),
+    ...(desktopApiAvailable ? { settings: new IpcSettingsRepository() } : {}),
+  };
 
   return {
     ...repositories,

@@ -225,6 +225,22 @@ describe('desktop AppShell', () => {
     await waitFor(() => expect(screen.getByText('Opened data location')).toBeTruthy());
   });
 
+  it('marks the desktop data location unavailable when config loading fails', async () => {
+    vi.stubGlobal('firebaseDesk', {
+      app: {
+        getConfig: vi.fn(async () => Promise.reject(new Error('No config'))),
+        openDataDirectory: vi.fn(async () => {}),
+      },
+    });
+    renderShell();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Settings' }));
+
+    expect(await screen.findByText('Unavailable')).toBeTruthy();
+    expect((screen.getByRole('button', { name: 'Open location' }) as HTMLButtonElement).disabled)
+      .toBe(true);
+  });
+
   it('clears firestore results when changing the tab account', async () => {
     const repositories = createMockRepositories();
     const runQuery = vi.spyOn(repositories.firestore, 'runQuery');

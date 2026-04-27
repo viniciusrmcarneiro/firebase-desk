@@ -1,4 +1,5 @@
 import type {
+  EmulatorConnectionProfile,
   ProjectAddInput,
   ProjectsRepository,
   ProjectSummary,
@@ -6,6 +7,8 @@ import type {
   ServiceAccountValidationResult,
 } from '@firebase-desk/repo-contracts';
 import { PROJECTS } from './fixtures/index.ts';
+
+const HOST_PORT_PATTERN = /^[^:\s]+:\d+$/;
 
 export class MockProjectsRepository implements ProjectsRepository {
   private readonly projects: ProjectSummary[] = [...PROJECTS];
@@ -39,8 +42,8 @@ export class MockProjectsRepository implements ProjectsRepository {
     const current = this.projects[idx]!;
     const next: ProjectSummary = {
       ...current,
-      ...(patch.name ? { name: patch.name } : {}),
-      ...(patch.emulator ? { emulator: patch.emulator } : {}),
+      ...(patch.name !== undefined ? { name: normalizeName(patch.name) } : {}),
+      ...(patch.emulator !== undefined ? { emulator: normalizeEmulator(patch.emulator) } : {}),
     };
     this.projects.splice(idx, 1, next);
     return next;
@@ -68,4 +71,22 @@ export class MockProjectsRepository implements ProjectsRepository {
   async pickServiceAccountFile() {
     return { canceled: true };
   }
+}
+
+function normalizeName(name: string): string {
+  const value = name.trim();
+  if (!value) throw new Error('Project display name is required.');
+  return value;
+}
+
+function normalizeEmulator(profile: EmulatorConnectionProfile): EmulatorConnectionProfile {
+  const firestoreHost = profile.firestoreHost.trim();
+  const authHost = profile.authHost.trim();
+  if (!HOST_PORT_PATTERN.test(firestoreHost)) {
+    throw new Error('Firestore emulator host must use host:port format.');
+  }
+  if (!HOST_PORT_PATTERN.test(authHost)) {
+    throw new Error('Auth emulator host must use host:port format.');
+  }
+  return { firestoreHost, authHost };
 }

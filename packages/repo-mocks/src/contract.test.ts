@@ -27,6 +27,9 @@ describe('repo-mocks contract conformance', () => {
     expect((await repo.get(added.id))?.id).toBe(added.id);
     const updated = await repo.update(added.id, { name: 'Tmp Renamed' });
     expect(updated.name).toBe('Tmp Renamed');
+    await expect(repo.update(added.id, { name: ' ' })).rejects.toThrow(
+      'Project display name is required.',
+    );
     await repo.remove(added.id);
     expect(await repo.get(added.id)).toBeNull();
   });

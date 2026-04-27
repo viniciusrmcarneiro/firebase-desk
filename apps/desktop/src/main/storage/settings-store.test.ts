@@ -1,4 +1,4 @@
-import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -29,6 +29,27 @@ describe('SettingsStore', () => {
     };
     expect(persisted.version).toBe(1);
     expect(typeof persisted.snapshot?.sidebarWidth).toBe('number');
+  });
+
+  it('falls back to defaults when settings file values are invalid', async () => {
+    const userDataPath = await makeTempDir();
+    await writeFile(
+      join(userDataPath, 'settings.json'),
+      JSON.stringify({
+        version: 1,
+        snapshot: {
+          sidebarWidth: 'wide',
+          inspectorWidth: 444,
+          theme: 123,
+          dataMode: 'other',
+          hotkeyOverrides: { bad: 42 },
+        },
+      }),
+    );
+
+    await expect(new SettingsStore(userDataPath).load()).resolves.toEqual(
+      DEFAULT_SETTINGS_SNAPSHOT,
+    );
   });
 });
 

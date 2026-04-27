@@ -66,8 +66,8 @@ export class MainProjectsRepository implements ProjectsRepository {
     const current = projects[index]!;
     const next: ProjectSummary = {
       ...current,
-      ...(patch.name ? { name: normalizeName(patch.name) } : {}),
-      ...(patch.emulator ? { emulator: normalizeEmulator(patch.emulator) } : {}),
+      ...(patch.name !== undefined ? { name: normalizeName(patch.name) } : {}),
+      ...(patch.emulator !== undefined ? { emulator: normalizeEmulator(patch.emulator) } : {}),
     };
 
     const updated = projects.map((project) => project.id === id ? next : project);

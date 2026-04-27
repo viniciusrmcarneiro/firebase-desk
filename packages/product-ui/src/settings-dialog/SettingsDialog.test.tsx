@@ -144,6 +144,31 @@ describe('SettingsDialog', () => {
     await waitFor(() => expect(onOpenDataDirectory).toHaveBeenCalledTimes(1));
   });
 
+  it('shows unavailable local data when the folder cannot be loaded', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    render(
+      <AppearanceProvider settings={new MockSettingsRepository()}>
+        <SettingsDialog
+          dataDirectoryPath={null}
+          open
+          onOpenChange={vi.fn()}
+          onOpenDataDirectory={async () => {}}
+        />
+      </AppearanceProvider>,
+    );
+
+    expect(screen.getByLabelText('Data storage folder').textContent).toBe('Unavailable');
+    expect((screen.getByRole('button', { name: 'Open location' }) as HTMLButtonElement).disabled)
+      .toBe(true);
+  });
+
   it('shows local data folder open failures', async () => {
     vi.stubGlobal(
       'matchMedia',

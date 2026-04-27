@@ -124,7 +124,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
 
   const [density, setDensity] = useState<DensityName>('compact');
   const [settingsOpen, setSettingsOpen] = useState(false);
-  const [dataDirectoryPath, setDataDirectoryPath] = useState<string | null>(null);
+  const [dataDirectoryPath, setDataDirectoryPath] = useState<string | null | undefined>(undefined);
   const [addProjectOpen, setAddProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [credentialWarning, setCredentialWarning] = useState<string | null>(null);
@@ -180,9 +180,12 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
   useEffect(() => {
     if (!settingsOpen) return;
     const appApi = getDesktopAppApi();
-    if (!appApi?.getConfig) return;
+    setDataDirectoryPath(undefined);
+    if (!appApi?.getConfig) {
+      setDataDirectoryPath(null);
+      return;
+    }
     let cancelled = false;
-    setDataDirectoryPath(null);
     appApi.getConfig()
       .then((config) => {
         if (!cancelled) setDataDirectoryPath(config.dataDirectory);

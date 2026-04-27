@@ -104,6 +104,20 @@ describe('MainProjectsRepository', () => {
     });
   });
 
+  it('rejects empty project names on update', async () => {
+    const repo = createRepo(await makeTempDir(), plainTextEncryption);
+    const project = await repo.add({
+      name: 'Local',
+      projectId: 'demo-local',
+      target: 'emulator',
+      emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
+    });
+
+    await expect(repo.update(project.id, { name: ' ' })).rejects.toThrow(
+      'Project display name is required.',
+    );
+  });
+
   it('rejects invalid emulator host formats', async () => {
     const repo = createRepo(await makeTempDir(), plainTextEncryption);
 

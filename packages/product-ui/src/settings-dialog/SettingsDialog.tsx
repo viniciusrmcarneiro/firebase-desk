@@ -6,7 +6,7 @@ import { useEffect, useState } from 'react';
 import { useAppearance } from '../appearance/AppearanceProvider.tsx';
 
 export interface SettingsDialogProps {
-  readonly dataDirectoryPath?: string | null;
+  readonly dataDirectoryPath?: string | null | undefined;
   readonly density?: DensityName;
   readonly onOpenChange: (open: boolean) => void;
   readonly onOpenDataDirectory?: () => Promise<void>;
@@ -34,6 +34,9 @@ export function SettingsDialog(
   const [isOpeningDataDirectory, setIsOpeningDataDirectory] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [savingDataMode, setSavingDataMode] = useState<DataMode | null>(null);
+  const dataDirectoryLabel = dataDirectoryPath === undefined
+    ? 'Loading'
+    : dataDirectoryPath ?? 'Unavailable';
 
   useEffect(() => {
     if (!open) return;
@@ -152,7 +155,7 @@ export function SettingsDialog(
                   className='min-w-0 flex-1 break-all rounded border border-border-subtle bg-bg-panel px-2 py-1 font-mono text-xs text-text-secondary'
                   title={dataDirectoryPath ?? undefined}
                 >
-                  {dataDirectoryPath ?? 'Loading'}
+                  {dataDirectoryLabel}
                 </code>
                 <Button
                   disabled={!dataDirectoryPath || !onOpenDataDirectory || isOpeningDataDirectory}
