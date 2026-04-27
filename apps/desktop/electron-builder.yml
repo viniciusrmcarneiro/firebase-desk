@@ -26,6 +26,7 @@ nsis:
   allowToChangeInstallationDirectory: true
 linux:
   icon: build/icon.png
+  executableName: firebase-desk
   target:
     - AppImage
     - deb
