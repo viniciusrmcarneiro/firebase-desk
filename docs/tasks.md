@@ -4,7 +4,7 @@ Detailed feature tasks and per-page/per-tab specs should be finalized after the 
 
 ## Context
 
-Before starting on any engineering work please read all the docs files in the `docs/` directory
+Before starting any engineering work, please read all files in the `docs/` directory.
 
 ## Phase 0: Planning
 

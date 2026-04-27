@@ -6,17 +6,41 @@ import { fileURLToPath } from 'node:url';
 const scriptDirectory = dirname(fileURLToPath(import.meta.url));
 const repositoryRoot = resolve(scriptDirectory, '..');
 const releaseDirectory = resolve(repositoryRoot, 'apps/desktop/release');
-const outputFileName = process.env['CHECKSUM_FILE_NAME'] ?? 'SHA256SUMS.txt';
+const outputFileName = process.env['CHECKSUM_FILE_NAME'] ?? resolveDefaultOutputFileName();
 const outputPath = resolve(releaseDirectory, outputFileName);
 const artifactExtensions = new Set(['.AppImage', '.deb', '.dmg', '.exe', '.zip']);
+
+function resolveDefaultOutputFileName() {
+  const nameParts = [
+    'SHA256SUMS',
+    process.env['RELEASE_CHANNEL'],
+    process.env['CHECKSUM_PLATFORM'],
+    process.env['RUNNER_ARCH'],
+  ].filter((part) => typeof part === 'string' && part.length > 0);
+  return `${nameParts.join('-')}.txt`;
+}
 
 function hasArtifactExtension(fileName) {
   return Array.from(artifactExtensions).some((extension) => fileName.endsWith(extension));
 }
 
+function insertArtifactName(sortedNames, artifactName) {
+  const insertIndex = sortedNames.findIndex((existingName) => {
+    return artifactName.localeCompare(existingName) < 0;
+  });
+
+  if (insertIndex === -1) return [...sortedNames, artifactName];
+
+  return [
+    ...sortedNames.slice(0, insertIndex),
+    artifactName,
+    ...sortedNames.slice(insertIndex),
+  ];
+}
+
 const artifactNames = readdirSync(releaseDirectory)
   .filter(hasArtifactExtension)
-  .sort((leftName, rightName) => leftName.localeCompare(rightName));
+  .reduce(insertArtifactName, []);
 
 if (artifactNames.length === 0) {
   throw new Error(`No package artifacts found in ${releaseDirectory}`);

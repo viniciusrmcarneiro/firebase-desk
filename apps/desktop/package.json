@@ -4,6 +4,7 @@
   "private": true,
   "license": "MIT",
   "description": "Firebase Desk Electron application.",
+  "homepage": "https://github.com/viniciusrmcarneiro/firebase-desk",
   "type": "module",
   "main": ".build/out/main/index.js",
   "scripts": {

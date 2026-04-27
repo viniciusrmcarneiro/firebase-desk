@@ -125,10 +125,17 @@ jobs:
                   sudo apt-get install -y xvfb libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2t64
             - run: pnpm install --frozen-lockfile
             - run: pnpm package
+            - name: Resolve package names
+              id: package_names
+              shell: bash
+              env:
+                  PACKAGE_PLATFORM: ${{ matrix.platform }}
+              run: |
+                  echo "artifact=firebase-desk-${RELEASE_CHANNEL}-${PACKAGE_PLATFORM}-${RUNNER_ARCH}" >> "$GITHUB_OUTPUT"
+                  echo "checksums=SHA256SUMS-${RELEASE_CHANNEL}-${PACKAGE_PLATFORM}-${RUNNER_ARCH}.txt" >> "$GITHUB_OUTPUT"
             - run: pnpm package:checksums
               env:
-                  CHECKSUM_FILE_NAME: SHA256SUMS-${{ needs.prepare.outputs.release_channel }}-${{
-                      matrix.platform }}-${{ runner.arch }}.txt
+                  CHECKSUM_FILE_NAME: ${{ steps.package_names.outputs.checksums }}
             - name: Smoke packaged app with emulators (Linux)
               if: matrix.platform == 'linux'
               run: |
@@ -149,8 +156,7 @@ jobs:
                   Write-Host "Found packaged app: $($match.FullName)"
             - uses: actions/upload-artifact@v4
               with:
-                  name: firebase-desk-${{ needs.prepare.outputs.release_channel }}-${{
-                      matrix.platform }}-${{ runner.arch }}
+                  name: ${{ steps.package_names.outputs.artifact }}
                   path: |
                       apps/desktop/release/*.dmg
                       apps/desktop/release/*.zip
