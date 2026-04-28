@@ -53,6 +53,20 @@ describe('scriptResultModel', () => {
     expect(streamItemsFor({ ...result, errors: [{ message: 'nope' }] })).toEqual([]);
   });
 
+  it('keeps partial stream output visible when a run has errors', () => {
+    const result: ScriptRunResult = {
+      returnValue: null,
+      stream: [{ id: 'yield-1', label: 'yield 1', badge: 'number', view: 'json', value: 1 }],
+      logs: [],
+      errors: [{ message: 'boom' }],
+      durationMs: 1,
+    };
+
+    expect(streamItemsFor(result)).toEqual([
+      { id: 'yield-1', label: 'yield 1', badge: 'number', view: 'json', value: 1 },
+    ]);
+  });
+
   it('formats log and error values for preview', () => {
     expect(formatLogEntry({
       level: 'info',

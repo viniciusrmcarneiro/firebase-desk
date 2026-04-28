@@ -1,7 +1,12 @@
 import type {
+  ScriptLogEntry,
+  ScriptRunError,
+  ScriptRunEvent,
+  ScriptRunEventListener,
   ScriptRunnerRepository,
   ScriptRunRequest,
   ScriptRunResult,
+  ScriptStreamItem,
 } from '@firebase-desk/repo-contracts';
 import { type ChildProcess, fork } from 'node:child_process';
 import type { ScriptRunnerConnection, ScriptWorkerResponse } from './types.ts';
@@ -18,7 +23,10 @@ export interface ProcessScriptRunnerOptions {
 
 interface ActiveRun {
   readonly child: ChildProcess;
+  readonly errors: ScriptRunError[];
+  readonly logs: ScriptLogEntry[];
   readonly startedAt: number;
+  readonly stream: ScriptStreamItem[];
   cancelled: boolean;
   settled: boolean;
   resolve(result: ScriptRunResult): void;
@@ -28,6 +36,7 @@ export class ProcessScriptRunnerRepository implements ScriptRunnerRepository {
   private readonly activeRuns = new Map<string, ActiveRun>();
   private readonly cancelledRuns = new Set<string>();
   private readonly forkWorker: (workerPath: string) => ChildProcess;
+  private readonly listeners = new Set<ScriptRunEventListener>();
   private readonly now: () => number;
   private readonly resolver: ScriptRunnerConnectionResolver;
   private readonly workerPath: string;
@@ -56,24 +65,32 @@ export class ProcessScriptRunnerRepository implements ScriptRunnerRepository {
       const active: ActiveRun = {
         child,
         cancelled: false,
+        errors: [],
+        logs: [],
         resolve,
         settled: false,
         startedAt,
+        stream: [],
       };
       this.activeRuns.set(request.runId, active);
 
-      child.once('message', (message: unknown) => {
+      child.on('message', (message: unknown) => {
+        const event = eventFromWorkerMessage(message);
+        if (event) {
+          this.recordEvent(request.runId, event);
+          return;
+        }
         const result = resultFromWorkerMessage(message);
-        if (result) this.finish(request.runId, result);
+        if (result) this.finish(request.runId, resultWithPartial(active, result));
       });
       child.once('error', (error) => {
-        this.finish(request.runId, errorRunResult(error, this.duration(active)));
+        this.finish(request.runId, errorRunResult(error, this.duration(active), active));
       });
       child.once('exit', (code, signal) => {
         const current = this.activeRuns.get(request.runId);
         if (!current || current.settled) return;
         if (current.cancelled) {
-          this.finish(request.runId, cancelledResult(this.duration(current)));
+          this.finish(request.runId, cancelledResult(this.duration(current), current));
           return;
         }
         this.finish(
@@ -85,6 +102,7 @@ export class ProcessScriptRunnerRepository implements ScriptRunnerRepository {
               }).`,
             ),
             this.duration(current),
+            current,
           ),
         );
       });
@@ -108,16 +126,42 @@ export class ProcessScriptRunnerRepository implements ScriptRunnerRepository {
     active.child.kill();
   }
 
+  subscribe(listener: ScriptRunEventListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private recordEvent(runId: string, event: ScriptRunEvent): void {
+    const active = this.activeRuns.get(runId);
+    if (!active || active.settled || event.runId !== runId) return;
+    if (event.type === 'output') active.stream.push(event.item);
+    else if (event.type === 'log') active.logs.push(event.log);
+    else if (event.type === 'error') active.errors.push(event.error);
+    this.emit(event);
+  }
+
   private finish(runId: string, result: ScriptRunResult): void {
     const active = this.activeRuns.get(runId);
     if (!active || active.settled) return;
     active.settled = true;
     this.activeRuns.delete(runId);
+    this.emit({ type: 'complete', runId, result });
     active.resolve(result);
   }
 
   private duration(active: ActiveRun): number {
     return Math.max(0, this.now() - active.startedAt);
+  }
+
+  private emit(event: ScriptRunEvent): void {
+    const listeners = Array.from(this.listeners);
+    for (const listener of listeners) {
+      try {
+        listener(event);
+      } catch {
+        // A subscriber must not break child-process event handling.
+      }
+    }
   }
 }
 
@@ -137,24 +181,42 @@ function resultFromWorkerMessage(message: unknown): ScriptRunResult | null {
   return null;
 }
 
-function cancelledResult(durationMs: number): ScriptRunResult {
+function eventFromWorkerMessage(message: unknown): ScriptRunEvent | null {
+  if (!message || typeof message !== 'object') return null;
+  const record = message as ScriptWorkerResponse;
+  return record.type === 'event' ? record.event : null;
+}
+
+function cancelledResult(durationMs: number, active?: ActiveRun): ScriptRunResult {
   return {
     returnValue: null,
-    stream: [],
-    logs: [{ level: 'info', message: 'Script cancelled', timestamp: new Date().toISOString() }],
-    errors: [],
+    stream: active?.stream ?? [],
+    logs: [
+      ...(active?.logs ?? []),
+      { level: 'info', message: 'Script cancelled', timestamp: new Date().toISOString() },
+    ],
+    errors: active?.errors ?? [],
     durationMs,
     cancelled: true,
   };
 }
 
-function errorRunResult(error: unknown, durationMs: number): ScriptRunResult {
+function errorRunResult(error: unknown, durationMs: number, active?: ActiveRun): ScriptRunResult {
   return {
     returnValue: null,
-    stream: [],
-    logs: [],
-    errors: [scriptError(error)],
+    stream: active?.stream ?? [],
+    logs: active?.logs ?? [],
+    errors: [...(active?.errors ?? []), scriptError(error)],
     durationMs,
+  };
+}
+
+function resultWithPartial(active: ActiveRun, result: ScriptRunResult): ScriptRunResult {
+  return {
+    ...result,
+    stream: result.stream ?? active.stream,
+    logs: result.logs.length ? result.logs : active.logs,
+    errors: result.errors.length ? result.errors : active.errors,
   };
 }
 

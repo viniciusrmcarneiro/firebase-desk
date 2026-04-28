@@ -3,6 +3,7 @@ import {
   type IpcChannel,
   type IpcRequest,
   type IpcResponse,
+  SCRIPT_RUN_EVENT_CHANNEL,
 } from '@firebase-desk/ipc-schemas';
 import type {
   AuthUser,
@@ -12,6 +13,7 @@ import type {
   FirestoreQuery,
   Page,
   PageRequest,
+  ScriptRunEvent,
   ScriptRunResult,
 } from '@firebase-desk/repo-contracts';
 import {
@@ -22,7 +24,7 @@ import {
   FirebaseFirestoreRepository,
 } from '@firebase-desk/repo-firebase';
 import { ProcessScriptRunnerRepository } from '@firebase-desk/script-runner';
-import { app, dialog, ipcMain, shell } from 'electron';
+import { app, BrowserWindow, dialog, ipcMain, shell } from 'electron';
 import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
@@ -70,6 +72,7 @@ export function registerIpcHandlers(): void {
   const scriptRunnerRepository = new ProcessScriptRunnerRepository(connectionResolver, {
     workerPath: scriptRunnerWorkerPath(),
   });
+  scriptRunnerRepository.subscribe(broadcastScriptRunEvent);
   const authRepository = new FirebaseAuthRepository(authProvider);
 
   const handlers: Partial<{ [C in IpcChannel]: Handler<C>; }> = {
@@ -312,4 +315,17 @@ function toIpcScriptRunResult(result: ScriptRunResult): IpcResponse<'scriptRunne
     durationMs: result.durationMs,
     ...(result.cancelled !== undefined ? { cancelled: result.cancelled } : {}),
   };
+}
+
+function toIpcScriptRunEvent(event: ScriptRunEvent): unknown {
+  if (event.type === 'complete') {
+    return { ...event, result: toIpcScriptRunResult(event.result) };
+  }
+  return event;
+}
+
+export function broadcastScriptRunEvent(event: ScriptRunEvent): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send(SCRIPT_RUN_EVENT_CHANNEL, toIpcScriptRunEvent(event));
+  }
 }

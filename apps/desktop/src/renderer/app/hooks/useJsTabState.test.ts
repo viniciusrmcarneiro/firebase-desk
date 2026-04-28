@@ -1,9 +1,14 @@
-import type { ScriptRunResult } from '@firebase-desk/repo-contracts';
+import type { ScriptRunEvent, ScriptRunResult } from '@firebase-desk/repo-contracts';
 import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useRepositories } from '../RepositoryProvider.tsx';
 import { tabActions, tabsStore } from '../stores/tabsStore.ts';
 import { useJsTabState } from './useJsTabState.ts';
 import { useCancelScript, useRunScript } from './useRepositoriesData.ts';
+
+vi.mock('../RepositoryProvider.tsx', () => ({
+  useRepositories: vi.fn(),
+}));
 
 vi.mock('./useRepositoriesData.ts', () => ({
   useCancelScript: vi.fn(),
@@ -17,10 +22,21 @@ const scriptResult: ScriptRunResult = {
   returnValue: { ok: true },
 };
 
+function scriptRunRequest(mutate: ReturnType<typeof vi.fn>, index = 0) {
+  const call = mutate.mock.calls.at(index);
+  expect(call).toBeDefined();
+  return call![0] as { readonly runId: string; };
+}
+
 describe('useJsTabState', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     tabActions.reset();
+    vi.mocked(useRepositories).mockReturnValue({
+      scriptRunner: {
+        subscribe: vi.fn(() => () => {}),
+      },
+    } as unknown as ReturnType<typeof useRepositories>);
     vi.mocked(useRunScript).mockReturnValue(runScriptResult());
     vi.mocked(useCancelScript).mockReturnValue(cancelScriptResult());
   });
@@ -99,7 +115,7 @@ describe('useJsTabState', () => {
     act(() => {
       expect(result.current.runScript()).toBe(true);
     });
-    const request = mutate.mock.calls[0]?.[0] as { readonly runId: string; };
+    const request = scriptRunRequest(mutate);
 
     expect(result.current.isRunning).toBe(true);
     act(() => {
@@ -114,6 +130,202 @@ describe('useJsTabState', () => {
     );
     expect(result.current.isRunning).toBe(false);
     expect(result.current.scriptResult?.cancelled).toBe(true);
+  });
+
+  it('merges live script output into the active tab', () => {
+    const mutate = vi.fn();
+    const cancelMutate = vi.fn();
+    let listener: ((event: ScriptRunEvent) => void) | null = null;
+    vi.mocked(useRepositories).mockReturnValue({
+      scriptRunner: {
+        subscribe: vi.fn((next) => {
+          listener = next;
+          return () => {};
+        }),
+      },
+    } as unknown as ReturnType<typeof useRepositories>);
+    vi.mocked(useRunScript).mockReturnValue({
+      isPending: true,
+      mutate,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useRunScript>);
+    vi.mocked(useCancelScript).mockReturnValue({
+      mutate: cancelMutate,
+    } as unknown as ReturnType<typeof useCancelScript>);
+    const tabId = tabActions.openTab({ kind: 'js-query', connectionId: 'emu' });
+    const tab = tabsStore.state.tabs.find((item) => item.id === tabId)!;
+    const { result } = renderHook(() =>
+      useJsTabState({
+        activeTab: tab,
+        selectedTreeItemId: 'script:emu',
+      })
+    );
+
+    act(() => {
+      expect(result.current.runScript()).toBe(true);
+    });
+    const request = scriptRunRequest(mutate);
+    act(() =>
+      listener?.({
+        type: 'output',
+        runId: request.runId,
+        item: { id: 'yield-1', label: 'yield 1', badge: 'number', view: 'json', value: 1 },
+      })
+    );
+
+    expect(result.current.scriptResult?.stream).toEqual([
+      expect.objectContaining({ label: 'yield 1', value: 1 }),
+    ]);
+  });
+
+  it('ignores stale live script events after a rerun', () => {
+    const mutate = vi.fn();
+    let listener: ((event: ScriptRunEvent) => void) | null = null;
+    vi.mocked(useRepositories).mockReturnValue({
+      scriptRunner: {
+        subscribe: vi.fn((next) => {
+          listener = next;
+          return () => {};
+        }),
+      },
+    } as unknown as ReturnType<typeof useRepositories>);
+    vi.mocked(useRunScript).mockReturnValue({
+      isPending: true,
+      mutate,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useRunScript>);
+    const tabId = tabActions.openTab({ kind: 'js-query', connectionId: 'emu' });
+    const tab = tabsStore.state.tabs.find((item) => item.id === tabId)!;
+    const { result } = renderHook(() =>
+      useJsTabState({
+        activeTab: tab,
+        selectedTreeItemId: 'script:emu',
+      })
+    );
+
+    act(() => {
+      expect(result.current.runScript()).toBe(true);
+    });
+    const firstRunId = scriptRunRequest(mutate).runId;
+    act(() => {
+      expect(result.current.runScript()).toBe(true);
+    });
+    const secondRunId = scriptRunRequest(mutate, 1).runId;
+
+    act(() =>
+      listener?.({
+        type: 'output',
+        runId: firstRunId,
+        item: { id: 'yield-1', label: 'stale', badge: 'number', view: 'json', value: 1 },
+      })
+    );
+    expect(result.current.scriptResult).toBeUndefined();
+
+    act(() =>
+      listener?.({
+        type: 'output',
+        runId: secondRunId,
+        item: { id: 'yield-1', label: 'fresh', badge: 'number', view: 'json', value: 2 },
+      })
+    );
+    expect(result.current.scriptResult?.stream?.[0]).toMatchObject({ label: 'fresh' });
+  });
+
+  it('ignores live script events after a tab is cleared', () => {
+    const mutate = vi.fn();
+    const cancelMutate = vi.fn();
+    let listener: ((event: ScriptRunEvent) => void) | null = null;
+    vi.mocked(useRepositories).mockReturnValue({
+      scriptRunner: {
+        subscribe: vi.fn((next) => {
+          listener = next;
+          return () => {};
+        }),
+      },
+    } as unknown as ReturnType<typeof useRepositories>);
+    vi.mocked(useRunScript).mockReturnValue({
+      isPending: true,
+      mutate,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useRunScript>);
+    vi.mocked(useCancelScript).mockReturnValue({
+      mutate: cancelMutate,
+    } as unknown as ReturnType<typeof useCancelScript>);
+    const tabId = tabActions.openTab({ kind: 'js-query', connectionId: 'emu' });
+    const tab = tabsStore.state.tabs.find((item) => item.id === tabId)!;
+    const { result } = renderHook(() =>
+      useJsTabState({
+        activeTab: tab,
+        selectedTreeItemId: 'script:emu',
+      })
+    );
+
+    act(() => {
+      expect(result.current.runScript()).toBe(true);
+    });
+    const runId = scriptRunRequest(mutate).runId;
+    act(() => result.current.clearTab(tabId));
+    act(() =>
+      listener?.({
+        type: 'output',
+        runId,
+        item: { id: 'yield-1', label: 'ignored', badge: 'number', view: 'json', value: 1 },
+      })
+    );
+
+    expect(cancelMutate).toHaveBeenCalledWith(runId);
+    expect(result.current.scriptResult).toBeUndefined();
+    expect(result.current.scripts[tabId]).toBeUndefined();
+  });
+
+  it('keeps partial output when cancelling a running script', () => {
+    const mutate = vi.fn();
+    const cancelMutate = vi.fn();
+    let listener: ((event: ScriptRunEvent) => void) | null = null;
+    vi.mocked(useRepositories).mockReturnValue({
+      scriptRunner: {
+        subscribe: vi.fn((next) => {
+          listener = next;
+          return () => {};
+        }),
+      },
+    } as unknown as ReturnType<typeof useRepositories>);
+    vi.mocked(useRunScript).mockReturnValue({
+      isPending: true,
+      mutate,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useRunScript>);
+    vi.mocked(useCancelScript).mockReturnValue({
+      mutate: cancelMutate,
+    } as unknown as ReturnType<typeof useCancelScript>);
+    const tabId = tabActions.openTab({ kind: 'js-query', connectionId: 'emu' });
+    const tab = tabsStore.state.tabs.find((item) => item.id === tabId)!;
+    const { result } = renderHook(() =>
+      useJsTabState({
+        activeTab: tab,
+        selectedTreeItemId: 'script:emu',
+      })
+    );
+
+    act(() => {
+      expect(result.current.runScript()).toBe(true);
+    });
+    const runId = scriptRunRequest(mutate).runId;
+    act(() =>
+      listener?.({
+        type: 'output',
+        runId,
+        item: { id: 'yield-1', label: 'yield 1', badge: 'number', view: 'json', value: 1 },
+      })
+    );
+    act(() => {
+      expect(result.current.cancelScript()).toBe(true);
+    });
+
+    expect(result.current.scriptResult).toMatchObject({
+      cancelled: true,
+      stream: [expect.objectContaining({ label: 'yield 1' })],
+    });
   });
 
   it('keeps running state and start time scoped by tab', () => {
@@ -174,7 +386,7 @@ describe('useJsTabState', () => {
     act(() => {
       expect(result.current.runScript()).toBe(true);
     });
-    const request = mutate.mock.calls[0]?.[0] as { readonly runId: string; };
+    const request = scriptRunRequest(mutate);
 
     expect(result.current.isTabRunning(tabId)).toBe(true);
 

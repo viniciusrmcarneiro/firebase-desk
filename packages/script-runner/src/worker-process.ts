@@ -2,6 +2,8 @@ import type { ScriptRunResult } from '@firebase-desk/repo-contracts';
 import type { ScriptWorkerMessage, ScriptWorkerResponse } from './types.ts';
 import { runScriptInWorker } from './worker-runtime.ts';
 
+const pendingSends = new Set<Promise<void>>();
+
 export function startScriptWorkerProcess(): void {
   process.once('message', (message: unknown) => {
     void handleMessage(message);
@@ -11,23 +13,47 @@ export function startScriptWorkerProcess(): void {
 async function handleMessage(message: unknown): Promise<void> {
   const parsed = parseRunMessage(message);
   if (!parsed) {
-    send({ type: 'error', error: 'Invalid script runner worker message.' });
-    process.exit(1);
+    await queueSend({ type: 'error', error: 'Invalid script runner worker message.' });
+    await finishProcess(1);
     return;
   }
 
   try {
-    const result = await runScriptInWorker(parsed.request, parsed.connection);
-    send({ type: 'result', result });
-    process.exit(0);
+    const result = await runScriptInWorker(
+      parsed.request,
+      parsed.connection,
+      (event) => {
+        void queueSend({ type: 'event', event });
+      },
+    );
+    await queueSend({ type: 'result', result });
+    await finishProcess(0);
   } catch (error) {
-    send({ type: 'result', result: failedResult(error) });
-    process.exit(0);
+    await queueSend({ type: 'result', result: failedResult(error) });
+    await finishProcess(0);
   }
 }
 
-function send(message: ScriptWorkerResponse): void {
-  process.send?.(message);
+function queueSend(message: ScriptWorkerResponse): Promise<void> {
+  const pending = send(message).finally(() => pendingSends.delete(pending));
+  pendingSends.add(pending);
+  return pending;
+}
+
+async function finishProcess(exitCode: number): Promise<void> {
+  await Promise.allSettled(pendingSends);
+  process.exitCode = exitCode;
+  if (process.connected) process.disconnect();
+}
+
+async function send(message: ScriptWorkerResponse): Promise<void> {
+  await new Promise<void>((resolve) => {
+    if (!process.send) {
+      resolve();
+      return;
+    }
+    process.send(message, () => resolve());
+  });
 }
 
 function parseRunMessage(message: unknown): ScriptWorkerMessage | null {

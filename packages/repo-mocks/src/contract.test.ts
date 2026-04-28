@@ -1,3 +1,4 @@
+import type { ScriptRunEvent } from '@firebase-desk/repo-contracts';
 import { describe, expect, it } from 'vitest';
 import {
   createAuthUserFixture,
@@ -134,6 +135,28 @@ describe('repo-mocks contract conformance', () => {
     await expect(repo.run({ runId: 'run-6', connectionId: 'p', source: 'document' })).resolves
       .toMatchObject({ stream: [{ label: 'yield document-like value' }] });
     await expect(repo.cancel('run-6')).resolves.toBeUndefined();
+  });
+
+  it('script runner emits live events and unsubscribes listeners', async () => {
+    const repo = new MockScriptRunnerRepository();
+    const events: ScriptRunEvent[] = [];
+    const unsubscribe = repo.subscribe((event) => events.push(event));
+
+    await repo.run({ runId: 'run-live', connectionId: 'p', source: 'plain' });
+
+    expect(events[0]).toMatchObject({ type: 'log', runId: 'run-live' });
+    expect(events).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({ type: 'output', runId: 'run-live' }),
+        expect.objectContaining({ type: 'complete', runId: 'run-live' }),
+      ]),
+    );
+
+    unsubscribe();
+    events.length = 0;
+    await repo.run({ runId: 'run-after-unsubscribe', connectionId: 'p', source: 'throw' });
+
+    expect(events).toEqual([]);
   });
 
   it('fixture builders create targeted contract-shaped data', () => {

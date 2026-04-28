@@ -1,6 +1,7 @@
 /// <reference types="vite/client" />
 
 import type { IpcRequest, IpcResponse } from '@firebase-desk/ipc-schemas';
+import type { ScriptRunEventListener } from '@firebase-desk/repo-contracts';
 
 declare global {
   interface DesktopAppApi {
@@ -62,6 +63,7 @@ declare global {
     readonly cancel: (
       request: IpcRequest<'scriptRunner.cancel'>,
     ) => Promise<IpcResponse<'scriptRunner.cancel'>>;
+    readonly subscribe: (listener: ScriptRunEventListener) => () => void;
   }
 
   interface DesktopAuthApi {

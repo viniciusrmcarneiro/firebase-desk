@@ -11,7 +11,7 @@ import {
   TabsTrigger,
 } from '@firebase-desk/ui';
 import { Bug, FileText, Table2, TerminalSquare } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { formatDuration } from './duration.ts';
 import { JsonPreview } from './JsonPreview.tsx';
 import { formatLogEntry, streamItemsFor, toFirebaseError } from './scriptResultModel.ts';
@@ -24,33 +24,54 @@ export function ScriptOutput(
   {
     isRunning,
     result,
+    runId = null,
     startedAt = null,
   }: {
     readonly isRunning: boolean;
     readonly result: ScriptRunResult | null;
+    readonly runId?: string | null;
     readonly startedAt?: number | null;
   },
 ) {
   const logItems = useMemo(() => result?.logs ?? [], [result]);
   const errorItems = useMemo(() => result?.errors ?? [], [result]);
   const streamItems = useMemo(() => streamItemsFor(result), [result]);
-  const [view, setView] = useState<ScriptOutputView>('logs');
+  const [view, setView] = useState<ScriptOutputView>(() => preferredOutputView(result));
+  const manualViewRef = useRef(false);
+  const selectManualView = (nextView: ScriptOutputView) => {
+    manualViewRef.current = true;
+    setView(nextView);
+  };
 
   useEffect(() => {
-    if (!result) return;
-    setView(result.cancelled ? 'logs' : result.errors.length ? 'errors' : 'results');
-  }, [result]);
+    manualViewRef.current = false;
+    setView('logs');
+  }, [runId]);
+
+  useEffect(() => {
+    if (!result || manualViewRef.current) return;
+    if (errorItems.length) setView('errors');
+    else if (streamItems.length) setView('results');
+    else if (logItems.length) setView('logs');
+  }, [errorItems.length, logItems.length, result, streamItems.length]);
 
   return (
     <Tabs
       className='h-full min-h-0'
       value={view}
-      onValueChange={(nextView) => setView(nextView as ScriptOutputView)}
+      onValueChange={(nextView) => {
+        selectManualView(nextView as ScriptOutputView);
+      }}
     >
       <Panel className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]'>
         <PanelHeader
           actions={
-            <ScriptOutputActions isRunning={isRunning} result={result} startedAt={startedAt} />
+            <ScriptOutputActions
+              isRunning={isRunning}
+              result={result}
+              startedAt={startedAt}
+              onSelectView={selectManualView}
+            />
           }
         >
           Output
@@ -71,13 +92,22 @@ export function ScriptOutput(
   );
 }
 
+function preferredOutputView(result: ScriptRunResult | null): ScriptOutputView {
+  if (!result) return 'logs';
+  if (result.errors.length) return 'errors';
+  if (streamItemsFor(result).length) return 'results';
+  return 'logs';
+}
+
 function ScriptOutputActions(
   {
     isRunning,
+    onSelectView,
     result,
     startedAt,
   }: {
     readonly isRunning: boolean;
+    readonly onSelectView: (view: ScriptOutputView) => void;
     readonly result: ScriptRunResult | null;
     readonly startedAt: number | null;
   },
@@ -96,13 +126,13 @@ function ScriptOutputActions(
         )
         : null}
       <TabsList className='border-b-0'>
-        <TabsTrigger className='gap-1.5' value='results'>
+        <TabsTrigger className='gap-1.5' value='results' onClick={() => onSelectView('results')}>
           <Table2 size={14} aria-hidden='true' /> Results
         </TabsTrigger>
-        <TabsTrigger className='gap-1.5' value='logs'>
+        <TabsTrigger className='gap-1.5' value='logs' onClick={() => onSelectView('logs')}>
           <FileText size={14} aria-hidden='true' /> Logs
         </TabsTrigger>
-        <TabsTrigger className='gap-1.5' value='errors'>
+        <TabsTrigger className='gap-1.5' value='errors' onClick={() => onSelectView('errors')}>
           <Bug size={14} aria-hidden='true' /> Errors
         </TabsTrigger>
       </TabsList>

@@ -14,19 +14,29 @@ export interface ScriptStreamItem {
   readonly value: unknown;
 }
 
+export interface ScriptRunError {
+  readonly name?: string;
+  readonly code?: string;
+  readonly message: string;
+  readonly stack?: string;
+}
+
 export interface ScriptRunResult {
   readonly returnValue: unknown;
   readonly stream?: ReadonlyArray<ScriptStreamItem>;
   readonly logs: ReadonlyArray<ScriptLogEntry>;
-  readonly errors: ReadonlyArray<{
-    readonly name?: string;
-    readonly code?: string;
-    readonly message: string;
-    readonly stack?: string;
-  }>;
+  readonly errors: ReadonlyArray<ScriptRunError>;
   readonly durationMs: number;
   readonly cancelled?: boolean;
 }
+
+export type ScriptRunEvent =
+  | { readonly type: 'output'; readonly runId: string; readonly item: ScriptStreamItem; }
+  | { readonly type: 'log'; readonly runId: string; readonly log: ScriptLogEntry; }
+  | { readonly type: 'error'; readonly runId: string; readonly error: ScriptRunError; }
+  | { readonly type: 'complete'; readonly runId: string; readonly result: ScriptRunResult; };
+
+export type ScriptRunEventListener = (event: ScriptRunEvent) => void;
 
 export interface ScriptRunRequest {
   readonly runId: string;
@@ -37,4 +47,5 @@ export interface ScriptRunRequest {
 export interface ScriptRunnerRepository {
   run(request: ScriptRunRequest): Promise<ScriptRunResult>;
   cancel(runId: string): Promise<void>;
+  subscribe(listener: ScriptRunEventListener): () => void;
 }

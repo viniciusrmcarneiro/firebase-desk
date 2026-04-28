@@ -39,6 +39,35 @@ export function normalizeReturnValue(value: unknown): unknown {
   return normalizeScriptValue(value)?.value ?? null;
 }
 
+export interface NormalizedReturn {
+  readonly returnValue: unknown;
+  readonly streamItem: ScriptStreamItem | null;
+}
+
+export function normalizeReturnResult(value: unknown): NormalizedReturn {
+  const normalized = normalizeScriptValue(value);
+  if (!normalized) {
+    return {
+      returnValue: null,
+      streamItem: null,
+    };
+  }
+  return {
+    returnValue: normalized.value,
+    streamItem: {
+      id: 'return-value',
+      label: 'return value',
+      badge: normalized.badge,
+      view: normalized.view,
+      value: normalized.value,
+    },
+  };
+}
+
+export function normalizeReturnStreamItem(value: unknown): ScriptStreamItem | null {
+  return normalizeReturnResult(value).streamItem;
+}
+
 export function normalizeStreamItem(
   value: unknown,
   index: number,

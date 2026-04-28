@@ -41,8 +41,9 @@ export function queryPathForRows(rows: ReadonlyArray<FirestoreDocumentResult>): 
 }
 
 export function streamItemsFor(result: ScriptRunResult | null): ReadonlyArray<ScriptStreamItem> {
-  if (!result || result.errors.length) return [];
+  if (!result) return [];
   if (result.stream?.length) return result.stream;
+  if (result.errors.length) return [];
   if (!isRenderableValue(result.returnValue)) return [];
   return [{
     id: 'return-value',

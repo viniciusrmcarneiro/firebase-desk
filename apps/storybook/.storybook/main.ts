@@ -7,6 +7,16 @@ const config: StorybookConfig = {
     name: '@storybook/react-vite',
     options: {},
   },
+  viteFinal(viteConfig) {
+    return {
+      ...viteConfig,
+      build: {
+        ...viteConfig.build,
+        // Storybook bundles docs/runtime/vendor code; this is not shipped app code.
+        chunkSizeWarningLimit: 1_200,
+      },
+    };
+  },
 };
 
 export default config;
