@@ -47,6 +47,20 @@ describe('preload script runner api', () => {
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ type: 'log', runId: 'run-1' }));
     expect(electronMocks.removeListener).toHaveBeenCalledWith(SCRIPT_RUN_EVENT_CHANNEL, handler);
   });
+
+  it('ignores invalid script runner events', () => {
+    const api = exposedApi();
+    const listener = vi.fn();
+    api.scriptRunner.subscribe(listener);
+    const handler = electronMocks.on.mock.calls[0]?.[1] as (
+      event: unknown,
+      payload: unknown,
+    ) => void;
+
+    expect(() => handler({}, { type: 'invalid', runId: 'run-1' })).not.toThrow();
+
+    expect(listener).not.toHaveBeenCalled();
+  });
 });
 
 function exposedApi(): DesktopApi {

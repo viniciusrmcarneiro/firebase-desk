@@ -176,6 +176,64 @@ describe('ProcessScriptRunnerRepository', () => {
     ]);
   });
 
+  it('keeps emitting when a subscriber throws', async () => {
+    const child = new FakeChildProcess();
+    const events: unknown[] = [];
+    const repo = new ProcessScriptRunnerRepository(
+      {
+        async resolveConnection(connectionId) {
+          return connectionFor(connectionId);
+        },
+      },
+      {
+        forkWorker: vi.fn(() => child as unknown as ChildProcess),
+        workerPath: '/worker.js',
+      },
+    );
+    repo.subscribe(() => {
+      throw new Error('listener failed');
+    });
+    repo.subscribe((event) => events.push(event));
+
+    const run = repo.run({
+      runId: 'run-4',
+      connectionId: 'emu',
+      source: 'yield 1; return 2;',
+    });
+    await Promise.resolve();
+
+    expect(() => {
+      child.emit('message', {
+        type: 'event',
+        event: {
+          type: 'output',
+          runId: 'run-4',
+          item: { id: 'yield-1', label: 'yield 1', badge: 'number', view: 'json', value: 1 },
+        },
+      });
+    }).not.toThrow();
+    child.emit('message', {
+      type: 'result',
+      result: {
+        returnValue: 2,
+        stream: [{ id: 'yield-1', label: 'yield 1', badge: 'number', view: 'json', value: 1 }],
+        logs: [],
+        errors: [],
+        durationMs: 4,
+      },
+    });
+
+    await expect(run).resolves.toMatchObject({ returnValue: 2 });
+    expect(events).toEqual([
+      expect.objectContaining({ type: 'output', runId: 'run-4' }),
+      expect.objectContaining({
+        type: 'complete',
+        runId: 'run-4',
+        result: expect.objectContaining({ returnValue: 2 }),
+      }),
+    ]);
+  });
+
   it('preserves partial worker events when the child exits unexpectedly', async () => {
     const child = new FakeChildProcess();
     const events: unknown[] = [];
@@ -195,7 +253,7 @@ describe('ProcessScriptRunnerRepository', () => {
     repo.subscribe((event) => events.push(event));
 
     const run = repo.run({
-      runId: 'run-4',
+      runId: 'run-5',
       connectionId: 'emu',
       source: 'yield 1;',
     });
@@ -204,7 +262,7 @@ describe('ProcessScriptRunnerRepository', () => {
       type: 'event',
       event: {
         type: 'log',
-        runId: 'run-4',
+        runId: 'run-5',
         log: { level: 'info', message: 'before exit', timestamp: '2026-04-28T00:00:00.000Z' },
       },
     });
@@ -212,7 +270,7 @@ describe('ProcessScriptRunnerRepository', () => {
       type: 'event',
       event: {
         type: 'output',
-        runId: 'run-4',
+        runId: 'run-5',
         item: { id: 'yield-1', label: 'yield 1', badge: 'number', view: 'json', value: 1 },
       },
     });
@@ -229,7 +287,7 @@ describe('ProcessScriptRunnerRepository', () => {
     expect(result.errors[0]?.message).toContain('Script runner exited before completing');
     expect(events.at(-1)).toMatchObject({
       type: 'complete',
-      runId: 'run-4',
+      runId: 'run-5',
       result: expect.objectContaining({ durationMs: 29 }),
     });
   });

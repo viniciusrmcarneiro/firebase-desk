@@ -16,11 +16,7 @@ import {
 } from 'firebase-admin/firestore';
 import { format } from 'node:util';
 import { createContext, Script } from 'node:vm';
-import {
-  normalizeReturnStreamItem,
-  normalizeReturnValue,
-  normalizeStreamItem,
-} from './normalize.ts';
+import { normalizeReturnResult, normalizeStreamItem } from './normalize.ts';
 
 export interface ScriptRuntimeContext {
   readonly auth: Auth;
@@ -50,13 +46,13 @@ export async function runUserScript(
   try {
     const generator = createUserGenerator(source, context, logs, events);
     const rawReturnValue = await drainGenerator(generator, stream, 1, events);
-    const returnItem = normalizeReturnStreamItem(rawReturnValue);
+    const { returnValue, streamItem: returnItem } = normalizeReturnResult(rawReturnValue);
     if (returnItem) {
       stream.push(returnItem);
       emitRunEvent(events, { type: 'output', item: returnItem });
     }
     return {
-      returnValue: normalizeReturnValue(rawReturnValue),
+      returnValue,
       stream,
       logs,
       errors: [],

@@ -54,7 +54,9 @@ const api = {
     cancel: (request: IpcRequest<'scriptRunner.cancel'>) => invoke('scriptRunner.cancel', request),
     subscribe: (listener: ScriptRunEventListener) => {
       const handler = (_event: IpcRendererEvent, raw: unknown) => {
-        listener(ScriptRunEventSchema.parse(raw) as ScriptRunEvent);
+        const parsed = ScriptRunEventSchema.safeParse(raw);
+        if (!parsed.success) return;
+        listener(parsed.data as ScriptRunEvent);
       };
       ipcRenderer.on(SCRIPT_RUN_EVENT_CHANNEL, handler);
       return () => ipcRenderer.removeListener(SCRIPT_RUN_EVENT_CHANNEL, handler);

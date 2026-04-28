@@ -154,7 +154,14 @@ export class ProcessScriptRunnerRepository implements ScriptRunnerRepository {
   }
 
   private emit(event: ScriptRunEvent): void {
-    for (const listener of this.listeners) listener(event);
+    const listeners = Array.from(this.listeners);
+    for (const listener of listeners) {
+      try {
+        listener(event);
+      } catch {
+        // A subscriber must not break child-process event handling.
+      }
+    }
   }
 }
 
