@@ -12,11 +12,11 @@ const result: ScriptRunResult = {
 };
 
 describe('ScriptOutput', () => {
-  it('formats completed duration and renders return value', () => {
+  it('formats completed duration and renders return value', async () => {
     render(<ScriptOutput isRunning={false} result={result} />);
 
     expect(screen.getByText('1.234s').getAttribute('title')).toBe('1234ms');
-    expect(screen.getByText(/"ok": true/)).toBeTruthy();
+    expect(await screen.findByText(/"ok": true/)).toBeTruthy();
   });
 
   it('shows running elapsed state', () => {
@@ -31,7 +31,7 @@ describe('ScriptOutput', () => {
     expect(screen.getByText(/12\.\d{3}s elapsed/)).toBeTruthy();
   });
 
-  it('switches to errors when result has errors', () => {
+  it('switches to errors when result has errors', async () => {
     render(
       <ScriptOutput
         isRunning={false}
@@ -39,10 +39,10 @@ describe('ScriptOutput', () => {
       />,
     );
 
-    expect(screen.getByText(/permission-denied/)).toBeTruthy();
+    expect(await screen.findByText(/permission-denied/)).toBeTruthy();
   });
 
-  it('keeps cancelled runs on logs', () => {
+  it('keeps cancelled runs on logs', async () => {
     render(
       <ScriptOutput
         isRunning={false}
@@ -51,7 +51,7 @@ describe('ScriptOutput', () => {
     );
 
     expect(screen.getByText('cancelled')).toBeTruthy();
-    expect(screen.getByText(/\[01:02:03\] done/)).toBeTruthy();
+    expect(await screen.findByText(/\[01:02:03\] done/)).toBeTruthy();
   });
 
   it('auto-opens results when live output arrives', () => {
@@ -69,7 +69,7 @@ describe('ScriptOutput', () => {
     expect(screen.getByText('yield 1')).toBeTruthy();
   });
 
-  it('does not steal manual output tab choice during live updates', () => {
+  it('does not steal manual output tab choice during live updates', async () => {
     const { rerender } = render(
       <ScriptOutput
         isRunning
@@ -96,6 +96,6 @@ describe('ScriptOutput', () => {
       />,
     );
 
-    expect(screen.getByText(/\[01:02:03\] done/)).toBeTruthy();
+    expect(await screen.findByText(/\[01:02:03\] done/)).toBeTruthy();
   });
 });

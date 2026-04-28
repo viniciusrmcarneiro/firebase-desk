@@ -14,7 +14,15 @@ interface TypedValueSummary {
 
 export function FirestoreValueCell({ value }: { readonly value: unknown; }): ReactNode {
   const typed = typedValueSummary(value);
-  if (!typed) return formatFirestoreValue(value);
+  if (!typed) {
+    const plain = plainValueSummary(value);
+    if (!plain) return formatFirestoreValue(value);
+    return (
+      <span className='font-mono text-xs text-text-primary' title={plain.title}>
+        {plain.value}
+      </span>
+    );
+  }
   return (
     <span
       className='inline-flex max-w-full items-center gap-1.5 overflow-hidden align-middle'
@@ -28,12 +36,21 @@ export function FirestoreValueCell({ value }: { readonly value: unknown; }): Rea
   );
 }
 
+function plainValueSummary(
+  value: unknown,
+): { readonly title: string; readonly value: string; } | null {
+  if (value === null || value === undefined) return null;
+  if (!Array.isArray(value) && typeof value !== 'object') return null;
+  const title = safeJson(value);
+  if (!title) return null;
+  return { title, value: compactJsonPreview(value) };
+}
+
 export function formatFirestoreValue(value: unknown): string {
   if (value === null || value === undefined) return String(value);
-  if (Array.isArray(value)) return `Array(${value.length})`;
   const typed = typedValueSummary(value);
   if (typed) return typed.value;
-  if (typeof value === 'object') return 'Object';
+  if (Array.isArray(value) || typeof value === 'object') return compactJsonPreview(value);
   return String(value);
 }
 
@@ -138,17 +155,21 @@ function bytesSummary(value: Record<string, unknown>): TypedValueSummary {
 
 function encodedArraySummary(value: Record<string, unknown>): TypedValueSummary {
   const entries = value['value'];
+  const title = safeJson(entries);
   return {
     label: 'array',
-    value: Array.isArray(entries) ? `Array(${entries.length})` : 'Invalid array',
+    ...(title ? { title } : {}),
+    value: Array.isArray(entries) ? compactJsonPreview(entries) : 'Invalid array',
   };
 }
 
 function encodedMapSummary(value: Record<string, unknown>): TypedValueSummary {
   const entries = value['value'];
+  const title = safeJson(entries);
   return {
     label: 'map',
-    value: isPlainObject(entries) ? `Map(${Object.keys(entries).length})` : 'Invalid map',
+    ...(title ? { title } : {}),
+    value: isPlainObject(entries) ? compactJsonPreview(entries) : 'Invalid map',
   };
 }
 
@@ -198,4 +219,10 @@ function safeJson(value: unknown): string | undefined {
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function compactJsonPreview(value: unknown): string {
+  const json = safeJson(value);
+  if (!json) return String(value);
+  return json.length > 120 ? `${json.slice(0, 117)}...` : json;
 }

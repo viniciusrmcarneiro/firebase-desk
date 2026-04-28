@@ -15,6 +15,7 @@ class TestSettingsRepository implements SettingsRepository {
     sidebarWidth: 280,
     dataMode: 'mock',
     theme: 'system',
+    resultTableLayouts: {},
   };
 
   async load(): Promise<SettingsSnapshot> {
@@ -28,6 +29,7 @@ class TestSettingsRepository implements SettingsRepository {
       theme: patch.theme ?? this.snapshot.theme,
       dataMode: patch.dataMode ?? this.snapshot.dataMode,
       hotkeyOverrides: patch.hotkeyOverrides ?? this.snapshot.hotkeyOverrides,
+      resultTableLayouts: patch.resultTableLayouts ?? this.snapshot.resultTableLayouts,
     };
     return this.snapshot;
   }

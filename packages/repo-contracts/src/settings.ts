@@ -7,12 +7,20 @@ export type HotkeyOverrides = Readonly<Record<string, string>>;
 
 export type DataMode = 'mock' | 'live';
 
+export interface ResultTableLayout {
+  readonly columnOrder: string[];
+  readonly columnSizing: Record<string, number>;
+}
+
+export type ResultTableLayouts = Record<string, ResultTableLayout>;
+
 export interface SettingsSnapshot {
   readonly sidebarWidth: number;
   readonly inspectorWidth: number;
   readonly theme: 'system' | 'light' | 'dark';
   readonly dataMode: DataMode;
   readonly hotkeyOverrides: HotkeyOverrides;
+  readonly resultTableLayouts: ResultTableLayouts;
 }
 
 export interface SettingsPatch {
@@ -21,6 +29,7 @@ export interface SettingsPatch {
   readonly theme?: SettingsSnapshot['theme'] | undefined;
   readonly dataMode?: DataMode | undefined;
   readonly hotkeyOverrides?: HotkeyOverrides | undefined;
+  readonly resultTableLayouts?: ResultTableLayouts | undefined;
 }
 
 export interface SettingsRepository {

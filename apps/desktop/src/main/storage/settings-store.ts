@@ -10,6 +10,7 @@ export const DEFAULT_SETTINGS_SNAPSHOT: SettingsSnapshot = {
   theme: 'system',
   dataMode: 'live',
   hotkeyOverrides: {},
+  resultTableLayouts: {},
 };
 
 export class SettingsStore {
@@ -47,7 +48,19 @@ export class SettingsStore {
 }
 
 function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
-  return { ...snapshot, hotkeyOverrides: { ...snapshot.hotkeyOverrides } };
+  return {
+    ...snapshot,
+    hotkeyOverrides: { ...snapshot.hotkeyOverrides },
+    resultTableLayouts: Object.fromEntries(
+      Object.entries(snapshot.resultTableLayouts).map(([key, value]) => [
+        key,
+        {
+          columnOrder: [...value.columnOrder],
+          columnSizing: { ...value.columnSizing },
+        },
+      ]),
+    ),
+  };
 }
 
 function isNotFound(error: unknown): boolean {

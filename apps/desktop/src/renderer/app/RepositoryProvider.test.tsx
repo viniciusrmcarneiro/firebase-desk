@@ -8,6 +8,7 @@ const snapshot: SettingsSnapshot = {
   theme: 'system',
   dataMode: 'mock',
   hotkeyOverrides: {},
+  resultTableLayouts: {},
 };
 
 afterEach(() => {

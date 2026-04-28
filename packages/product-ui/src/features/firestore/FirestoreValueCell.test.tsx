@@ -42,11 +42,20 @@ describe('FirestoreValueCell', () => {
 
   it('summarizes encoded Firestore map and array sentinels without expanding them', () => {
     expect(isFirestoreTypedValue({ __type__: 'map', value: { a: 1, b: true } })).toBe(true);
-    expect(formatFirestoreValue({ __type__: 'array', value: [1, 2, 3] })).toBe('Array(3)');
-    expect(formatFirestoreValue({ __type__: 'map', value: { a: 1, b: true } })).toBe('Map(2)');
+    expect(formatFirestoreValue({ __type__: 'array', value: [1, 2, 3] })).toBe('[1,2,3]');
+    expect(formatFirestoreValue({ __type__: 'map', value: { a: 1, b: true } })).toBe(
+      '{"a":1,"b":true}',
+    );
     expect(firestoreValueType({ __type__: 'reference', path: 'customers/cus_ada' })).toBe(
       'reference',
     );
+  });
+
+  it('renders plain objects with compact content previews', () => {
+    render(<FirestoreValueCell value={{ nested: true }} />);
+
+    expect(screen.getByText('{"nested":true}')).toBeTruthy();
+    expect(screen.getByTitle('{"nested":true}')).toBeTruthy();
   });
 });
 

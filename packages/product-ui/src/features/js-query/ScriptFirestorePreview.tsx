@@ -1,11 +1,19 @@
-import type { FirestoreDocumentResult } from '@firebase-desk/repo-contracts';
+import type { FirestoreDocumentResult, SettingsRepository } from '@firebase-desk/repo-contracts';
 import { useEffect, useMemo, useState } from 'react';
 import { FirestoreDocumentBrowser } from '../firestore/FirestoreDocumentBrowser.tsx';
 import type { FirestoreResultView } from '../firestore/types.ts';
 import { JsonPreview } from './JsonPreview.tsx';
 import { firestoreDocumentsFromValue, queryPathForRows } from './scriptResultModel.ts';
 
-export function ScriptFirestorePreview({ value }: { readonly value: unknown; }) {
+export function ScriptFirestorePreview(
+  {
+    settings,
+    value,
+  }: {
+    readonly settings?: SettingsRepository | undefined;
+    readonly value: unknown;
+  },
+) {
   const rows = useMemo(() => firestoreDocumentsFromValue(value), [value]);
   const [resultView, setResultView] = useState<FirestoreResultView>('table');
   const [selectedDocumentPath, setSelectedDocumentPath] = useState<string | null>(
@@ -30,6 +38,7 @@ export function ScriptFirestorePreview({ value }: { readonly value: unknown; }) 
         rows={rows}
         selectedDocument={selectedDocument}
         selectedDocumentPath={selectedDocumentPath}
+        settings={settings}
         onLoadMore={() => {}}
         onResultViewChange={setResultView}
         onSelectDocument={setSelectedDocumentPath}

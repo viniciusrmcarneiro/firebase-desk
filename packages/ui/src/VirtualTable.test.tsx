@@ -46,4 +46,24 @@ describe('VirtualTable', () => {
     expect(screen.getByText('Name')).toBeDefined();
     expect(screen.queryAllByTestId('name-cell')).toHaveLength(0);
   });
+
+  it('sizes the sticky header to the full table width', () => {
+    render(
+      <VirtualTable
+        rows={rows}
+        columns={[
+          { ...columns[0]!, width: 120 },
+          { ...columns[1]!, width: 80 },
+        ]}
+        enableColumnResize
+        rowHeight={24}
+      />,
+    );
+
+    const header = screen.getByText('Name').parentElement?.parentElement;
+    expect(header?.style.width).toBe('200px');
+    expect(screen.getByRole('separator', { name: 'Resize Name' }).className).toContain(
+      'before:bg-border-subtle',
+    );
+  });
 });

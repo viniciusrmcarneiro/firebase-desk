@@ -1,4 +1,4 @@
-import type { FirestoreDocumentResult } from '@firebase-desk/repo-contracts';
+import type { FirestoreDocumentResult, SettingsRepository } from '@firebase-desk/repo-contracts';
 import {
   Badge,
   EmptyState,
@@ -12,7 +12,8 @@ import {
   TabsTrigger,
 } from '@firebase-desk/ui';
 import { Braces, GitBranch, Table2 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
+import { JsonPreview } from '../../json-preview/index.ts';
 import { isCollectionPath, type SubcollectionLoadState, toggleSet } from './resultModel.tsx';
 import { ResultTable } from './ResultTable.tsx';
 import { ResultTreeView } from './ResultTreeView.tsx';
@@ -33,6 +34,7 @@ export interface ResultPanelProps {
   readonly resultView: FirestoreResultView;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocumentPath: string | null;
+  readonly settings?: SettingsRepository | undefined;
   readonly subcollectionStates: Readonly<Record<string, SubcollectionLoadState>>;
 }
 
@@ -52,12 +54,24 @@ export function ResultPanel(
     resultView,
     rows,
     selectedDocumentPath,
+    settings,
     subcollectionStates,
   }: ResultPanelProps,
 ) {
   const jsonValue = useMemo(() => ({ path: queryPath, documents: rows }), [queryPath, rows]);
   const showPagination = isCollectionPath(queryPath) && hasMore;
-  const [expandedTreeIds, setExpandedTreeIds] = useState<ReadonlySet<string>>(() => new Set());
+  const firstDocumentPath = rows[0]?.path ?? null;
+  const defaultExpandedTreeIds = useMemo(
+    () => defaultResultTreeExpansion(queryPath, rows),
+    [firstDocumentPath, queryPath],
+  );
+  const [expandedTreeIds, setExpandedTreeIds] = useState<ReadonlySet<string>>(
+    () => defaultExpandedTreeIds,
+  );
+
+  useEffect(() => {
+    setExpandedTreeIds(defaultExpandedTreeIds);
+  }, [defaultExpandedTreeIds]);
 
   function toggleTreeNode(id: string) {
     const willExpand = !expandedTreeIds.has(id);
@@ -82,7 +96,7 @@ export function ResultPanel(
 
   return (
     <Tabs
-      className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]'
+      className='h-full min-h-0'
       value={resultView}
       onValueChange={(value) => onResultViewChange(value as FirestoreResultView)}
     >
@@ -118,13 +132,18 @@ export function ResultPanel(
               </div>
             )
             : null}
-          <div className='min-h-0 flex-1 overflow-hidden'>
-            <TabsContent className='h-full min-h-0 overflow-hidden' value='table'>
+          <div className='grid min-h-0 flex-1 overflow-hidden'>
+            <TabsContent
+              className='col-start-1 row-start-1 m-0 h-full min-h-0 overflow-hidden data-[state=inactive]:hidden'
+              value='table'
+            >
               <ResultTable
                 hasMore={showPagination}
                 isFetchingMore={isFetchingMore}
+                queryPath={queryPath}
                 rows={rows}
                 selectedDocumentPath={selectedDocumentPath}
+                settings={settings}
                 subcollectionStates={subcollectionStates}
                 onEditDocument={onEditDocument}
                 onLoadMore={onLoadMore}
@@ -133,7 +152,10 @@ export function ResultPanel(
                 onSelectDocument={onSelectDocument}
               />
             </TabsContent>
-            <TabsContent className='h-full min-h-0 overflow-auto' value='tree'>
+            <TabsContent
+              className='col-start-1 row-start-1 m-0 h-full min-h-0 overflow-auto data-[state=inactive]:hidden'
+              value='tree'
+            >
               {rows.length
                 ? (
                   <ResultTreeView
@@ -149,14 +171,21 @@ export function ResultPanel(
                     onToggleNode={toggleTreeNode}
                   />
                 )
-                : <EmptyState title='No documents' />}
+                : (
+                  <div className='grid h-full place-items-center'>
+                    <EmptyState title='No documents' />
+                  </div>
+                )}
             </TabsContent>
-            <TabsContent className='h-full min-h-0 overflow-hidden' value='json'>
-              <textarea
-                aria-label='JSON results'
-                className='h-full w-full resize-none border-0 bg-bg-panel p-3 font-mono text-xs text-text-secondary outline-none'
-                readOnly
-                value={JSON.stringify(jsonValue, null, 2)}
+            <TabsContent
+              className='col-start-1 row-start-1 m-0 h-full min-h-0 overflow-hidden data-[state=inactive]:hidden'
+              value='json'
+            >
+              <JsonPreview
+                active={resultView === 'json'}
+                ariaLabel='JSON results'
+                mode='textarea'
+                value={jsonValue}
               />
             </TabsContent>
           </div>
@@ -164,4 +193,15 @@ export function ResultPanel(
       </Panel>
     </Tabs>
   );
+}
+
+function defaultResultTreeExpansion(
+  queryPath: string,
+  rows: ReadonlyArray<FirestoreDocumentResult>,
+): ReadonlySet<string> {
+  const rootId = `root:${queryPath}`;
+  const firstDocument = rows[0];
+  if (!firstDocument) return new Set([rootId]);
+  const documentId = `doc:${firstDocument.path}`;
+  return new Set([rootId, documentId, `${documentId}:fields`]);
 }

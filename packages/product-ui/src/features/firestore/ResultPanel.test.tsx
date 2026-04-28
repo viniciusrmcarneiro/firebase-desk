@@ -13,17 +13,22 @@ vi.mock('./ResultTable.tsx', () => ({
 vi.mock('./ResultTreeView.tsx', () => ({
   ResultTreeView: (
     {
+      expandedIds,
       onToggleNode,
       rows,
     }: {
+      readonly expandedIds: ReadonlySet<string>;
       readonly onToggleNode: (id: string) => void;
       readonly rows: ReadonlyArray<FirestoreDocumentResult>;
       readonly subcollectionStates: Readonly<Record<string, SubcollectionLoadState>>;
     },
   ) => (
-    <button type='button' onClick={() => onToggleNode(`doc:${rows[0]?.path ?? ''}`)}>
-      tree
-    </button>
+    <div>
+      <div data-testid='expanded'>{Array.from(expandedIds).join('|')}</div>
+      <button type='button' onClick={() => onToggleNode(`doc:${rows[0]?.path ?? ''}`)}>
+        tree
+      </button>
+    </div>
   ),
 }));
 
@@ -74,8 +79,34 @@ describe('ResultPanel', () => {
       />,
     );
 
+    expect(screen.getByTestId('expanded').textContent).toContain('root:orders');
+    expect(screen.getByTestId('expanded').textContent).toContain('doc:orders/ord_1');
+
+    fireEvent.click(screen.getByRole('button', { name: 'tree' }));
     fireEvent.click(screen.getByRole('button', { name: 'tree' }));
 
     expect(onLoadSubcollections).toHaveBeenCalledWith('orders/ord_1');
+  });
+
+  it('renders json results in a full-size tab pane', async () => {
+    render(
+      <ResultPanel
+        errorMessage={null}
+        hasMore={false}
+        isFetchingMore={false}
+        isLoading={false}
+        queryPath='orders'
+        resultView='json'
+        rows={[]}
+        selectedDocumentPath={null}
+        subcollectionStates={{}}
+        onLoadMore={() => {}}
+        onResultViewChange={() => {}}
+      />,
+    );
+
+    const preview = await screen.findByLabelText('JSON results');
+    expect(preview.className).toContain('h-full');
+    expect(preview.closest('[role="tabpanel"]')?.className).toContain('col-start-1');
   });
 });

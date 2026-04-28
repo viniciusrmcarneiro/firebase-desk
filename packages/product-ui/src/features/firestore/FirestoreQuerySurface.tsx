@@ -1,6 +1,7 @@
 import type {
   FirestoreCollectionNode,
   FirestoreDocumentResult,
+  SettingsRepository,
 } from '@firebase-desk/repo-contracts';
 import { useState } from 'react';
 import { DocumentEditorModal } from './DocumentEditorModal.tsx';
@@ -37,6 +38,7 @@ export interface FirestoreQuerySurfaceProps {
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocument?: FirestoreDocumentResult | null;
   readonly selectedDocumentPath?: string | null;
+  readonly settings?: SettingsRepository | undefined;
 }
 
 export function FirestoreQuerySurface(
@@ -58,6 +60,7 @@ export function FirestoreQuerySurface(
     rows,
     selectedDocument = null,
     selectedDocumentPath = null,
+    settings,
   }: FirestoreQuerySurfaceProps,
 ) {
   const [resultView, setResultView] = useState<FirestoreResultView>('table');
@@ -84,6 +87,7 @@ export function FirestoreQuerySurface(
         rows={rows}
         selectedDocument={selectedDocument}
         selectedDocumentPath={selectedDocumentPath}
+        settings={settings}
         onDeleteDocument={onDeleteDocument}
         onEditDocument={setEditorDocument}
         onLoadMore={onLoadMore}

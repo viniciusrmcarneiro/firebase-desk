@@ -8,6 +8,7 @@ const initialSnapshot: SettingsSnapshot = {
   theme: 'system',
   dataMode: 'mock',
   hotkeyOverrides: { 'query.run': 'Meta+Enter' },
+  resultTableLayouts: {},
 };
 
 describe('MainSettingsRepository', () => {
@@ -29,6 +30,23 @@ describe('MainSettingsRepository', () => {
 
     await expect(repository.getHotkeyOverrides()).resolves.toEqual({ 'tab.new': 'Meta+N' });
   });
+
+  it('preserves table layouts through partial saves', async () => {
+    const store = new MemorySettingsStore({
+      ...initialSnapshot,
+      resultTableLayouts: {
+        orders: { columnOrder: ['id', 'total'], columnSizing: { total: 220 } },
+      },
+    });
+    const repository = new MainSettingsRepository(store);
+
+    await expect(repository.save({ sidebarWidth: 400 })).resolves.toMatchObject({
+      sidebarWidth: 400,
+      resultTableLayouts: {
+        orders: { columnOrder: ['id', 'total'], columnSizing: { total: 220 } },
+      },
+    });
+  });
 });
 
 class MemorySettingsStore {
@@ -44,6 +62,10 @@ class MemorySettingsStore {
   }
 
   private clone(snapshot: SettingsSnapshot): SettingsSnapshot {
-    return { ...snapshot, hotkeyOverrides: { ...snapshot.hotkeyOverrides } };
+    return {
+      ...snapshot,
+      hotkeyOverrides: { ...snapshot.hotkeyOverrides },
+      resultTableLayouts: { ...snapshot.resultTableLayouts },
+    };
   }
 }

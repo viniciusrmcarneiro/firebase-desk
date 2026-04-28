@@ -1,4 +1,4 @@
-import type { FirestoreDocumentResult } from '@firebase-desk/repo-contracts';
+import type { FirestoreDocumentResult, SettingsRepository } from '@firebase-desk/repo-contracts';
 import {
   Button,
   ContextMenuContent,
@@ -6,12 +6,12 @@ import {
   DataTable,
   type DataTableColumn,
   EmptyState,
-  IconButton,
 } from '@firebase-desk/ui';
-import { ExternalLink } from 'lucide-react';
+import { ExternalLink, RotateCcw } from 'lucide-react';
 import { useMemo } from 'react';
 import { FirestoreValueCell } from './FirestoreValueCell.tsx';
 import { fieldCatalogForRows, type SubcollectionLoadState } from './resultModel.tsx';
+import { useResultTableLayout } from './resultTableLayout.ts';
 import { renderSubcollectionButtons } from './SubcollectionControls.tsx';
 
 export interface ResultTableProps {
@@ -22,8 +22,10 @@ export interface ResultTableProps {
   readonly onLoadSubcollections?: ((documentPath: string) => Promise<void> | void) | undefined;
   readonly onOpenDocumentInNewTab?: ((documentPath: string) => void) | undefined;
   readonly onSelectDocument?: ((documentPath: string) => void) | undefined;
+  readonly queryPath: string;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocumentPath: string | null;
+  readonly settings?: SettingsRepository | undefined;
   readonly subcollectionStates: Readonly<Record<string, SubcollectionLoadState>>;
 }
 
@@ -38,8 +40,10 @@ export function ResultTable(
     onLoadSubcollections,
     onOpenDocumentInNewTab,
     onSelectDocument,
+    queryPath,
     rows,
     selectedDocumentPath,
+    settings,
     subcollectionStates,
   }: ResultTableProps,
 ) {
@@ -51,70 +55,73 @@ export function ResultTable(
     kind: 'document',
     document,
   }));
+  const showSubcollections = rows.some((row) =>
+    row.hasSubcollections || (row.subcollections?.length ?? 0) > 0
+  );
   const columns = useMemo<ReadonlyArray<DataTableColumn<ResultTableRow>>>(
     () => [
       {
         id: 'id',
         header: 'Document ID',
         width: 180,
+        minWidth: 120,
         cell: ({ row }) => <code>{row.original.document.id}</code>,
       },
       ...fieldColumns.map((field) => ({
         id: field,
         header: () => <code>{field}</code>,
         width: 160,
+        minWidth: 96,
         cell: ({ row }) => {
           const value = row.original.document.data[field];
           return field in row.original.document.data ? <FirestoreValueCell value={value} /> : '';
         },
       } satisfies DataTableColumn<ResultTableRow>)),
-      {
-        id: 'subcollections',
-        header: 'Subcollections',
-        width: 420,
-        cell: ({ row }) =>
-          renderSubcollectionButtons(
-            row.original.document,
-            onOpenDocumentInNewTab,
-            subcollectionStates[row.original.document.path],
-            onLoadSubcollections,
-          ),
-      },
-      ...(onOpenDocumentInNewTab
+      ...(showSubcollections
         ? [
           {
-            id: 'actions',
-            header: () => <span className='sr-only'>Actions</span>,
-            width: 56,
-            cell: ({ row }) => {
-              const tableRow = row.original;
-              return (
-                <IconButton
-                  icon={<ExternalLink size={13} aria-hidden='true' />}
-                  label={`Open ${tableRow.document.id} in new tab`}
-                  size='xs'
-                  variant='ghost'
-                  onClick={(event) => {
-                    event.stopPropagation();
-                    onOpenDocumentInNewTab(tableRow.document.path);
-                  }}
-                />
-              );
-            },
+            id: 'subcollections',
+            header: 'Subcollections',
+            width: 420,
+            minWidth: 180,
+            maxWidth: 720,
+            cell: ({ row }) =>
+              renderSubcollectionButtons(
+                row.original.document,
+                onOpenDocumentInNewTab,
+                subcollectionStates[row.original.document.path],
+                onLoadSubcollections,
+              ),
           } satisfies DataTableColumn<ResultTableRow>,
         ]
         : []),
     ],
-    [fieldColumns, onLoadSubcollections, onOpenDocumentInNewTab, subcollectionStates],
+    [
+      fieldColumns,
+      onLoadSubcollections,
+      onOpenDocumentInNewTab,
+      showSubcollections,
+      subcollectionStates,
+    ],
   );
+  const { hasSavedLayout, layout, resetLayout, saveLayout } = useResultTableLayout({
+    columns,
+    queryPath,
+    settings,
+  });
+  const showFooter = hasMore || hasSavedLayout;
 
   return (
     <div className='grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto]'>
       <DataTable
+        columnLayout={layout}
         columns={columns}
         data={tableRows}
         emptyState={<EmptyState title='No documents' />}
+        enableColumnReorder
+        enableColumnResize
         getRowId={(row) => row.document.path}
+        onColumnLayoutChange={saveLayout}
         rowClassName={(row) =>
           selectedDocumentPath === row.document.path ? 'bg-action-selected' : undefined}
         {...(onOpenDocumentInNewTab
@@ -139,12 +146,24 @@ export function ResultTable(
           ? { onRowDoubleClick: (row: ResultTableRow) => onEditDocument(row.document) }
           : {})}
       />
-      {hasMore
+      {showFooter
         ? (
-          <div className='border-t border-border-subtle bg-bg-panel px-3 py-2'>
-            <Button disabled={isFetchingMore} variant='secondary' onClick={onLoadMore}>
-              {isFetchingMore ? 'Loading' : 'Load more'}
-            </Button>
+          <div className='flex items-center gap-2 border-t border-border-subtle bg-bg-panel px-3 py-2'>
+            {hasMore
+              ? (
+                <Button disabled={isFetchingMore} variant='secondary' onClick={onLoadMore}>
+                  {isFetchingMore ? 'Loading' : 'Load more'}
+                </Button>
+              )
+              : null}
+            {hasSavedLayout
+              ? (
+                <Button className='gap-1.5' size='xs' variant='secondary' onClick={resetLayout}>
+                  <RotateCcw size={13} aria-hidden='true' />
+                  Reset table layout
+                </Button>
+              )
+              : null}
           </div>
         )
         : null}

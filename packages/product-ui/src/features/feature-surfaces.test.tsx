@@ -558,8 +558,7 @@ describe('feature surfaces', () => {
     const treeTab = screen.getByRole('tab', { name: /Tree/ });
     fireEvent.mouseDown(treeTab, { button: 0, ctrlKey: false });
     expect(screen.queryByText('evt_created')).toBeNull();
-    fireEvent.click(screen.getByText('orders'));
-    fireEvent.click(screen.getByText('ord_1024'));
+    fireEvent.click(screen.getByText('Subcollections'));
     fireEvent.click(screen.getByText('events'));
     expect(await screen.findByText('evt_created')).toBeTruthy();
 
@@ -691,7 +690,7 @@ describe('feature surfaces', () => {
 
     const treeTab = screen.getByRole('tab', { name: /Tree/ });
     fireEvent.mouseDown(treeTab, { button: 0, ctrlKey: false });
-    fireEvent.click(screen.getByText('orders'));
+    fireEvent.click(screen.getByText('ord_lazy'));
     fireEvent.click(screen.getByText('ord_lazy'));
 
     await waitFor(() => expect(onLoadSubcollections).toHaveBeenCalledWith('orders/ord_lazy'));
@@ -753,10 +752,9 @@ describe('feature surfaces', () => {
     );
 
     const tree = screen.getByRole('tree');
-    fireEvent.click(within(tree).getByText('orders'));
-    fireEvent.click(within(tree).getByText('ord_tree'));
     expect(within(tree).getByText('Fields')).toBeTruthy();
     expect(within(tree).getByText('Subcollections')).toBeTruthy();
+    fireEvent.click(within(tree).getByText('Subcollections'));
 
     expect(within(tree).getByText('skiers')).toBeTruthy();
     expect(within(tree).queryByText('Documents')).toBeNull();

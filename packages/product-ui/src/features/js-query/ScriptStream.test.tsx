@@ -9,7 +9,7 @@ describe('ScriptStream', () => {
     expect(screen.getByText('No data to show')).toBeTruthy();
   });
 
-  it('renders json stream cards', () => {
+  it('renders json stream cards', async () => {
     render(
       <ScriptStream
         items={[{
@@ -24,6 +24,6 @@ describe('ScriptStream', () => {
 
     expect(screen.getByText('yield 1')).toBeTruthy();
     expect(screen.getByText('Object(1)')).toBeTruthy();
-    expect(screen.getByText(/"ok": true/)).toBeTruthy();
+    expect(await screen.findByText(/"ok": true/)).toBeTruthy();
   });
 });

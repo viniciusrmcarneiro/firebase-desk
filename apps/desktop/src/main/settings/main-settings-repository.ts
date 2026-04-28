@@ -31,6 +31,9 @@ export class MainSettingsRepository implements SettingsRepository {
       hotkeyOverrides: patch.hotkeyOverrides
         ? { ...patch.hotkeyOverrides }
         : { ...current.hotkeyOverrides },
+      resultTableLayouts: patch.resultTableLayouts
+        ? cloneResultTableLayouts(patch.resultTableLayouts)
+        : cloneResultTableLayouts(current.resultTableLayouts),
     });
   }
 
@@ -41,4 +44,18 @@ export class MainSettingsRepository implements SettingsRepository {
   async setHotkeyOverrides(overrides: HotkeyOverrides): Promise<void> {
     await this.save({ hotkeyOverrides: { ...overrides } });
   }
+}
+
+function cloneResultTableLayouts(
+  layouts: SettingsSnapshot['resultTableLayouts'],
+): SettingsSnapshot['resultTableLayouts'] {
+  return Object.fromEntries(
+    Object.entries(layouts).map(([key, value]) => [
+      key,
+      {
+        columnOrder: [...value.columnOrder],
+        columnSizing: { ...value.columnSizing },
+      },
+    ]),
+  );
 }

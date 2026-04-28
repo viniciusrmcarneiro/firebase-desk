@@ -53,4 +53,34 @@ describe('ExplorerTree', () => {
     expect(onOpen).toHaveBeenCalledWith('doc:one');
     expect(onAction).toHaveBeenCalledWith('doc:one');
   });
+
+  it('supports keyboard navigation and toggling from the full row', () => {
+    const onToggle = vi.fn();
+    const onOpen = vi.fn();
+    render(
+      <ExplorerTree
+        rows={[
+          ...rows,
+          {
+            id: 'doc:two',
+            label: 'two',
+            level: 0,
+            hasChildren: false,
+          },
+        ]}
+        onOpen={onOpen}
+        onToggle={onToggle}
+      />,
+    );
+
+    const first = screen.getByRole('treeitem', { name: /one/ });
+    first.focus();
+    fireEvent.keyDown(first, { key: 'ArrowRight' });
+    fireEvent.keyDown(first, { key: 'ArrowDown' });
+    const second = screen.getByRole('treeitem', { name: /two/ });
+    fireEvent.keyDown(second, { key: 'Enter' });
+
+    expect(onToggle).toHaveBeenCalledWith('doc:one');
+    expect(onOpen).toHaveBeenCalledWith('doc:two');
+  });
 });

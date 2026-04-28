@@ -54,6 +54,7 @@ describe('desktop App', () => {
       theme: 'system',
       dataMode: 'mock',
       hotkeyOverrides: {},
+      resultTableLayouts: {},
     });
 
     render(<App />);

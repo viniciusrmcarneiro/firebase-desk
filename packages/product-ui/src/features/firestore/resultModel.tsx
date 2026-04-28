@@ -186,7 +186,7 @@ function appendDocumentTreeRows(
     openPath: row.path,
   });
   if (!expanded) return;
-  const fields = Object.entries(row.data);
+  const fields = sortedEntries(row.data);
   const fieldsId = `${nodeId}:fields`;
   const fieldsExpanded = expandedIds.has(fieldsId);
   flattened.push({
@@ -309,7 +309,7 @@ function appendValueTreeRows(
   }
   const entries = Array.isArray(value)
     ? value.map((entry, index) => [`[${index}]`, entry] as const)
-    : Object.entries(value as Record<string, unknown>);
+    : sortedEntries(value as Record<string, unknown>);
   const expanded = expandedIds.has(nodeId);
   flattened.push({
     id: nodeId,
@@ -318,6 +318,7 @@ function appendValueTreeRows(
     label: key,
     level,
     meta: valueType(value),
+    value: formatValue(value),
     hasChildren: entries.length > 0,
     expanded,
   });
@@ -354,4 +355,16 @@ function valueType(value: unknown): string {
 
 function formatValue(value: unknown): string {
   return formatFirestoreValue(value);
+}
+
+function sortedEntries(value: Record<string, unknown>): ReadonlyArray<readonly [string, unknown]> {
+  return Object.entries(value).reduce<ReadonlyArray<readonly [string, unknown]>>(
+    (sorted, entry) => {
+      const [key] = entry;
+      const index = sorted.findIndex(([itemKey]) => key.localeCompare(itemKey) < 0);
+      if (index < 0) return [...sorted, entry];
+      return [...sorted.slice(0, index), entry, ...sorted.slice(index)];
+    },
+    [],
+  );
 }
