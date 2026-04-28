@@ -63,6 +63,8 @@ describe('useWorkspaceTree', () => {
       useWorkspaceTree({
         activeTab,
         openFirestoreTab,
+        openFirestoreTabInNewTab: vi.fn(),
+        openJsTabInNewTab: vi.fn(),
         openToolTab,
         projects,
         selectedTreeItemId: null,
@@ -92,6 +94,8 @@ describe('useWorkspaceTree', () => {
       useWorkspaceTree({
         activeTab,
         openFirestoreTab: vi.fn(),
+        openFirestoreTabInNewTab: vi.fn(),
+        openJsTabInNewTab: vi.fn(),
         openToolTab: vi.fn(),
         projects,
         selectedTreeItemId: null,
@@ -131,6 +135,8 @@ describe('useWorkspaceTree', () => {
       useWorkspaceTree({
         activeTab,
         openFirestoreTab: vi.fn(),
+        openFirestoreTabInNewTab: vi.fn(),
+        openJsTabInNewTab: vi.fn(),
         openToolTab: vi.fn(),
         projects,
         selectedTreeItemId: null,
@@ -167,5 +173,75 @@ describe('useWorkspaceTree', () => {
     expect(setLastAction).toHaveBeenCalledWith(
       expect.stringContaining('Firestore load failed: permission denied'),
     );
+  });
+
+  it('keeps script click reusing a tab and script double click opening a new tab', () => {
+    const openToolTab = vi.fn(() => 'tab-js-reused');
+    const openJsTabInNewTab = vi.fn(() => 'tab-js-new');
+    const recordInteraction = vi.spyOn(tabActions, 'recordInteraction').mockImplementation(
+      () => {},
+    );
+    const { result } = renderHook(() =>
+      useWorkspaceTree({
+        activeTab,
+        openFirestoreTab: vi.fn(),
+        openFirestoreTabInNewTab: vi.fn(),
+        openJsTabInNewTab,
+        openToolTab,
+        projects,
+        selectedTreeItemId: null,
+        setLastAction: vi.fn(),
+      })
+    );
+
+    act(() => result.current.handleSelectItem('script:emu'));
+
+    expect(openToolTab).toHaveBeenCalledWith('js-query', 'emu');
+    expect(openJsTabInNewTab).not.toHaveBeenCalled();
+    expect(recordInteraction).toHaveBeenCalledWith({
+      activeTabId: 'tab-js-reused',
+      path: 'scripts/default',
+      selectedTreeItemId: 'script:emu',
+    });
+
+    act(() => result.current.handleOpenItem('script:emu'));
+
+    expect(openJsTabInNewTab).toHaveBeenCalledWith('emu');
+    expect(recordInteraction).toHaveBeenCalledWith({
+      activeTabId: 'tab-js-new',
+      path: 'scripts/default',
+      selectedTreeItemId: 'script:emu',
+    });
+  });
+
+  it('opens collection double clicks in a new tab', () => {
+    const openFirestoreTab = vi.fn(() => 'tab-firestore-reused');
+    const openFirestoreTabInNewTab = vi.fn(() => 'tab-firestore-new');
+    const recordInteraction = vi.spyOn(tabActions, 'recordInteraction').mockImplementation(
+      () => {},
+    );
+    const { result } = renderHook(() =>
+      useWorkspaceTree({
+        activeTab,
+        openFirestoreTab,
+        openFirestoreTabInNewTab,
+        openJsTabInNewTab: vi.fn(),
+        openToolTab: vi.fn(),
+        projects,
+        selectedTreeItemId: null,
+        setLastAction: vi.fn(),
+      })
+    );
+
+    act(() => result.current.handleSelectItem('collection:emu:orders'));
+    act(() => result.current.handleOpenItem('collection:emu:orders'));
+
+    expect(openFirestoreTab).toHaveBeenCalledWith('emu', 'orders');
+    expect(openFirestoreTabInNewTab).toHaveBeenCalledWith('emu', 'orders');
+    expect(recordInteraction).toHaveBeenCalledWith({
+      activeTabId: 'tab-firestore-new',
+      path: 'orders',
+      selectedTreeItemId: 'collection:emu:orders',
+    });
   });
 });

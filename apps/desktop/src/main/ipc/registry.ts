@@ -5,16 +5,28 @@ import {
   type IpcResponse,
 } from '@firebase-desk/ipc-schemas';
 import type {
+  AuthUser,
   FirestoreCollectionNode,
   FirestoreDocumentNode,
   FirestoreDocumentResult,
   FirestoreQuery,
   Page,
   PageRequest,
+  ScriptRunResult,
 } from '@firebase-desk/repo-contracts';
-import { AdminFirestoreProvider, FirebaseFirestoreRepository } from '@firebase-desk/repo-firebase';
+import {
+  AdminAuthProvider,
+  AdminFirestoreProvider,
+  FirebaseAuthRepository,
+  type FirebaseConnectionResolver,
+  FirebaseFirestoreRepository,
+} from '@firebase-desk/repo-firebase';
+import { ProcessScriptRunnerRepository } from '@firebase-desk/script-runner';
 import { app, dialog, ipcMain, shell } from 'electron';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { resolveDataMode } from '../app/data-mode.ts';
 import { MainProjectsRepository } from '../projects/main-projects-repository.ts';
 import { MainSettingsRepository } from '../settings/main-settings-repository.ts';
@@ -42,7 +54,7 @@ export function registerIpcHandlers(): void {
   const projectsStore = new ProjectsStore(userDataPath);
   const credentialsStore = new CredentialsStore(userDataPath);
   const projectsRepository = new MainProjectsRepository(projectsStore, credentialsStore);
-  const firestoreProvider = new AdminFirestoreProvider({
+  const connectionResolver: FirebaseConnectionResolver = {
     async resolveConnection(connectionId) {
       const project = await projectsRepository.get(connectionId);
       if (!project) throw new Error(`Connection not found: ${connectionId}`);
@@ -51,8 +63,14 @@ export function registerIpcHandlers(): void {
         credentialJson: project.hasCredential ? await credentialsStore.load(project.id) : null,
       };
     },
-  });
+  };
+  const firestoreProvider = new AdminFirestoreProvider(connectionResolver);
   const firestoreRepository = new FirebaseFirestoreRepository(firestoreProvider);
+  const authProvider = new AdminAuthProvider(connectionResolver);
+  const scriptRunnerRepository = new ProcessScriptRunnerRepository(connectionResolver, {
+    workerPath: scriptRunnerWorkerPath(),
+  });
+  const authRepository = new FirebaseAuthRepository(authProvider);
 
   const handlers: Partial<{ [C in IpcChannel]: Handler<C>; }> = {
     'health.check': (_request) => ({
@@ -75,12 +93,14 @@ export function registerIpcHandlers(): void {
       const project = await projectsRepository.update(id, patch);
       firestoreRepository.invalidateConnection(id);
       await firestoreProvider.invalidateConnection(id);
+      await authProvider.invalidateConnection(id);
       return project;
     },
     'projects.remove': async ({ id }) => {
       await projectsRepository.remove(id);
       firestoreRepository.invalidateConnection(id);
       await firestoreProvider.invalidateConnection(id);
+      await authProvider.invalidateConnection(id);
     },
     'projects.validateServiceAccount': ({ json }) =>
       projectsRepository.validateServiceAccount(json),
@@ -113,6 +133,21 @@ export function registerIpcHandlers(): void {
       firestoreRepository.getDocument(connectionId, documentPath).then((document) =>
         document ? toIpcDocumentResult(document) : null
       ),
+    'scriptRunner.run': async (request) =>
+      toIpcScriptRunResult(await scriptRunnerRepository.run(request)),
+    'scriptRunner.cancel': async ({ runId }) => {
+      await scriptRunnerRepository.cancel(runId);
+    },
+    'auth.listUsers': async ({ projectId, request }) =>
+      toIpcAuthUserPage(await authRepository.listUsers(projectId, toPageRequest(request))),
+    'auth.getUser': async ({ projectId, uid }) => {
+      const user = await authRepository.getUser(projectId, uid);
+      return user ? toIpcAuthUser(user) : null;
+    },
+    'auth.searchUsers': async ({ projectId, query }) =>
+      (await authRepository.searchUsers(projectId, query)).map(toIpcAuthUser),
+    'auth.setCustomClaims': async ({ claims, projectId, uid }) =>
+      toIpcAuthUser(await authRepository.setCustomClaims(projectId, uid, claims)),
     'settings.load': () => settingsRepository.load(),
     'settings.save': (request) => settingsRepository.save(request),
     'settings.getHotkeyOverrides': () => settingsRepository.getHotkeyOverrides(),
@@ -138,18 +173,51 @@ export function registerIpcHandlers(): void {
   }
 }
 
+function scriptRunnerWorkerPath(): string {
+  const currentDir = dirname(fileURLToPath(import.meta.url));
+  const candidatePaths = [
+    resolve(currentDir, 'script-runner-worker.js'),
+    resolve(currentDir, '..', 'script-runner-worker.js'),
+    resolve(currentDir, '../script-runner-worker.ts'),
+  ];
+  const workerPath = candidatePaths.find((path) => existsSync(path));
+  if (workerPath) return workerPath;
+  throw new Error(`Unable to locate script runner worker. Checked ${candidatePaths.join(', ')}.`);
+}
+
 function errorText(error: unknown): string {
   if (error instanceof Error) return error.stack ?? error.message;
   return String(error);
 }
 
 function toPageRequest(
-  request: IpcRequest<'firestore.listDocuments'>['request'],
+  request?: {
+    readonly cursor?: { readonly token: string; } | undefined;
+    readonly limit?: number | undefined;
+  },
 ): PageRequest | undefined {
   if (!request) return undefined;
   return {
     ...(request.limit !== undefined ? { limit: request.limit } : {}),
     ...(request.cursor !== undefined ? { cursor: { token: request.cursor.token } } : {}),
+  };
+}
+
+function toIpcAuthUserPage(page: Page<AuthUser>): IpcResponse<'auth.listUsers'> {
+  return {
+    items: page.items.map(toIpcAuthUser),
+    nextCursor: page.nextCursor ? { token: page.nextCursor.token } : null,
+  };
+}
+
+function toIpcAuthUser(user: AuthUser): NonNullable<IpcResponse<'auth.getUser'>> {
+  return {
+    uid: user.uid,
+    email: user.email,
+    displayName: user.displayName,
+    provider: user.provider,
+    disabled: user.disabled,
+    customClaims: { ...user.customClaims },
   };
 }
 
@@ -213,5 +281,35 @@ function toIpcDocumentResult(
     ...(document.subcollections
       ? { subcollections: document.subcollections.map(toIpcCollectionNode) }
       : {}),
+  };
+}
+
+function toIpcScriptRunResult(result: ScriptRunResult): IpcResponse<'scriptRunner.run'> {
+  return {
+    returnValue: result.returnValue,
+    ...(result.stream
+      ? {
+        stream: result.stream.map((item) => ({
+          id: item.id,
+          label: item.label,
+          badge: item.badge,
+          view: item.view,
+          value: item.value,
+        })),
+      }
+      : {}),
+    logs: result.logs.map((log) => ({
+      level: log.level,
+      message: log.message,
+      timestamp: log.timestamp,
+    })),
+    errors: result.errors.map((error) => ({
+      ...(error.name ? { name: error.name } : {}),
+      ...(error.code ? { code: error.code } : {}),
+      message: error.message,
+      ...(error.stack ? { stack: error.stack } : {}),
+    })),
+    durationMs: result.durationMs,
+    ...(result.cancelled !== undefined ? { cancelled: result.cancelled } : {}),
   };
 }

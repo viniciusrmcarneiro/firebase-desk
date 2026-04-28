@@ -13,7 +13,13 @@ export default defineConfig({
   main: {
     build: {
       outDir: '.build/out/main',
-      lib: { entry: resolve(__dirname, 'src/main/index.ts'), formats: ['es'] },
+      lib: {
+        entry: {
+          index: resolve(__dirname, 'src/main/index.ts'),
+          'script-runner-worker': resolve(__dirname, 'src/main/script-runner-worker.ts'),
+        },
+        formats: ['es'],
+      },
       rollupOptions: {
         external: ['electron', /^node:/],
       },

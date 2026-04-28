@@ -3,10 +3,11 @@ import { act, renderHook } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceTab } from '../stores/tabsStore.ts';
 import { useAuthTabState } from './useAuthTabState.ts';
-import { useSearchUsers, useUsers } from './useRepositoriesData.ts';
+import { useSearchUsers, useSetCustomClaims, useUsers } from './useRepositoriesData.ts';
 
 vi.mock('./useRepositoriesData.ts', () => ({
   useSearchUsers: vi.fn(),
+  useSetCustomClaims: vi.fn(),
   useUsers: vi.fn(),
 }));
 
@@ -45,6 +46,9 @@ describe('useAuthTabState', () => {
     vi.mocked(useSearchUsers).mockImplementation((_projectId, query) =>
       searchResult(query ? [ada] : undefined)
     );
+    vi.mocked(useSetCustomClaims).mockReturnValue({
+      mutateAsync: vi.fn(),
+    } as unknown as ReturnType<typeof useSetCustomClaims>);
   });
 
   it('uses paged users until a search filter is present', () => {
@@ -63,7 +67,7 @@ describe('useAuthTabState', () => {
 
     expect(result.current.users).toEqual([ada]);
     expect(result.current.selectedUser).toBeNull();
-    expect(useSearchUsers).toHaveBeenLastCalledWith('demo-local', 'ada', true);
+    expect(useSearchUsers).toHaveBeenLastCalledWith('demo-local', 'ada', true, 'tab-auth-1', 0);
   });
 
   it('loads more only when not searching and can clear the filter', () => {
@@ -85,6 +89,48 @@ describe('useAuthTabState', () => {
     act(() => result.current.loadMore());
 
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('refreshes the current auth query from the first page', () => {
+    const { result } = renderHook(() =>
+      useAuthTabState({
+        activeTab: tab,
+        runtimeProjectId: 'demo-local',
+        selectedUserId: null,
+      })
+    );
+
+    act(() => result.current.refetch());
+
+    expect(useUsers).toHaveBeenLastCalledWith('demo-local', 25, 'tab-auth-1', 1);
+  });
+
+  it('saves claims and updates the selected user', async () => {
+    const mutateAsync = vi.fn().mockResolvedValue({
+      ...grace,
+      customClaims: { role: 'owner' },
+    });
+    vi.mocked(useSetCustomClaims).mockReturnValue({
+      mutateAsync,
+    } as unknown as ReturnType<typeof useSetCustomClaims>);
+    const { result } = renderHook(() =>
+      useAuthTabState({
+        activeTab: tab,
+        runtimeProjectId: 'demo-local',
+        selectedUserId: 'u_grace',
+      })
+    );
+
+    await act(async () => {
+      await result.current.saveCustomClaims('u_grace', { role: 'owner' });
+    });
+
+    expect(mutateAsync).toHaveBeenCalledWith({
+      claims: { role: 'owner' },
+      projectId: 'demo-local',
+      uid: 'u_grace',
+    });
+    expect(result.current.selectedUser?.customClaims).toEqual({ role: 'owner' });
   });
 });
 

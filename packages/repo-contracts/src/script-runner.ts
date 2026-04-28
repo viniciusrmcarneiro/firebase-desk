@@ -25,14 +25,16 @@ export interface ScriptRunResult {
     readonly stack?: string;
   }>;
   readonly durationMs: number;
+  readonly cancelled?: boolean;
 }
 
 export interface ScriptRunRequest {
-  readonly projectId: string;
+  readonly runId: string;
+  readonly connectionId: string;
   readonly source: string;
-  readonly timeoutMs?: number;
 }
 
 export interface ScriptRunnerRepository {
   run(request: ScriptRunRequest): Promise<ScriptRunResult>;
+  cancel(runId: string): Promise<void>;
 }

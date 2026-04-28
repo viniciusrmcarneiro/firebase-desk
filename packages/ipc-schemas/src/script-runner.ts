@@ -8,15 +8,30 @@ export const ScriptLogEntrySchema = z.object({
   timestamp: z.string(),
 });
 
+export const ScriptStreamItemSchema = z.object({
+  id: z.string(),
+  label: z.string(),
+  badge: z.string(),
+  view: z.enum(['json', 'table']),
+  value: z.unknown(),
+});
+
 export const ScriptRunRequestSchema = z.object({
-  projectId: z.string(),
+  runId: z.string(),
+  connectionId: z.string(),
   source: z.string(),
-  timeoutMs: z.number().int().positive().optional(),
 });
 
 export const ScriptRunResultSchema = z.object({
   returnValue: z.unknown(),
+  stream: z.array(ScriptStreamItemSchema).optional(),
   logs: z.array(ScriptLogEntrySchema),
-  errors: z.array(z.object({ message: z.string(), stack: z.string().optional() })),
+  errors: z.array(z.object({
+    name: z.string().optional(),
+    code: z.string().optional(),
+    message: z.string(),
+    stack: z.string().optional(),
+  })),
   durationMs: z.number(),
+  cancelled: z.boolean().optional(),
 });

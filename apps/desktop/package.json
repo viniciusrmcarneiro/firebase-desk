@@ -26,6 +26,7 @@
     "@firebase-desk/repo-contracts": "workspace:*",
     "@firebase-desk/repo-firebase": "workspace:*",
     "@firebase-desk/repo-mocks": "workspace:*",
+    "@firebase-desk/script-runner": "workspace:*",
     "@firebase-desk/ui": "workspace:*",
     "@tanstack/react-query": "5.90.12",
     "@tanstack/react-store": "0.11.0",

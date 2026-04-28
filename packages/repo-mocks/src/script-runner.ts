@@ -17,7 +17,7 @@ export class MockScriptRunnerRepository implements ScriptRunnerRepository {
     const logs = [
       {
         level: 'info' as const,
-        message: `Firebase Admin SDK ready for ${request.projectId}`,
+        message: `Firebase Admin SDK ready for ${request.connectionId}`,
         timestamp: new Date().toISOString(),
       },
     ];
@@ -40,7 +40,7 @@ export class MockScriptRunnerRepository implements ScriptRunnerRepository {
     if (source.includes('plain')) {
       const value = {
         ok: true,
-        projectId: request.projectId,
+        connectionId: request.connectionId,
         summary: { paidOrders: returnedOrders.length, customers: customers.length },
       };
       return {
@@ -159,6 +159,8 @@ export class MockScriptRunnerRepository implements ScriptRunnerRepository {
       durationMs: Date.now() - startedAt,
     };
   }
+
+  async cancel(_runId: string): Promise<void> {}
 }
 
 function docsFor(path: string): ReadonlyArray<FixtureDocument> {

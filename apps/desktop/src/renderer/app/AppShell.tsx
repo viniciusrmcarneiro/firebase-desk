@@ -151,7 +151,6 @@ export function AppShell(
     selectedUserId: selection.authUserId,
   });
   const jsTab = useJsTabState({
-    activeProject,
     activeTab,
     initialScripts: persistedWorkspace?.scripts,
     selectedTreeItemId: selection.treeItemId,
@@ -159,6 +158,8 @@ export function AppShell(
   const workspaceTree = useWorkspaceTree({
     activeTab,
     openFirestoreTab,
+    openFirestoreTabInNewTab,
+    openJsTabInNewTab,
     openToolTab,
     projects,
     selectedTreeItemId: selection.treeItemId,
@@ -241,6 +242,7 @@ export function AppShell(
     activeTab,
     firestoreTab.activeDraft,
     activeProject,
+    jsTab.isRunning,
     jsTab.scriptSource,
   ]);
 
@@ -311,8 +313,7 @@ export function AppShell(
         ? `Close ${tab.title}? The workspace will have no open tabs.`
         : `Close ${tab.title}? Unsaved tab state for this tab will be discarded.`,
       onConfirm: () => {
-        tabActions.closeTab(tabId);
-        setLastAction(`Closed ${tab.title}`);
+        closeTabsWithCleanup([tab], () => tabActions.closeTab(tabId), `Closed ${tab.title}`);
       },
       title: 'Close tab',
     });
@@ -328,8 +329,12 @@ export function AppShell(
         count === 1 ? '' : 's'
       }? Their tab state will be discarded.`,
       onConfirm: () => {
-        tabActions.closeOtherTabs(tabId);
-        setLastAction(`Closed other tabs around ${tab.title}`);
+        const tabsToClose = tabsState.tabs.filter((item) => item.id !== tabId);
+        closeTabsWithCleanup(
+          tabsToClose,
+          () => tabActions.closeOtherTabs(tabId),
+          `Closed other tabs around ${tab.title}`,
+        );
       },
       title: 'Close other tabs',
     });
@@ -344,8 +349,12 @@ export function AppShell(
         index === 1 ? '' : 's'
       } to the left? Their tab state will be discarded.`,
       onConfirm: () => {
-        tabActions.closeTabsToLeft(tabId);
-        setLastAction('Closed tabs to left');
+        const tabsToClose = tabsState.tabs.slice(0, index);
+        closeTabsWithCleanup(
+          tabsToClose,
+          () => tabActions.closeTabsToLeft(tabId),
+          'Closed tabs to left',
+        );
       },
       title: 'Close tabs to left',
     });
@@ -361,8 +370,12 @@ export function AppShell(
         count === 1 ? '' : 's'
       } to the right? Their tab state will be discarded.`,
       onConfirm: () => {
-        tabActions.closeTabsToRight(tabId);
-        setLastAction('Closed tabs to right');
+        const tabsToClose = tabsState.tabs.slice(index + 1);
+        closeTabsWithCleanup(
+          tabsToClose,
+          () => tabActions.closeTabsToRight(tabId),
+          'Closed tabs to right',
+        );
       },
       title: 'Close tabs to right',
     });
@@ -376,8 +389,7 @@ export function AppShell(
         tabsState.tabs.length === 1 ? '' : 's'
       }? The workspace will have no open tabs.`,
       onConfirm: () => {
-        tabActions.closeAllTabs();
-        setLastAction('Closed all tabs');
+        closeTabsWithCleanup(tabsState.tabs, tabActions.closeAllTabs, 'Closed all tabs');
       },
       title: 'Close all tabs',
     });
@@ -431,7 +443,15 @@ export function AppShell(
   }
 
   function handleRunScript() {
+    if (jsTab.isRunning) {
+      handleCancelScript();
+      return;
+    }
     if (jsTab.runScript()) setLastAction('Ran JavaScript query');
+  }
+
+  function handleCancelScript() {
+    if (jsTab.cancelScript()) setLastAction('Cancelled JavaScript query');
   }
 
   function openTab(kind: WorkspaceTabKind) {
@@ -446,6 +466,10 @@ export function AppShell(
     return tabActions.openOrSelectTab({ kind, connectionId });
   }
 
+  function openJsTabInNewTab(connectionId: string) {
+    return tabActions.openTab({ kind: 'js-query', connectionId });
+  }
+
   function openFirestoreTab(connectionId: string, path: string) {
     return firestoreTab.openTab(connectionId, path);
   }
@@ -453,6 +477,16 @@ export function AppShell(
   function openFirestoreTabInNewTab(connectionId: string, path: string) {
     return firestoreTab.openTabInNewTab(connectionId, path);
   }
+
+  const activeTabIsRefreshing = activeTab
+    ? activeTab.kind === 'firestore-query'
+      ? firestoreTab.isLoading
+      : activeTab.kind === 'auth-users'
+      ? authTab.usersIsLoading
+      : activeTab.kind === 'js-query'
+      ? jsTab.isRunning
+      : false
+    : false;
 
   const activeView = activeTab
     ? (
@@ -468,6 +502,7 @@ export function AppShell(
         queryRows={firestoreTab.queryRows}
         scriptIsRunning={jsTab.isRunning}
         scriptResult={jsTab.scriptResult}
+        scriptStartedAt={jsTab.scriptStartedAt}
         scriptSource={jsTab.scriptSource}
         selectedDocument={firestoreTab.selectedDocument}
         selectedDocumentPath={firestoreTab.selectedDocumentPath}
@@ -478,6 +513,7 @@ export function AppShell(
         usersIsFetchingMore={authTab.usersIsFetchingMore}
         usersIsLoading={authTab.usersIsLoading}
         onAuthFilterChange={authTab.setAuthFilter}
+        onCancelScript={handleCancelScript}
         onDeleteDocument={(path) => handleDeleteDocument(path)}
         onDraftChange={firestoreTab.setDraft}
         onLoadMore={firestoreTab.loadMore}
@@ -496,6 +532,7 @@ export function AppShell(
         onRunQuery={handleRunQuery}
         onRunScript={handleRunScript}
         onSaveDocument={(path, data) => handleSaveDocument(path, data)}
+        onSaveUserCustomClaims={authTab.saveCustomClaims}
         onScriptChange={jsTab.setScriptSource}
         onSelectDocument={(path) => firestoreTab.selectDocument(activeTab.id, path)}
         onSelectUser={(uid) => selectionActions.selectAuthUser(uid)}
@@ -522,7 +559,7 @@ export function AppShell(
     if (activeTab.connectionId === connectionId) return;
     setFirestoreActionError(null);
     tabActions.updateConnection(activeTab.id, connectionId);
-    clearConnectionScopedTabState(activeTab.id);
+    clearConnectionScopedTabState(activeTab);
     const nextTreeItemId = treeItemIdForTab({ ...activeTab, connectionId });
     selectionActions.selectTreeItem(nextTreeItemId);
     tabActions.recordInteraction({
@@ -533,11 +570,66 @@ export function AppShell(
     setLastAction('Changed tab account');
   }
 
-  function clearConnectionScopedTabState(tabId: string) {
-    firestoreTab.clearTab(tabId);
-    jsTab.clearTab(tabId);
+  function clearConnectionScopedTabState(tab: WorkspaceTab) {
+    clearTabRuntimeState(tab);
     selectionActions.selectAuthUser(null);
     authTab.clear();
+  }
+
+  function closeTabsWithCleanup(
+    tabsToClose: ReadonlyArray<WorkspaceTab>,
+    closeAll: () => void,
+    successLabel: string,
+  ) {
+    const blockedTabs = tabsToClose.filter((tab) => tab.kind !== 'js-query' && isTabBusy(tab));
+    const blockedIds = new Set(blockedTabs.map((tab) => tab.id));
+    const closableTabs = tabsToClose.filter((tab) => !blockedIds.has(tab.id));
+
+    for (const tab of closableTabs) clearTabRuntimeState(tab);
+
+    if (!closableTabs.length) {
+      setLastAction(`Still loading ${blockedTabs[0]?.title ?? 'tab'}`);
+      return;
+    }
+
+    if (blockedTabs.length) {
+      for (const tab of closableTabs) tabActions.closeTab(tab.id);
+      setLastAction(
+        `${successLabel}; kept ${blockedTabs.length} busy tab${
+          blockedTabs.length === 1 ? '' : 's'
+        }`,
+      );
+      return;
+    }
+
+    closeAll();
+    setLastAction(successLabel);
+  }
+
+  function clearTabRuntimeState(tab: WorkspaceTab) {
+    cancelTabQueries(tab);
+    firestoreTab.clearTab(tab.id);
+    jsTab.clearTab(tab.id);
+  }
+
+  function cancelTabQueries(tab: WorkspaceTab) {
+    if (tab.kind === 'firestore-query') {
+      void queryClient.cancelQueries({ queryKey: ['firestore', 'query', tab.id] });
+      void queryClient.cancelQueries({ queryKey: ['firestore', 'document', tab.id] });
+    }
+    if (tab.kind === 'auth-users') void queryClient.cancelQueries({ queryKey: ['auth', tab.id] });
+  }
+
+  function isTabBusy(tab: WorkspaceTab): boolean {
+    if (tab.kind === 'js-query') return jsTab.isTabRunning(tab.id);
+    if (tab.kind === 'firestore-query') {
+      return queryClient.isFetching({ queryKey: ['firestore', 'query', tab.id] }) > 0
+        || queryClient.isFetching({ queryKey: ['firestore', 'document', tab.id] }) > 0;
+    }
+    if (tab.kind === 'auth-users') {
+      return queryClient.isFetching({ queryKey: ['auth', tab.id] }) > 0;
+    }
+    return false;
   }
 
   function handleRefreshActiveTab() {
@@ -688,8 +780,15 @@ export function AppShell(
                         />
                         <Badge variant={activeProject.target}>{activeProject.target}</Badge>
                         <IconButton
-                          icon={<RefreshCw size={14} aria-hidden='true' />}
-                          label='Refresh tab'
+                          disabled={activeTabIsRefreshing}
+                          icon={
+                            <RefreshCw
+                              className={activeTabIsRefreshing ? 'animate-spin' : undefined}
+                              size={14}
+                              aria-hidden='true'
+                            />
+                          }
+                          label={activeTabIsRefreshing ? 'Refreshing tab' : 'Refresh tab'}
                           size='xs'
                           variant='ghost'
                           onClick={handleRefreshActiveTab}
@@ -973,6 +1072,7 @@ interface TabViewProps {
   readonly isFetchingMore: boolean;
   readonly isLoading: boolean;
   readonly onAuthFilterChange: (value: string) => void;
+  readonly onCancelScript: () => void;
   readonly onDeleteDocument: (documentPath: string) => void;
   readonly onDraftChange: (draft: FirestoreQueryDraft) => void;
   readonly onLoadMore: () => void;
@@ -988,12 +1088,17 @@ interface TabViewProps {
     documentPath: string,
     data: Record<string, unknown>,
   ) => Promise<void> | void;
+  readonly onSaveUserCustomClaims: (
+    uid: string,
+    claims: Record<string, unknown>,
+  ) => Promise<void> | void;
   readonly onScriptChange: (source: string) => void;
   readonly onSelectDocument: (documentPath: string) => void;
   readonly onSelectUser: (uid: string) => void;
   readonly queryRows: ReadonlyArray<FirestoreDocumentResult>;
   readonly scriptIsRunning: boolean;
   readonly scriptResult: ScriptRunResult | undefined;
+  readonly scriptStartedAt: number | null;
   readonly scriptSource: string;
   readonly selectedDocument: FirestoreDocumentResult | null;
   readonly selectedDocumentPath: string | null;
@@ -1019,6 +1124,7 @@ function TabView(props: TabViewProps) {
         users={props.users}
         onFilterChange={props.onAuthFilterChange}
         onLoadMore={props.onLoadMoreUsers}
+        onSaveCustomClaims={props.onSaveUserCustomClaims}
         onSelectUser={props.onSelectUser}
       />
     );
@@ -1028,7 +1134,9 @@ function TabView(props: TabViewProps) {
       <JsQuerySurface
         isRunning={props.scriptIsRunning}
         result={props.scriptResult ?? null}
+        runStartedAt={props.scriptStartedAt}
         source={props.scriptSource}
+        onCancel={props.onCancelScript}
         onRun={props.onRunScript}
         onSourceChange={props.onScriptChange}
       />

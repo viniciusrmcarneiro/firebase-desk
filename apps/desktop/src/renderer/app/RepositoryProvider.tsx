@@ -17,13 +17,11 @@ import {
   MockSettingsRepository,
 } from '@firebase-desk/repo-mocks';
 import { createContext, type ReactNode, useContext } from 'react';
+import { IpcAuthRepository } from './repositories/ipc-auth-repository.ts';
 import { IpcFirestoreRepository } from './repositories/ipc-firestore-repository.ts';
 import { IpcProjectsRepository } from './repositories/ipc-projects-repository.ts';
+import { IpcScriptRunnerRepository } from './repositories/ipc-script-runner-repository.ts';
 import { IpcSettingsRepository } from './repositories/ipc-settings-repository.ts';
-import {
-  UnsupportedLiveAuthRepository,
-  UnsupportedLiveScriptRunnerRepository,
-} from './repositories/unsupported-live-repositories.ts';
 
 export interface RepositorySet {
   readonly auth: AuthRepository;
@@ -62,10 +60,10 @@ export function createRepositories(
   const settings = desktopApiAvailable ? new IpcSettingsRepository() : new MockSettingsRepository();
   const repositories: RepositorySet = dataMode === 'live'
     ? {
-      auth: new UnsupportedLiveAuthRepository(),
+      auth: new IpcAuthRepository(),
       firestore: new IpcFirestoreRepository(),
       projects: new IpcProjectsRepository(),
-      scriptRunner: new UnsupportedLiveScriptRunnerRepository(),
+      scriptRunner: new IpcScriptRunnerRepository(),
       settings,
     }
     : { ...createMockRepositories(), settings };

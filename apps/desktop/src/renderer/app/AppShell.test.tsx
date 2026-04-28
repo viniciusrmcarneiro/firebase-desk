@@ -184,10 +184,56 @@ describe('desktop AppShell', () => {
 
     await waitFor(() =>
       expect(run).toHaveBeenCalledWith(
-        expect.objectContaining({ projectId: 'demo-local', source: expect.any(String) }),
+        expect.objectContaining({
+          connectionId: 'emu',
+          runId: expect.any(String),
+          source: expect.any(String),
+        }),
       )
     );
     expect(await screen.findByText('yield DocumentSnapshot')).toBeTruthy();
+  });
+
+  it('cancels a running JS Query when closing its tab', async () => {
+    const repositories = createMockRepositories();
+    const run = vi.spyOn(repositories.scriptRunner, 'run').mockImplementation(
+      () => new Promise(() => {}),
+    );
+    const cancel = vi.spyOn(repositories.scriptRunner, 'cancel');
+    renderShell({
+      repositories,
+      initialTab: { kind: 'js-query', connectionId: 'emu' },
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
+
+    await waitFor(() => expect(run).toHaveBeenCalledTimes(1));
+    const runId = run.mock.calls[0]?.[0].runId;
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close JS Query' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    await waitFor(() => expect(cancel).toHaveBeenCalledWith(runId));
+  });
+
+  it('keeps a busy Firestore query tab open when closing it', async () => {
+    const repositories = createMockRepositories();
+    const runQuery = vi.spyOn(repositories.firestore, 'runQuery').mockImplementation(
+      () => new Promise(() => {}),
+    );
+    renderShell({
+      repositories,
+      initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
+    });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
+    await waitFor(() => expect(runQuery).toHaveBeenCalledTimes(1));
+
+    fireEvent.click(screen.getByRole('button', { name: 'Close orders' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Close' }));
+
+    expect(await screen.findByText('Still loading orders')).toBeTruthy();
+    expect(screen.getByRole('textbox', { name: 'Query path' })).toBeTruthy();
   });
 
   it('opens settings with settings-backed details', async () => {

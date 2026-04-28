@@ -44,14 +44,17 @@ vi.mock('@monaco-editor/react', () => ({
   default: (
     {
       onChange,
+      options,
       value,
     }: {
       readonly onChange?: (value: string) => void;
+      readonly options?: { readonly readOnly?: boolean; };
       readonly value: string;
     },
   ) => (
     <textarea
       data-testid='monaco'
+      readOnly={options?.readOnly ?? false}
       value={value}
       onChange={(event) => onChange?.(event.currentTarget.value)}
     />
@@ -413,14 +416,14 @@ describe('feature surfaces', () => {
     expect(onCloseTab).toHaveBeenCalledWith('tab-auth');
   });
 
-  it('AuthUsersSurface filters, selects users, and exposes Load more', () => {
+  it('AuthUsersSurface renders provided users, selects users, and exposes Load more', () => {
     const onSelectUser = vi.fn();
     const onLoadMore = vi.fn();
     render(
       <AuthUsersSurface
-        filterValue='grace'
+        filterValue='grace@example.com'
         hasMore
-        users={AUTH_USERS}
+        users={[AUTH_USERS[1]!]}
         onFilterChange={() => {}}
         onLoadMore={onLoadMore}
         onSelectUser={onSelectUser}
@@ -434,6 +437,98 @@ describe('feature surfaces', () => {
 
     expect(onSelectUser).toHaveBeenCalledWith('u_grace');
     expect(onLoadMore).toHaveBeenCalledTimes(1);
+  });
+
+  it('AuthUsersSurface shows loading state before users arrive', () => {
+    render(
+      <AuthUsersSurface
+        filterValue=''
+        hasMore={false}
+        isLoading
+        users={[]}
+        onFilterChange={() => {}}
+        onLoadMore={() => {}}
+        onSelectUser={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('status').textContent).toContain('Loading users');
+    expect(screen.queryByText('No users')).toBeNull();
+  });
+
+  it('AuthUsersSurface edits custom claims JSON', async () => {
+    const onSaveCustomClaims = vi.fn();
+    renderWithAppearance(
+      <AuthUsersSurface
+        filterValue=''
+        hasMore={false}
+        selectedUserId='u_ada'
+        users={[AUTH_USERS[0]!]}
+        onFilterChange={() => {}}
+        onLoadMore={() => {}}
+        onSaveCustomClaims={onSaveCustomClaims}
+        onSelectUser={() => {}}
+      />,
+    );
+
+    expect(screen.getByText((content) => content.includes('"role": "admin"'))).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    expect(await screen.findByRole('dialog', { name: 'Custom claims' })).toBeTruthy();
+    fireEvent.change(await screen.findByTestId('monaco'), {
+      target: { value: '{ "role": "owner" }' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    await waitFor(() =>
+      expect(onSaveCustomClaims).toHaveBeenCalledWith('u_ada', { role: 'owner' })
+    );
+  });
+
+  it('AuthUsersSurface rejects non-object custom claims JSON', async () => {
+    const onSaveCustomClaims = vi.fn();
+    renderWithAppearance(
+      <AuthUsersSurface
+        filterValue=''
+        hasMore={false}
+        selectedUserId='u_ada'
+        users={[AUTH_USERS[0]!]}
+        onFilterChange={() => {}}
+        onLoadMore={() => {}}
+        onSaveCustomClaims={onSaveCustomClaims}
+        onSelectUser={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.change(await screen.findByTestId('monaco'), { target: { value: '[]' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('Custom claims JSON must be an object.')).toBeTruthy();
+    expect(onSaveCustomClaims).not.toHaveBeenCalled();
+  });
+
+  it('AuthUsersSurface surfaces custom claims save errors', async () => {
+    const onSaveCustomClaims = vi.fn().mockRejectedValue(new Error('Claims rejected'));
+    renderWithAppearance(
+      <AuthUsersSurface
+        filterValue=''
+        hasMore={false}
+        selectedUserId='u_ada'
+        users={[AUTH_USERS[0]!]}
+        onFilterChange={() => {}}
+        onLoadMore={() => {}}
+        onSaveCustomClaims={onSaveCustomClaims}
+        onSelectUser={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
+    fireEvent.change(await screen.findByTestId('monaco'), {
+      target: { value: '{ "role": "owner" }' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
+
+    expect(await screen.findByText('Claims rejected')).toBeTruthy();
   });
 
   it('FirestoreQuerySurface selects rows, opens editor, and renders nested subcollection docs', async () => {
@@ -708,6 +803,7 @@ describe('feature surfaces', () => {
       <JsQuerySurface
         result={scriptResult}
         source={JS_QUERY_SAMPLE_SOURCE}
+        onCancel={() => {}}
         onRun={onRun}
         onSourceChange={() => {}}
       />,
@@ -721,5 +817,39 @@ describe('feature surfaces', () => {
     fireEvent.click(screen.getByText('yield QuerySnapshot'));
     expect(await screen.findByRole('tab', { name: /Tree/ })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /Logs/ })).toBeTruthy();
+  });
+
+  it('JsQuerySurface switches Run to Cancel while running', () => {
+    const onCancel = vi.fn();
+    renderWithAppearance(
+      <JsQuerySurface
+        isRunning
+        result={null}
+        source={JS_QUERY_SAMPLE_SOURCE}
+        onCancel={onCancel}
+        onRun={() => {}}
+        onSourceChange={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.getByText(/elapsed/)).toBeTruthy();
+    expect(screen.getByTestId('monaco')).toHaveProperty('readOnly', true);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('JsQuerySurface formats completed durations with millisecond precision', () => {
+    renderWithAppearance(
+      <JsQuerySurface
+        result={{ ...scriptResult, durationMs: 1234 }}
+        source={JS_QUERY_SAMPLE_SOURCE}
+        onCancel={() => {}}
+        onRun={() => {}}
+        onSourceChange={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('1.234s').getAttribute('title')).toBe('1234ms');
   });
 });

@@ -48,11 +48,14 @@ const api = {
   },
   scriptRunner: {
     run: (request: IpcRequest<'scriptRunner.run'>) => invoke('scriptRunner.run', request),
+    cancel: (request: IpcRequest<'scriptRunner.cancel'>) => invoke('scriptRunner.cancel', request),
   },
   auth: {
     listUsers: (request: IpcRequest<'auth.listUsers'>) => invoke('auth.listUsers', request),
     getUser: (request: IpcRequest<'auth.getUser'>) => invoke('auth.getUser', request),
     searchUsers: (request: IpcRequest<'auth.searchUsers'>) => invoke('auth.searchUsers', request),
+    setCustomClaims: (request: IpcRequest<'auth.setCustomClaims'>) =>
+      invoke('auth.setCustomClaims', request),
   },
   channels: Object.keys(IPC_CHANNELS) as IpcChannel[],
 } as const;

@@ -4,6 +4,7 @@ import {
   AuthUsersPageSchema,
   ListUsersRequestSchema,
   SearchUsersRequestSchema,
+  SetCustomClaimsRequestSchema,
 } from './auth.ts';
 import {
   FirestoreCollectionNodeSchema,
@@ -99,6 +100,10 @@ export const IPC_CHANNELS = {
     request: ScriptRunRequestSchema,
     response: ScriptRunResultSchema,
   },
+  'scriptRunner.cancel': {
+    request: z.object({ runId: z.string() }),
+    response: z.void(),
+  },
   'auth.listUsers': {
     request: ListUsersRequestSchema,
     response: AuthUsersPageSchema,
@@ -110,6 +115,10 @@ export const IPC_CHANNELS = {
   'auth.searchUsers': {
     request: SearchUsersRequestSchema,
     response: z.array(AuthUserSchema),
+  },
+  'auth.setCustomClaims': {
+    request: SetCustomClaimsRequestSchema,
+    response: AuthUserSchema,
   },
   'settings.load': {
     request: z.object({}),
