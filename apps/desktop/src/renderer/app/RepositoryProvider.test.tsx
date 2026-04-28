@@ -38,7 +38,11 @@ describe('createRepositories', () => {
   });
 
   it('does not fall back to mock feature repositories in live data mode', async () => {
+    const listUsers = vi.fn(async () => ({ items: [], nextCursor: null }));
     vi.stubGlobal('firebaseDesk', {
+      auth: {
+        listUsers,
+      },
       firestore: {
         listRootCollections: vi.fn(async () => []),
       },
@@ -55,9 +59,11 @@ describe('createRepositories', () => {
 
     const repositories = createRepositories({ dataMode: 'live' });
 
-    await expect(repositories.auth.listUsers('demo-local')).rejects.toThrow(
-      'Authentication live data is not available yet.',
-    );
+    await expect(repositories.auth.listUsers('demo-local')).resolves.toEqual({
+      items: [],
+      nextCursor: null,
+    });
+    expect(listUsers).toHaveBeenCalledWith({ projectId: 'demo-local' });
     await expect(repositories.scriptRunner.run({ projectId: 'demo-local', source: 'return 1;' }))
       .rejects.toThrow('JavaScript Query live execution is not available yet.');
   });

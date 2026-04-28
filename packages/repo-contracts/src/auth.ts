@@ -13,4 +13,9 @@ export interface AuthRepository {
   listUsers(projectId: string, request?: PageRequest): Promise<Page<AuthUser>>;
   getUser(projectId: string, uid: string): Promise<AuthUser | null>;
   searchUsers(projectId: string, query: string): Promise<ReadonlyArray<AuthUser>>;
+  setCustomClaims(
+    projectId: string,
+    uid: string,
+    claims: Record<string, unknown>,
+  ): Promise<AuthUser>;
 }

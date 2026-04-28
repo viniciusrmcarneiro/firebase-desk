@@ -454,6 +454,16 @@ export function AppShell(
     return firestoreTab.openTabInNewTab(connectionId, path);
   }
 
+  const activeTabIsRefreshing = activeTab
+    ? activeTab.kind === 'firestore-query'
+      ? firestoreTab.isLoading
+      : activeTab.kind === 'auth-users'
+      ? authTab.usersIsLoading
+      : activeTab.kind === 'js-query'
+      ? jsTab.isRunning
+      : false
+    : false;
+
   const activeView = activeTab
     ? (
       <TabView
@@ -496,6 +506,7 @@ export function AppShell(
         onRunQuery={handleRunQuery}
         onRunScript={handleRunScript}
         onSaveDocument={(path, data) => handleSaveDocument(path, data)}
+        onSaveUserCustomClaims={authTab.saveCustomClaims}
         onScriptChange={jsTab.setScriptSource}
         onSelectDocument={(path) => firestoreTab.selectDocument(activeTab.id, path)}
         onSelectUser={(uid) => selectionActions.selectAuthUser(uid)}
@@ -688,8 +699,15 @@ export function AppShell(
                         />
                         <Badge variant={activeProject.target}>{activeProject.target}</Badge>
                         <IconButton
-                          icon={<RefreshCw size={14} aria-hidden='true' />}
-                          label='Refresh tab'
+                          disabled={activeTabIsRefreshing}
+                          icon={
+                            <RefreshCw
+                              className={activeTabIsRefreshing ? 'animate-spin' : undefined}
+                              size={14}
+                              aria-hidden='true'
+                            />
+                          }
+                          label={activeTabIsRefreshing ? 'Refreshing tab' : 'Refresh tab'}
                           size='xs'
                           variant='ghost'
                           onClick={handleRefreshActiveTab}
@@ -988,6 +1006,10 @@ interface TabViewProps {
     documentPath: string,
     data: Record<string, unknown>,
   ) => Promise<void> | void;
+  readonly onSaveUserCustomClaims: (
+    uid: string,
+    claims: Record<string, unknown>,
+  ) => Promise<void> | void;
   readonly onScriptChange: (source: string) => void;
   readonly onSelectDocument: (documentPath: string) => void;
   readonly onSelectUser: (uid: string) => void;
@@ -1019,6 +1041,7 @@ function TabView(props: TabViewProps) {
         users={props.users}
         onFilterChange={props.onAuthFilterChange}
         onLoadMore={props.onLoadMoreUsers}
+        onSaveCustomClaims={props.onSaveUserCustomClaims}
         onSelectUser={props.onSelectUser}
       />
     );

@@ -20,4 +20,10 @@ export const SearchUsersRequestSchema = z.object({
   query: z.string(),
 });
 
+export const SetCustomClaimsRequestSchema = z.object({
+  projectId: z.string(),
+  uid: z.string(),
+  claims: z.record(z.string(), z.unknown()),
+});
+
 export const AuthUsersPageSchema = pageOf(AuthUserSchema);

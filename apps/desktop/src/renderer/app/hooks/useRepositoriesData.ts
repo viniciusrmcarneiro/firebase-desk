@@ -1,8 +1,26 @@
-import type { FirestoreQuery, PageRequest, ScriptRunRequest } from '@firebase-desk/repo-contracts';
+import type {
+  AuthUser,
+  FirestoreQuery,
+  PageRequest,
+  ScriptRunRequest,
+} from '@firebase-desk/repo-contracts';
 import { useInfiniteQuery, useMutation, useQuery } from '@tanstack/react-query';
 import { useRepositories } from '../RepositoryProvider.tsx';
 
 const DEFAULT_PAGE_SIZE = 25;
+const AUTH_MANUAL_QUERY_OPTIONS = {
+  gcTime: 0,
+  refetchOnMount: false,
+  refetchOnReconnect: false,
+  refetchOnWindowFocus: false,
+  staleTime: Infinity,
+} as const;
+
+export interface SetCustomClaimsInput {
+  readonly claims: Record<string, unknown>;
+  readonly projectId: string;
+  readonly uid: string;
+}
 
 export function useProjects() {
   const repositories = useRepositories();
@@ -94,12 +112,18 @@ export function useGetDocument(
   });
 }
 
-export function useUsers(projectId: string | null | undefined, limit = DEFAULT_PAGE_SIZE) {
+export function useUsers(
+  projectId: string | null | undefined,
+  limit = DEFAULT_PAGE_SIZE,
+  scopeId = 'default',
+  runId = 0,
+) {
   const repositories = useRepositories();
   return useInfiniteQuery({
     enabled: Boolean(projectId),
+    ...AUTH_MANUAL_QUERY_OPTIONS,
     initialPageParam: undefined as PageRequest['cursor'] | undefined,
-    queryKey: ['auth', projectId, 'users', limit],
+    queryKey: ['auth', scopeId, projectId, 'users', limit, runId],
     queryFn: ({ pageParam }) =>
       repositories.auth.listUsers(projectId ?? '', pageRequest(pageParam, limit)),
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
@@ -110,12 +134,23 @@ export function useSearchUsers(
   projectId: string | null | undefined,
   query: string,
   enabled = true,
+  scopeId = 'default',
+  runId = 0,
 ) {
   const repositories = useRepositories();
   return useQuery({
     enabled: enabled && Boolean(projectId && query.trim()),
-    queryKey: ['auth', projectId, 'users', 'search', query.trim()],
+    ...AUTH_MANUAL_QUERY_OPTIONS,
+    queryKey: ['auth', scopeId, projectId, 'users', 'search', query.trim(), runId],
     queryFn: () => repositories.auth.searchUsers(projectId ?? '', query.trim()),
+  });
+}
+
+export function useSetCustomClaims() {
+  const repositories = useRepositories();
+  return useMutation<AuthUser, Error, SetCustomClaimsInput>({
+    mutationFn: ({ claims, projectId, uid }) =>
+      repositories.auth.setCustomClaims(projectId, uid, claims),
   });
 }
 

@@ -5,6 +5,7 @@ import {
   type IpcResponse,
 } from '@firebase-desk/ipc-schemas';
 import type {
+  AuthUser,
   FirestoreCollectionNode,
   FirestoreDocumentNode,
   FirestoreDocumentResult,
@@ -12,7 +13,12 @@ import type {
   Page,
   PageRequest,
 } from '@firebase-desk/repo-contracts';
-import { AdminFirestoreProvider, FirebaseFirestoreRepository } from '@firebase-desk/repo-firebase';
+import {
+  AdminAuthProvider,
+  AdminFirestoreProvider,
+  FirebaseAuthRepository,
+  FirebaseFirestoreRepository,
+} from '@firebase-desk/repo-firebase';
 import { app, dialog, ipcMain, shell } from 'electron';
 import { readFile } from 'node:fs/promises';
 import { resolveDataMode } from '../app/data-mode.ts';
@@ -53,6 +59,17 @@ export function registerIpcHandlers(): void {
     },
   });
   const firestoreRepository = new FirebaseFirestoreRepository(firestoreProvider);
+  const authProvider = new AdminAuthProvider({
+    async resolveConnection(connectionId) {
+      const project = await projectsRepository.get(connectionId);
+      if (!project) throw new Error(`Connection not found: ${connectionId}`);
+      return {
+        project,
+        credentialJson: project.hasCredential ? await credentialsStore.load(project.id) : null,
+      };
+    },
+  });
+  const authRepository = new FirebaseAuthRepository(authProvider);
 
   const handlers: Partial<{ [C in IpcChannel]: Handler<C>; }> = {
     'health.check': (_request) => ({
@@ -75,12 +92,14 @@ export function registerIpcHandlers(): void {
       const project = await projectsRepository.update(id, patch);
       firestoreRepository.invalidateConnection(id);
       await firestoreProvider.invalidateConnection(id);
+      await authProvider.invalidateConnection(id);
       return project;
     },
     'projects.remove': async ({ id }) => {
       await projectsRepository.remove(id);
       firestoreRepository.invalidateConnection(id);
       await firestoreProvider.invalidateConnection(id);
+      await authProvider.invalidateConnection(id);
     },
     'projects.validateServiceAccount': ({ json }) =>
       projectsRepository.validateServiceAccount(json),
@@ -113,6 +132,16 @@ export function registerIpcHandlers(): void {
       firestoreRepository.getDocument(connectionId, documentPath).then((document) =>
         document ? toIpcDocumentResult(document) : null
       ),
+    'auth.listUsers': async ({ projectId, request }) =>
+      toIpcAuthUserPage(await authRepository.listUsers(projectId, toPageRequest(request))),
+    'auth.getUser': async ({ projectId, uid }) => {
+      const user = await authRepository.getUser(projectId, uid);
+      return user ? toIpcAuthUser(user) : null;
+    },
+    'auth.searchUsers': async ({ projectId, query }) =>
+      (await authRepository.searchUsers(projectId, query)).map(toIpcAuthUser),
+    'auth.setCustomClaims': async ({ claims, projectId, uid }) =>
+      toIpcAuthUser(await authRepository.setCustomClaims(projectId, uid, claims)),
     'settings.load': () => settingsRepository.load(),
     'settings.save': (request) => settingsRepository.save(request),
     'settings.getHotkeyOverrides': () => settingsRepository.getHotkeyOverrides(),
@@ -144,12 +173,33 @@ function errorText(error: unknown): string {
 }
 
 function toPageRequest(
-  request: IpcRequest<'firestore.listDocuments'>['request'],
+  request?: {
+    readonly cursor?: { readonly token: string; } | undefined;
+    readonly limit?: number | undefined;
+  },
 ): PageRequest | undefined {
   if (!request) return undefined;
   return {
     ...(request.limit !== undefined ? { limit: request.limit } : {}),
     ...(request.cursor !== undefined ? { cursor: { token: request.cursor.token } } : {}),
+  };
+}
+
+function toIpcAuthUserPage(page: Page<AuthUser>): IpcResponse<'auth.listUsers'> {
+  return {
+    items: page.items.map(toIpcAuthUser),
+    nextCursor: page.nextCursor ? { token: page.nextCursor.token } : null,
+  };
+}
+
+function toIpcAuthUser(user: AuthUser): NonNullable<IpcResponse<'auth.getUser'>> {
+  return {
+    uid: user.uid,
+    email: user.email,
+    displayName: user.displayName,
+    provider: user.provider,
+    disabled: user.disabled,
+    customClaims: { ...user.customClaims },
   };
 }
 

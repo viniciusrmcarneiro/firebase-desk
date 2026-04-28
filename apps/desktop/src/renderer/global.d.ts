@@ -71,6 +71,9 @@ declare global {
     readonly searchUsers: (
       request: IpcRequest<'auth.searchUsers'>,
     ) => Promise<IpcResponse<'auth.searchUsers'>>;
+    readonly setCustomClaims: (
+      request: IpcRequest<'auth.setCustomClaims'>,
+    ) => Promise<IpcResponse<'auth.setCustomClaims'>>;
   }
 
   interface DesktopApi {

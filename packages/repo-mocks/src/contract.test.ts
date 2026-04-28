@@ -86,11 +86,16 @@ describe('repo-mocks contract conformance', () => {
     const page = await repo.listUsers('p', { limit: 2 });
     expect(page.items).toHaveLength(2);
     expect(page.nextCursor?.token).toBe('2');
-    const found = await repo.searchUsers('p', 'ada');
+    const found = await repo.searchUsers('p', 'ada@example.com');
     expect(found.length).toBe(1);
     const user = await repo.getUser('p', 'u_ada');
     expect(user?.uid).toBe('u_ada');
     expect(user?.customClaims['permissions']).toEqual(['read', 'write', 'billing']);
+    const updated = await repo.setCustomClaims('p', 'u_ada', { role: 'owner' });
+    expect(updated.customClaims).toEqual({ role: 'owner' });
+    await expect(repo.getUser('p', 'u_ada')).resolves.toMatchObject({
+      customClaims: { role: 'owner' },
+    });
   });
 
   it('settings repo: load/save with hotkey overrides', async () => {

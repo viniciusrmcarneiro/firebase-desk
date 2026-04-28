@@ -4,6 +4,8 @@ import {
   Button,
   DataTable,
   type DataTableColumn,
+  Dialog,
+  DialogContent,
   EmptyState,
   InlineAlert,
   Input,
@@ -14,8 +16,9 @@ import {
   ResizablePanel,
   ResizablePanelGroup,
 } from '@firebase-desk/ui';
-import { ShieldCheck, UserRound, Users } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { Pencil, ShieldCheck, UserRound, Users } from 'lucide-react';
+import { useEffect, useState } from 'react';
+import { CodeEditor } from '../../code-editor/CodeEditor.tsx';
 
 export interface AuthUsersSurfaceProps {
   readonly errorMessage?: string | null;
@@ -25,6 +28,9 @@ export interface AuthUsersSurfaceProps {
   readonly isLoading?: boolean;
   readonly onFilterChange: (value: string) => void;
   readonly onLoadMore: () => void;
+  readonly onSaveCustomClaims?:
+    | ((uid: string, claims: Record<string, unknown>) => Promise<void> | void)
+    | undefined;
   readonly onSelectUser: (uid: string) => void;
   readonly selectedUser?: AuthUser | null;
   readonly selectedUserId?: string | null;
@@ -40,15 +46,15 @@ export function AuthUsersSurface(
     isLoading = false,
     onFilterChange,
     onLoadMore,
+    onSaveCustomClaims,
     onSelectUser,
     selectedUser = null,
     selectedUserId = null,
     users,
   }: AuthUsersSurfaceProps,
 ) {
-  const filteredUsers = useMemo(() => filterUsers(users, filterValue), [filterValue, users]);
-  const selectedVisibleUser = filteredUsers.find((user) => user.uid === selectedUserId)
-    ?? filteredUsers[0]
+  const selectedVisibleUser = users.find((user) => user.uid === selectedUserId)
+    ?? users[0]
     ?? selectedUser;
   const isWide = useMediaQuery('(min-width: 900px)');
   const direction = isWide ? 'horizontal' : 'vertical';
@@ -71,7 +77,7 @@ export function AuthUsersSurface(
                 <Input
                   aria-label='Filter users'
                   className='max-w-65'
-                  placeholder='Filter users'
+                  placeholder='UID or email'
                   value={filterValue}
                   onChange={(event) => onFilterChange(event.currentTarget.value)}
                 />
@@ -80,7 +86,7 @@ export function AuthUsersSurface(
               <span className='flex min-w-0 items-center gap-2'>
                 <Users size={15} aria-hidden='true' />
                 <span className='truncate'>Users</span>
-                <Badge>{isLoading ? 'loading' : `${filteredUsers.length}`}</Badge>
+                <Badge>{isLoading ? 'loading' : `${users.length}`}</Badge>
               </span>
             </PanelHeader>
             <PanelBody className='min-h-0 p-0'>
@@ -94,8 +100,9 @@ export function AuthUsersSurface(
               <AuthUsersTable
                 hasMore={hasMore}
                 isFetchingMore={isFetchingMore}
+                isLoading={isLoading}
                 selectedUserId={selectedVisibleUser?.uid ?? null}
-                users={filteredUsers}
+                users={users}
                 onLoadMore={onLoadMore}
                 onSelectUser={onSelectUser}
               />
@@ -108,7 +115,10 @@ export function AuthUsersSurface(
           defaultSize={isWide ? '36%' : '42%'}
           minSize={isWide ? '300px' : '220px'}
         >
-          <AuthUserDetail user={selectedVisibleUser ?? null} />
+          <AuthUserDetail
+            user={selectedVisibleUser ?? null}
+            onSaveCustomClaims={onSaveCustomClaims}
+          />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>
@@ -118,6 +128,7 @@ export function AuthUsersSurface(
 interface AuthUsersTableProps {
   readonly hasMore: boolean;
   readonly isFetchingMore: boolean;
+  readonly isLoading: boolean;
   readonly onLoadMore: () => void;
   readonly onSelectUser: (uid: string) => void;
   readonly selectedUserId: string | null;
@@ -127,8 +138,25 @@ interface AuthUsersTableProps {
 type AuthUsersTableRow = { readonly kind: 'user'; readonly user: AuthUser; };
 
 function AuthUsersTable(
-  { hasMore, isFetchingMore, onLoadMore, onSelectUser, selectedUserId, users }: AuthUsersTableProps,
+  {
+    hasMore,
+    isFetchingMore,
+    isLoading,
+    onLoadMore,
+    onSelectUser,
+    selectedUserId,
+    users,
+  }: AuthUsersTableProps,
 ) {
+  if (!users.length && isLoading) {
+    return (
+      <LoadingState
+        description='Fetching Authentication users for this project.'
+        title='Loading users'
+      />
+    );
+  }
+
   if (!users.length) {
     return <EmptyState icon={<UserRound size={20} aria-hidden='true' />} title='No users' />;
   }
@@ -198,10 +226,55 @@ function AuthUsersTable(
   );
 }
 
-function AuthUserDetail({ user }: { readonly user: AuthUser | null; }) {
+function LoadingState(
+  { description, title }: { readonly description: string; readonly title: string; },
+) {
+  return (
+    <div role='status' aria-live='polite' className='grid h-full place-items-center'>
+      <EmptyState
+        description={description}
+        title={title}
+      />
+    </div>
+  );
+}
+
+function AuthUserDetail(
+  {
+    onSaveCustomClaims,
+    user,
+  }: {
+    readonly onSaveCustomClaims?:
+      | ((uid: string, claims: Record<string, unknown>) => Promise<void> | void)
+      | undefined;
+    readonly user: AuthUser | null;
+  },
+) {
+  const [editorOpen, setEditorOpen] = useState(false);
+
+  useEffect(() => {
+    if (!user) setEditorOpen(false);
+  }, [user]);
+
   return (
     <Panel className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]'>
-      <PanelHeader actions={user ? <Badge>claims</Badge> : null}>
+      <PanelHeader
+        actions={user
+          ? (
+            <div className='flex items-center gap-2'>
+              <Badge>claims</Badge>
+              {onSaveCustomClaims
+                ? (
+                  <Button size='xs' variant='secondary' onClick={() => setEditorOpen(true)}>
+                    <Pencil size={13} aria-hidden='true' />
+                    Edit
+                  </Button>
+                )
+                : null}
+            </div>
+          )
+          : null}
+      >
         <span className='flex min-w-0 items-center gap-2'>
           <ShieldCheck size={15} aria-hidden='true' />
           <span className='truncate'>User detail</span>
@@ -228,6 +301,12 @@ function AuthUserDetail({ user }: { readonly user: AuthUser | null; }) {
             />
           )}
       </PanelBody>
+      <ClaimsEditorModal
+        open={editorOpen}
+        user={user}
+        onOpenChange={setEditorOpen}
+        onSaveCustomClaims={onSaveCustomClaims}
+      />
     </Panel>
   );
 }
@@ -253,15 +332,84 @@ function JsonPreview({ value }: { readonly value: unknown; }) {
   );
 }
 
-function filterUsers(users: ReadonlyArray<AuthUser>, filterValue: string): ReadonlyArray<AuthUser> {
-  const query = filterValue.trim().toLowerCase();
-  if (!query) return users;
-  return users.filter((user) =>
-    user.uid.toLowerCase().includes(query)
-    || user.email?.toLowerCase().includes(query)
-    || user.displayName?.toLowerCase().includes(query)
-    || user.provider.toLowerCase().includes(query)
+function ClaimsEditorModal(
+  {
+    onOpenChange,
+    onSaveCustomClaims,
+    open,
+    user,
+  }: {
+    readonly onOpenChange: (open: boolean) => void;
+    readonly onSaveCustomClaims?:
+      | ((uid: string, claims: Record<string, unknown>) => Promise<void> | void)
+      | undefined;
+    readonly open: boolean;
+    readonly user: AuthUser | null;
+  },
+) {
+  const [source, setSource] = useState('{}');
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
+
+  useEffect(() => {
+    if (open && user) {
+      setSource(JSON.stringify(user.customClaims, null, 2));
+      setError(null);
+      setIsSaving(false);
+    }
+  }, [open, user]);
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent
+        className='w-[min(680px,calc(100vw-32px))]'
+        description={user?.uid ?? null}
+        title='Custom claims'
+      >
+        <div className='h-[min(360px,55vh)] overflow-hidden rounded-md border border-border-subtle'>
+          <CodeEditor language='json' value={source} onChange={setSource} />
+        </div>
+        {error ? <InlineAlert variant='danger'>{error}</InlineAlert> : null}
+        <div className='flex justify-end gap-2'>
+          <Button disabled={isSaving} variant='ghost' onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
+          <Button
+            disabled={isSaving}
+            variant='primary'
+            onClick={async () => {
+              if (!user || !onSaveCustomClaims) return;
+              setIsSaving(true);
+              setError(null);
+              try {
+                await onSaveCustomClaims(user.uid, parseClaimsJson(source));
+                onOpenChange(false);
+              } catch (caught) {
+                setError(messageFromError(caught, 'Could not save custom claims.'));
+              } finally {
+                setIsSaving(false);
+              }
+            }}
+          >
+            {isSaving ? 'Saving' : 'Save'}
+          </Button>
+        </div>
+      </DialogContent>
+    </Dialog>
   );
+}
+
+function parseClaimsJson(source: string): Record<string, unknown> {
+  const value = JSON.parse(source) as unknown;
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
+  }
+  throw new Error('Custom claims JSON must be an object.');
+}
+
+function messageFromError(error: unknown, fallback: string): string {
+  if (error instanceof Error) return error.message;
+  return fallback;
 }
 
 function useMediaQuery(query: string): boolean {

@@ -261,9 +261,9 @@ Move this ahead of real Firebase integration so packaging, artifacts, and instal
 
 ## Phase 10: Authentication
 
-- [ ] List users with pagination.
-- [ ] List users from emulator target.
-- [ ] Filter/search users.
-- [ ] View selected user details.
-- [ ] View custom claims.
-- [ ] Decide whether MVP edits custom claims.
+- [x] List users with pagination.
+- [x] List users from emulator target.
+- [x] Filter/search users.
+- [x] View selected user details.
+- [x] View custom claims.
+- [x] Decide whether MVP edits custom claims.
