@@ -320,6 +320,7 @@ export const JsQueryDefault: Story = {
       <JsQuerySurface
         result={jsQueryResult}
         source={JS_QUERY_SAMPLE_SOURCE}
+        onCancel={() => {}}
         onRun={() => {}}
         onSourceChange={() => {}}
       />

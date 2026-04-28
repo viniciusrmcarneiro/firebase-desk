@@ -87,6 +87,7 @@ describe('useFirestoreTabState', () => {
       25,
       1,
       true,
+      tab.id,
     );
     expect(pushHistory).toHaveBeenCalledWith(tab.id, 'orders');
     expect(recordInteraction).toHaveBeenCalledWith({
@@ -118,6 +119,7 @@ describe('useFirestoreTabState', () => {
       25,
       2,
       true,
+      tab.id,
     );
   });
 
@@ -136,7 +138,7 @@ describe('useFirestoreTabState', () => {
       result.current.runQuery();
     });
 
-    expect(getDocumentHook).toHaveBeenLastCalledWith('emu', 'orders/ord_1024', 1);
+    expect(getDocumentHook).toHaveBeenLastCalledWith('emu', 'orders/ord_1024', 1, tab.id);
   });
 
   it('keeps selected document scoped to current query rows', () => {

@@ -100,6 +100,10 @@ export const IPC_CHANNELS = {
     request: ScriptRunRequestSchema,
     response: ScriptRunResultSchema,
   },
+  'scriptRunner.cancel': {
+    request: z.object({ runId: z.string() }),
+    response: z.void(),
+  },
   'auth.listUsers': {
     request: ListUsersRequestSchema,
     response: AuthUsersPageSchema,

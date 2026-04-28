@@ -10,4 +10,8 @@ export class UnsupportedLiveScriptRunnerRepository implements ScriptRunnerReposi
   async run(_request: ScriptRunRequest): Promise<ScriptRunResult> {
     throw new Error(SCRIPT_RUNNER_UNAVAILABLE_MESSAGE);
   }
+
+  async cancel(_runId: string): Promise<void> {
+    throw new Error(SCRIPT_RUNNER_UNAVAILABLE_MESSAGE);
+  }
 }

@@ -59,6 +59,9 @@ declare global {
     readonly run: (
       request: IpcRequest<'scriptRunner.run'>,
     ) => Promise<IpcResponse<'scriptRunner.run'>>;
+    readonly cancel: (
+      request: IpcRequest<'scriptRunner.cancel'>,
+    ) => Promise<IpcResponse<'scriptRunner.cancel'>>;
   }
 
   interface DesktopAuthApi {

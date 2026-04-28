@@ -247,17 +247,23 @@ Move this ahead of real Firebase integration so packaging, artifacts, and instal
 
 ## Phase 9: JavaScript Query
 
-- [ ] Define script context API in `packages/script-runner`.
-- [ ] Run script for active project.
-- [ ] Run script against emulator target.
-- [ ] Capture `console.log` output.
-- [ ] Capture thrown errors.
-- [ ] Detect returned document snapshot.
-- [ ] Detect returned query snapshot.
-- [ ] Detect returned arrays/plain data.
-- [ ] Show "No data to show" for empty/unsupported returns.
-- [ ] Add execution timeout.
-- [ ] Move runner to isolated process before enabling real writes (within `packages/script-runner`).
+- [x] Define script context API in `packages/script-runner`.
+- [x] Execute plain JavaScript only; no TypeScript/compiler step in MVP.
+- [x] Run script for active connection by `connectionId`.
+- [x] Expose `project.id`, `project.projectId`, `project.name`, and `project.target`.
+- [x] Run script against emulator target.
+- [x] Expose limited Firebase Admin context: `db`, `auth`, and `admin.firestore()`/`admin.auth()`.
+- [x] Make `db.batch()` available in the sandbox.
+- [x] Capture `console.log` output.
+- [x] Capture thrown errors.
+- [x] Detect returned document snapshot.
+- [x] Detect returned query snapshot.
+- [x] Detect returned arrays/plain data.
+- [x] Normalize Firestore native values through encoded value format.
+- [x] Show "No data to show" for empty/unsupported returns.
+- [x] Run each execution in a short-lived child process.
+- [x] Add user cancellation with normal cancelled result state.
+- [x] Keep execution timeout deferred for post-MVP/next iteration.
 
 ## Phase 10: Authentication
 

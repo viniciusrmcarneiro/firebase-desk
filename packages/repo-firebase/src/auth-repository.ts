@@ -1,5 +1,5 @@
 import type { AuthRepository, AuthUser, Page, PageRequest } from '@firebase-desk/repo-contracts';
-import type { Auth, UserRecord } from 'firebase-admin/auth';
+import type { UserRecord } from 'firebase-admin/auth';
 import type { AdminAuthProvider } from './admin-auth-provider.ts';
 
 const DEFAULT_LIMIT = 25;
@@ -84,7 +84,7 @@ function toAuthUser(user: UserRecord): AuthUser {
     displayName: user.displayName ?? null,
     provider: user.providerData[0]?.providerId ?? (user.email ? 'password' : 'custom'),
     disabled: user.disabled,
-    customClaims: { ...(user.customClaims ?? {}) },
+    customClaims: { ...user.customClaims },
   };
 }
 

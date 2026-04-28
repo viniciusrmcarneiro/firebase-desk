@@ -108,7 +108,7 @@ describe('repo-mocks contract conformance', () => {
 
   it('script runner covers stream, errors, empty, arrays, plain objects, and document-like values', async () => {
     const repo = new MockScriptRunnerRepository();
-    const result = await repo.run({ projectId: 'p', source: 'noop' });
+    const result = await repo.run({ runId: 'run-1', connectionId: 'p', source: 'noop' });
     expect(result.logs.length).toBeGreaterThan(0);
     expect(result.stream?.some((item) => item.label.includes('QuerySnapshot'))).toBe(true);
     const querySnapshot = result.stream?.find((item) => item.label === 'yield QuerySnapshot');
@@ -122,16 +122,18 @@ describe('repo-mocks contract conformance', () => {
       ]),
     );
 
-    await expect(repo.run({ projectId: 'p', source: 'throw new Error()' })).resolves
+    await expect(repo.run({ runId: 'run-2', connectionId: 'p', source: 'throw new Error()' }))
+      .resolves
       .toMatchObject({ errors: [{ code: 'permission-denied' }] });
-    await expect(repo.run({ projectId: 'p', source: 'empty' })).resolves
+    await expect(repo.run({ runId: 'run-3', connectionId: 'p', source: 'empty' })).resolves
       .toMatchObject({ returnValue: null, stream: [] });
-    await expect(repo.run({ projectId: 'p', source: 'array' })).resolves
+    await expect(repo.run({ runId: 'run-4', connectionId: 'p', source: 'array' })).resolves
       .toMatchObject({ stream: [{ label: 'yield array' }] });
-    await expect(repo.run({ projectId: 'p', source: 'plain' })).resolves
+    await expect(repo.run({ runId: 'run-5', connectionId: 'p', source: 'plain' })).resolves
       .toMatchObject({ stream: [{ label: 'yield plain object' }] });
-    await expect(repo.run({ projectId: 'p', source: 'document' })).resolves
+    await expect(repo.run({ runId: 'run-6', connectionId: 'p', source: 'document' })).resolves
       .toMatchObject({ stream: [{ label: 'yield document-like value' }] });
+    await expect(repo.cancel('run-6')).resolves.toBeUndefined();
   });
 
   it('fixture builders create targeted contract-shaped data', () => {

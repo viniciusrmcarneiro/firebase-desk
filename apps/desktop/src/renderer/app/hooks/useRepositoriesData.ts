@@ -78,13 +78,14 @@ export function useRunQuery(
   limit = DEFAULT_PAGE_SIZE,
   runId = 0,
   enabled = true,
+  scopeId = 'default',
 ) {
   const repositories = useRepositories();
   return useInfiniteQuery({
     enabled: enabled && Boolean(query),
     gcTime: 0,
     initialPageParam: undefined as PageRequest['cursor'] | undefined,
-    queryKey: ['firestore', 'query', query, limit, runId],
+    queryKey: ['firestore', 'query', scopeId, query, limit, runId],
     queryFn: ({ pageParam }) =>
       repositories.firestore.runQuery(
         query ?? { connectionId: '', path: '' },
@@ -100,12 +101,13 @@ export function useGetDocument(
   connectionId: string | null | undefined,
   documentPath: string | null | undefined,
   runId = 0,
+  scopeId = 'default',
 ) {
   const repositories = useRepositories();
   return useQuery({
     enabled: Boolean(connectionId && documentPath),
     gcTime: 0,
-    queryKey: ['firestore', connectionId, 'document', documentPath, runId],
+    queryKey: ['firestore', 'document', scopeId, connectionId, documentPath, runId],
     queryFn: () => repositories.firestore.getDocument(connectionId ?? '', documentPath ?? ''),
     refetchOnWindowFocus: false,
     staleTime: 0,
@@ -158,6 +160,13 @@ export function useRunScript() {
   const repositories = useRepositories();
   return useMutation({
     mutationFn: (request: ScriptRunRequest) => repositories.scriptRunner.run(request),
+  });
+}
+
+export function useCancelScript() {
+  const repositories = useRepositories();
+  return useMutation({
+    mutationFn: (runId: string) => repositories.scriptRunner.cancel(runId),
   });
 }
 

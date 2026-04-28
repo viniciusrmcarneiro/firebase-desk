@@ -48,6 +48,7 @@ const api = {
   },
   scriptRunner: {
     run: (request: IpcRequest<'scriptRunner.run'>) => invoke('scriptRunner.run', request),
+    cancel: (request: IpcRequest<'scriptRunner.cancel'>) => invoke('scriptRunner.cancel', request),
   },
   auth: {
     listUsers: (request: IpcRequest<'auth.listUsers'>) => invoke('auth.listUsers', request),

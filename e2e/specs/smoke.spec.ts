@@ -54,6 +54,30 @@ test('desktop window boots and IPC health round-trips', async () => {
   }
 });
 
+test('mock JavaScript Query runs and renders streamed output', async () => {
+  const userDataDir = await mkdtemp(join(tmpdir(), 'firebase-desk-e2e-'));
+  const app = await launchDesktop({ args: ['--data-mode=mock'], userDataDir });
+  try {
+    const page = await app.firstWindow();
+    await expect(page).toHaveTitle(/Firebase Desk/);
+
+    const tree = page.getByRole('tree', { name: 'Account tree' });
+    await expect(tree.getByRole('treeitem', { name: /Local Emulator/ })).toBeVisible();
+    await tree.getByRole('treeitem', { name: /Local Emulator/ }).click();
+    await tree.getByRole('treeitem', { name: /JavaScript Query/ }).click();
+
+    await expect(page.getByRole('button', { name: 'Run' })).toBeVisible();
+    await page.getByRole('button', { name: 'Run' }).click();
+
+    await expect(page.getByText('yield DocumentSnapshot')).toBeVisible();
+    await expect(page.getByText('yield QuerySnapshot')).toBeVisible();
+    await expect(page.getByText(/^\d+(?:\.\d{3}s|ms)$/)).toBeVisible();
+  } finally {
+    await app.close();
+    await rm(userDataDir, { force: true, recursive: true });
+  }
+});
+
 test('Firestore reads real emulator collections, documents, queries, cursors, and subcollections', async () => {
   const userDataDir = await mkdtemp(join(tmpdir(), 'firebase-desk-e2e-'));
   const app = await launchDesktop({ args: ['--data-mode=live'], userDataDir });

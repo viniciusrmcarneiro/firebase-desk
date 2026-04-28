@@ -12,15 +12,21 @@ import type {
   FirestoreQuery,
   Page,
   PageRequest,
+  ScriptRunResult,
 } from '@firebase-desk/repo-contracts';
 import {
   AdminAuthProvider,
   AdminFirestoreProvider,
   FirebaseAuthRepository,
+  type FirebaseConnectionResolver,
   FirebaseFirestoreRepository,
 } from '@firebase-desk/repo-firebase';
+import { ProcessScriptRunnerRepository } from '@firebase-desk/script-runner';
 import { app, dialog, ipcMain, shell } from 'electron';
+import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { resolveDataMode } from '../app/data-mode.ts';
 import { MainProjectsRepository } from '../projects/main-projects-repository.ts';
 import { MainSettingsRepository } from '../settings/main-settings-repository.ts';
@@ -48,7 +54,7 @@ export function registerIpcHandlers(): void {
   const projectsStore = new ProjectsStore(userDataPath);
   const credentialsStore = new CredentialsStore(userDataPath);
   const projectsRepository = new MainProjectsRepository(projectsStore, credentialsStore);
-  const firestoreProvider = new AdminFirestoreProvider({
+  const connectionResolver: FirebaseConnectionResolver = {
     async resolveConnection(connectionId) {
       const project = await projectsRepository.get(connectionId);
       if (!project) throw new Error(`Connection not found: ${connectionId}`);
@@ -57,17 +63,12 @@ export function registerIpcHandlers(): void {
         credentialJson: project.hasCredential ? await credentialsStore.load(project.id) : null,
       };
     },
-  });
+  };
+  const firestoreProvider = new AdminFirestoreProvider(connectionResolver);
   const firestoreRepository = new FirebaseFirestoreRepository(firestoreProvider);
-  const authProvider = new AdminAuthProvider({
-    async resolveConnection(connectionId) {
-      const project = await projectsRepository.get(connectionId);
-      if (!project) throw new Error(`Connection not found: ${connectionId}`);
-      return {
-        project,
-        credentialJson: project.hasCredential ? await credentialsStore.load(project.id) : null,
-      };
-    },
+  const authProvider = new AdminAuthProvider(connectionResolver);
+  const scriptRunnerRepository = new ProcessScriptRunnerRepository(connectionResolver, {
+    workerPath: scriptRunnerWorkerPath(),
   });
   const authRepository = new FirebaseAuthRepository(authProvider);
 
@@ -132,6 +133,11 @@ export function registerIpcHandlers(): void {
       firestoreRepository.getDocument(connectionId, documentPath).then((document) =>
         document ? toIpcDocumentResult(document) : null
       ),
+    'scriptRunner.run': async (request) =>
+      toIpcScriptRunResult(await scriptRunnerRepository.run(request)),
+    'scriptRunner.cancel': async ({ runId }) => {
+      await scriptRunnerRepository.cancel(runId);
+    },
     'auth.listUsers': async ({ projectId, request }) =>
       toIpcAuthUserPage(await authRepository.listUsers(projectId, toPageRequest(request))),
     'auth.getUser': async ({ projectId, uid }) => {
@@ -165,6 +171,15 @@ export function registerIpcHandlers(): void {
       }
     });
   }
+}
+
+function scriptRunnerWorkerPath(): string {
+  const currentDir = dirname(fileURLToPath(import.meta.url));
+  const builtPath = resolve(currentDir, 'script-runner-worker.js');
+  if (existsSync(builtPath)) return builtPath;
+  const sourcePath = resolve(currentDir, '../script-runner-worker.ts');
+  if (existsSync(sourcePath)) return sourcePath;
+  return builtPath;
 }
 
 function errorText(error: unknown): string {
@@ -263,5 +278,35 @@ function toIpcDocumentResult(
     ...(document.subcollections
       ? { subcollections: document.subcollections.map(toIpcCollectionNode) }
       : {}),
+  };
+}
+
+function toIpcScriptRunResult(result: ScriptRunResult): IpcResponse<'scriptRunner.run'> {
+  return {
+    returnValue: result.returnValue,
+    ...(result.stream
+      ? {
+        stream: result.stream.map((item) => ({
+          id: item.id,
+          label: item.label,
+          badge: item.badge,
+          view: item.view,
+          value: item.value,
+        })),
+      }
+      : {}),
+    logs: result.logs.map((log) => ({
+      level: log.level,
+      message: log.message,
+      timestamp: log.timestamp,
+    })),
+    errors: result.errors.map((error) => ({
+      ...(error.name ? { name: error.name } : {}),
+      ...(error.code ? { code: error.code } : {}),
+      message: error.message,
+      ...(error.stack ? { stack: error.stack } : {}),
+    })),
+    durationMs: result.durationMs,
+    ...(result.cancelled !== undefined ? { cancelled: result.cancelled } : {}),
   };
 }

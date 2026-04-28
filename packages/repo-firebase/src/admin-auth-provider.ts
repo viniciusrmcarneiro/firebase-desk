@@ -12,6 +12,8 @@ interface CachedAuth {
   readonly cacheKey: string;
 }
 
+const noop = () => {};
+
 export class AdminAuthProvider {
   private readonly cache = new Map<string, CachedAuth>();
   private envQueue: Promise<void> = Promise.resolve();
@@ -65,7 +67,7 @@ export class AdminAuthProvider {
     operation: () => Promise<T>,
   ): Promise<T> {
     const nextHost = authEmulatorHostFor(config);
-    let release = () => {};
+    let release = noop;
     const previous = this.envQueue.catch(() => undefined);
     this.envQueue = new Promise<void>((resolve) => {
       release = resolve;

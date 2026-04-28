@@ -24,6 +24,8 @@ import {
 interface UseWorkspaceTreeInput {
   readonly activeTab: WorkspaceTab | undefined;
   readonly openFirestoreTab: (connectionId: string, path: string) => string;
+  readonly openFirestoreTabInNewTab: (connectionId: string, path: string) => string;
+  readonly openJsTabInNewTab: (connectionId: string) => string;
   readonly openToolTab: (
     kind: Exclude<WorkspaceTabKind, 'firestore-query'>,
     connectionId: string,
@@ -37,6 +39,8 @@ export function useWorkspaceTree(
   {
     activeTab,
     openFirestoreTab,
+    openFirestoreTabInNewTab,
+    openJsTabInNewTab,
     openToolTab,
     projects,
     selectedTreeItemId,
@@ -159,7 +163,7 @@ export function useWorkspaceTree(
       return;
     }
     if (parsed.kind === 'script' && parsed.connectionId) {
-      const tabId = openToolTab('js-query', parsed.connectionId);
+      const tabId = openJsTabInNewTab(parsed.connectionId);
       tabActions.recordInteraction({
         activeTabId: tabId,
         path: 'scripts/default',
@@ -168,7 +172,7 @@ export function useWorkspaceTree(
       return;
     }
     if (!parsed.connectionId || !parsed.path) return;
-    const tabId = openFirestoreTab(parsed.connectionId, parsed.path);
+    const tabId = openFirestoreTabInNewTab(parsed.connectionId, parsed.path);
     tabActions.recordInteraction({ activeTabId: tabId, path: parsed.path, selectedTreeItemId: id });
   }
 

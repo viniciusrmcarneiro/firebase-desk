@@ -44,14 +44,17 @@ vi.mock('@monaco-editor/react', () => ({
   default: (
     {
       onChange,
+      options,
       value,
     }: {
       readonly onChange?: (value: string) => void;
+      readonly options?: { readonly readOnly?: boolean; };
       readonly value: string;
     },
   ) => (
     <textarea
       data-testid='monaco'
+      readOnly={options?.readOnly ?? false}
       value={value}
       onChange={(event) => onChange?.(event.currentTarget.value)}
     />
@@ -800,6 +803,7 @@ describe('feature surfaces', () => {
       <JsQuerySurface
         result={scriptResult}
         source={JS_QUERY_SAMPLE_SOURCE}
+        onCancel={() => {}}
         onRun={onRun}
         onSourceChange={() => {}}
       />,
@@ -813,5 +817,39 @@ describe('feature surfaces', () => {
     fireEvent.click(screen.getByText('yield QuerySnapshot'));
     expect(await screen.findByRole('tab', { name: /Tree/ })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /Logs/ })).toBeTruthy();
+  });
+
+  it('JsQuerySurface switches Run to Cancel while running', () => {
+    const onCancel = vi.fn();
+    renderWithAppearance(
+      <JsQuerySurface
+        isRunning
+        result={null}
+        source={JS_QUERY_SAMPLE_SOURCE}
+        onCancel={onCancel}
+        onRun={() => {}}
+        onSourceChange={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Cancel' }));
+
+    expect(screen.getByText(/elapsed/)).toBeTruthy();
+    expect(screen.getByTestId('monaco')).toHaveProperty('readOnly', true);
+    expect(onCancel).toHaveBeenCalledTimes(1);
+  });
+
+  it('JsQuerySurface formats completed durations with millisecond precision', () => {
+    renderWithAppearance(
+      <JsQuerySurface
+        result={{ ...scriptResult, durationMs: 1234 }}
+        source={JS_QUERY_SAMPLE_SOURCE}
+        onCancel={() => {}}
+        onRun={() => {}}
+        onSourceChange={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('1.234s').getAttribute('title')).toBe('1234ms');
   });
 });

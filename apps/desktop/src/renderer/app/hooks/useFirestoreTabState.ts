@@ -71,17 +71,20 @@ export function useFirestoreTabState(
     ? queryRequest
     : null;
   const submittedQuery = activeQueryRequest?.query ?? null;
+  const queryScopeId = activeTab?.kind === 'firestore-query' ? activeTab.id : 'inactive';
   const queryRequestIsDocument = submittedQuery ? isDocumentPath(submittedQuery.path) : false;
   const queryResult = useRunQuery(
     queryRequestIsDocument ? null : submittedQuery,
     activeQueryRequest?.limit ?? activeDraft.limit,
     activeQueryRequest?.runId ?? 0,
     activeTab?.kind === 'firestore-query' && Boolean(submittedQuery) && !queryRequestIsDocument,
+    queryScopeId,
   );
   const queryDocumentResult = useGetDocument(
     queryRequestIsDocument ? submittedQuery?.connectionId : null,
     queryRequestIsDocument ? submittedQuery?.path : null,
     activeQueryRequest?.runId ?? 0,
+    queryScopeId,
   );
   const queryRows = queryRequestIsDocument
     ? queryDocumentResult.data ? [queryDocumentResult.data] : []

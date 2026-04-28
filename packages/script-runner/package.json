@@ -3,7 +3,7 @@
   "version": "0.0.0",
   "private": true,
   "license": "MIT",
-  "description": "Phase 2 marker package. Isolated worker runtime lands in Phase 6.",
+  "description": "JavaScript query runner for Firebase Desk.",
   "type": "module",
   "main": "./src/index.ts",
   "types": "./src/index.ts",
@@ -13,6 +13,11 @@
     "typecheck": "tsc -b",
     "test": "vitest run --passWithNoTests",
     "build": "tsc -b"
+  },
+  "dependencies": {
+    "@firebase-desk/data-format": "workspace:*",
+    "@firebase-desk/repo-contracts": "workspace:*",
+    "firebase-admin": "13.8.0"
   },
   "devDependencies": {
     "@firebase-desk/config-oxlint": "workspace:*",

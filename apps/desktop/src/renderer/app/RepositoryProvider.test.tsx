@@ -39,6 +39,12 @@ describe('createRepositories', () => {
 
   it('does not fall back to mock feature repositories in live data mode', async () => {
     const listUsers = vi.fn(async () => ({ items: [], nextCursor: null }));
+    const runScript = vi.fn(async () => ({
+      returnValue: 1,
+      logs: [],
+      errors: [],
+      durationMs: 1,
+    }));
     vi.stubGlobal('firebaseDesk', {
       auth: {
         listUsers,
@@ -48,6 +54,10 @@ describe('createRepositories', () => {
       },
       projects: {
         list: vi.fn(async () => []),
+      },
+      scriptRunner: {
+        run: runScript,
+        cancel: vi.fn(async () => {}),
       },
       settings: {
         load: vi.fn(async () => ({ ...snapshot, dataMode: 'live' as const })),
@@ -64,7 +74,16 @@ describe('createRepositories', () => {
       nextCursor: null,
     });
     expect(listUsers).toHaveBeenCalledWith({ projectId: 'demo-local' });
-    await expect(repositories.scriptRunner.run({ projectId: 'demo-local', source: 'return 1;' }))
-      .rejects.toThrow('JavaScript Query live execution is not available yet.');
+    await expect(repositories.scriptRunner.run({
+      runId: 'run-1',
+      connectionId: 'emu',
+      source: 'return 1;',
+    }))
+      .resolves.toMatchObject({ returnValue: 1 });
+    expect(runScript).toHaveBeenCalledWith({
+      runId: 'run-1',
+      connectionId: 'emu',
+      source: 'return 1;',
+    });
   });
 });
