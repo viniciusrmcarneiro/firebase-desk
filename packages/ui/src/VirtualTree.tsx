@@ -1,6 +1,13 @@
 import { density as densityTokens, type DensityName } from '@firebase-desk/design-tokens';
-import { type KeyboardEvent, type ReactNode, useCallback, useState } from 'react';
-import { VirtualList } from './VirtualList.tsx';
+import { useVirtualizer } from '@tanstack/react-virtual';
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 
 export interface VirtualTreeNode {
   readonly id: string;
@@ -34,16 +41,44 @@ export function VirtualTree(
   }: VirtualTreeProps,
 ) {
   const [focusedIndex, setFocusedIndex] = useState(0);
+  const parentRef = useRef<HTMLDivElement>(null);
+  const shouldFocusRef = useRef(false);
   const resolvedRowHeight = rowHeight ?? densityTokens[density].treeRowHeight;
+  const virtualizer = useVirtualizer({
+    count: flattenedNodes.length,
+    getScrollElement: () => parentRef.current,
+    estimateSize: () => resolvedRowHeight,
+    overscan: 8,
+  });
+
+  useEffect(() => {
+    setFocusedIndex((current) => clampIndex(current, flattenedNodes.length));
+  }, [flattenedNodes.length]);
+
+  const moveFocus = useCallback(
+    (index: number) => {
+      const next = clampIndex(index, flattenedNodes.length);
+      shouldFocusRef.current = true;
+      setFocusedIndex(next);
+      virtualizer.scrollToIndex(next, { align: 'auto' });
+    },
+    [flattenedNodes.length, virtualizer],
+  );
 
   const handleKeyDown = useCallback(
     (e: KeyboardEvent<HTMLDivElement>, index: number, node: VirtualTreeNode) => {
       if (e.key === 'ArrowDown') {
         e.preventDefault();
-        setFocusedIndex(Math.min(index + 1, flattenedNodes.length - 1));
+        moveFocus(index + 1);
       } else if (e.key === 'ArrowUp') {
         e.preventDefault();
-        setFocusedIndex(Math.max(index - 1, 0));
+        moveFocus(index - 1);
+      } else if (e.key === 'Home') {
+        e.preventDefault();
+        moveFocus(0);
+      } else if (e.key === 'End') {
+        e.preventDefault();
+        moveFocus(flattenedNodes.length - 1);
       } else if (e.key === 'Enter' || e.key === ' ') {
         if (!node.hasChildren && !onSelect) return;
         e.preventDefault();
@@ -51,50 +86,65 @@ export function VirtualTree(
         if (node.hasChildren) onToggle(node.id);
       }
     },
-    [flattenedNodes.length, onSelect, onToggle],
+    [flattenedNodes.length, moveFocus, onSelect, onToggle],
   );
 
   return (
-    <div role='tree' aria-label={ariaLabel} style={{ height: '100%' }}>
-      <VirtualList
-        density={density}
-        items={flattenedNodes}
-        estimateSize={() => resolvedRowHeight}
-        renderItem={(node, index) => (
-          <div
-            role='treeitem'
-            aria-expanded={node.hasChildren ? node.expanded : undefined}
-            aria-level={node.depth + 1}
-            tabIndex={index === focusedIndex ? 0 : -1}
-            ref={(el) => {
-              if (el && index === focusedIndex && el.ownerDocument.activeElement !== el) {
-                // focus only when the tree itself already owns focus
-                if (el.parentElement?.contains(el.ownerDocument.activeElement)) {
-                  el.focus();
+    <div ref={parentRef} className='h-full overflow-auto' role='tree' aria-label={ariaLabel}>
+      <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
+        {virtualizer.getVirtualItems().map((row) => {
+          const node = flattenedNodes[row.index];
+          if (!node) return null;
+          return (
+            <div
+              key={row.key}
+              role='treeitem'
+              aria-expanded={node.hasChildren ? node.expanded : undefined}
+              aria-level={node.depth + 1}
+              tabIndex={row.index === focusedIndex ? 0 : -1}
+              ref={(el) => {
+                if (el && row.index === focusedIndex && el.ownerDocument.activeElement !== el) {
+                  if (
+                    shouldFocusRef.current
+                    || parentRef.current?.contains(el.ownerDocument.activeElement)
+                  ) {
+                    shouldFocusRef.current = false;
+                    el.focus();
+                  }
                 }
-              }
-            }}
-            style={{
-              paddingLeft: node.depth * 12,
-              height: resolvedRowHeight,
-              display: 'flex',
-              alignItems: 'center',
-              cursor: node.hasChildren || onSelect ? 'pointer' : 'default',
-            }}
-            onClick={() => {
-              setFocusedIndex(index);
-              onSelect?.(node.id);
-              if (node.hasChildren) onToggle(node.id);
-            }}
-            onDoubleClick={() => onOpen?.(node.id)}
-            onKeyDown={(e) => handleKeyDown(e, index, node)}
-          >
-            {renderNode
-              ? renderNode(node)
-              : `${node.hasChildren ? (node.expanded ? '▾' : '▸') : ' '} ${node.label}`}
-          </div>
-        )}
-      />
+              }}
+              style={{
+                paddingLeft: node.depth * 12,
+                height: resolvedRowHeight,
+                display: 'flex',
+                alignItems: 'center',
+                cursor: node.hasChildren || onSelect ? 'pointer' : 'default',
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                width: '100%',
+                transform: `translateY(${row.start}px)`,
+              }}
+              onClick={() => {
+                setFocusedIndex(row.index);
+                onSelect?.(node.id);
+                if (node.hasChildren) onToggle(node.id);
+              }}
+              onDoubleClick={() => onOpen?.(node.id)}
+              onKeyDown={(e) => handleKeyDown(e, row.index, node)}
+            >
+              {renderNode
+                ? renderNode(node)
+                : `${node.hasChildren ? (node.expanded ? '▾' : '▸') : ' '} ${node.label}`}
+            </div>
+          );
+        })}
+      </div>
     </div>
   );
+}
+
+function clampIndex(index: number, count: number): number {
+  if (count <= 0) return 0;
+  return Math.max(0, Math.min(index, count - 1));
 }

@@ -14,6 +14,43 @@ export interface ResultTableLayout {
 
 export type ResultTableLayouts = Record<string, ResultTableLayout>;
 
+export const FIRESTORE_PRIMITIVE_FIELD_TYPES = [
+  'boolean',
+  'bytes',
+  'geoPoint',
+  'null',
+  'number',
+  'reference',
+  'string',
+  'timestamp',
+] as const;
+
+export type FirestorePrimitiveFieldType = (typeof FIRESTORE_PRIMITIVE_FIELD_TYPES)[number];
+
+export type FirestoreFieldType =
+  | FirestorePrimitiveFieldType
+  | `array<${FirestorePrimitiveFieldType | 'mixed'}>`;
+
+export const FIRESTORE_ARRAY_FIELD_TYPES = [
+  'array<boolean>',
+  'array<bytes>',
+  'array<geoPoint>',
+  'array<mixed>',
+  'array<null>',
+  'array<number>',
+  'array<reference>',
+  'array<string>',
+  'array<timestamp>',
+] as const satisfies ReadonlyArray<`array<${FirestorePrimitiveFieldType | 'mixed'}>`>;
+
+export interface FirestoreFieldCatalogEntry {
+  readonly count: number;
+  readonly field: string;
+  readonly types: FirestoreFieldType[];
+}
+
+export type FirestoreFieldCatalogs = Record<string, FirestoreFieldCatalogEntry[]>;
+
 export interface SettingsSnapshot {
   readonly sidebarWidth: number;
   readonly inspectorWidth: number;
@@ -21,6 +58,7 @@ export interface SettingsSnapshot {
   readonly dataMode: DataMode;
   readonly hotkeyOverrides: HotkeyOverrides;
   readonly resultTableLayouts: ResultTableLayouts;
+  readonly firestoreFieldCatalogs: FirestoreFieldCatalogs;
 }
 
 export interface SettingsPatch {
@@ -30,6 +68,7 @@ export interface SettingsPatch {
   readonly dataMode?: DataMode | undefined;
   readonly hotkeyOverrides?: HotkeyOverrides | undefined;
   readonly resultTableLayouts?: ResultTableLayouts | undefined;
+  readonly firestoreFieldCatalogs?: FirestoreFieldCatalogs | undefined;
 }
 
 export interface SettingsRepository {

@@ -34,6 +34,26 @@ describe('settings schemas', () => {
           columnSizing: { team: 220 },
         },
       },
+      firestoreFieldCatalogs: {},
+    });
+  });
+
+  it('validates firestore field catalogs in patches', () => {
+    expect(
+      SettingsPatchSchema.parse({
+        firestoreFieldCatalogs: {
+          'orders/skiers': [
+            { count: 2, field: 'profile.age', types: ['number', 'array<string>'] },
+          ],
+        },
+      }),
+    ).toEqual({
+      resultTableLayouts: {},
+      firestoreFieldCatalogs: {
+        'orders/skiers': [
+          { count: 2, field: 'profile.age', types: ['number', 'array<string>'] },
+        ],
+      },
     });
   });
 });

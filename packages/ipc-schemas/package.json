@@ -16,13 +16,13 @@
     "build": "tsc -b"
   },
   "dependencies": {
+    "@firebase-desk/repo-contracts": "workspace:*",
     "zod": "4.3.6"
   },
   "devDependencies": {
     "@firebase-desk/config-oxlint": "workspace:*",
     "@firebase-desk/config-tsconfig": "workspace:*",
     "@firebase-desk/config-vitest": "workspace:*",
-    "@firebase-desk/repo-contracts": "workspace:*",
     "oxlint": "1.61.0",
     "typescript": "6.0.3",
     "vitest": "4.1.5"

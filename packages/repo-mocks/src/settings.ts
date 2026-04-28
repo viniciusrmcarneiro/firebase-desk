@@ -12,6 +12,7 @@ const DEFAULT_SNAPSHOT: SettingsSnapshot = {
   dataMode: 'mock',
   hotkeyOverrides: {},
   resultTableLayouts: {},
+  firestoreFieldCatalogs: {},
 };
 
 export class MockSettingsRepository implements SettingsRepository {
@@ -33,6 +34,9 @@ export class MockSettingsRepository implements SettingsRepository {
       resultTableLayouts: patch.resultTableLayouts
         ? cloneResultTableLayouts(patch.resultTableLayouts)
         : cloneResultTableLayouts(this.snapshot.resultTableLayouts),
+      firestoreFieldCatalogs: patch.firestoreFieldCatalogs
+        ? cloneFirestoreFieldCatalogs(patch.firestoreFieldCatalogs)
+        : cloneFirestoreFieldCatalogs(this.snapshot.firestoreFieldCatalogs),
     };
     return this.load();
   }
@@ -51,6 +55,7 @@ function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
     ...snapshot,
     hotkeyOverrides: { ...snapshot.hotkeyOverrides },
     resultTableLayouts: cloneResultTableLayouts(snapshot.resultTableLayouts),
+    firestoreFieldCatalogs: cloneFirestoreFieldCatalogs(snapshot.firestoreFieldCatalogs),
   };
 }
 
@@ -64,6 +69,21 @@ function cloneResultTableLayouts(
         columnOrder: [...value.columnOrder],
         columnSizing: { ...value.columnSizing },
       },
+    ]),
+  );
+}
+
+function cloneFirestoreFieldCatalogs(
+  catalogs: SettingsSnapshot['firestoreFieldCatalogs'],
+): SettingsSnapshot['firestoreFieldCatalogs'] {
+  return Object.fromEntries(
+    Object.entries(catalogs).map(([key, entries]) => [
+      key,
+      entries.map((entry) => ({
+        count: entry.count,
+        field: entry.field,
+        types: [...entry.types],
+      })),
     ]),
   );
 }

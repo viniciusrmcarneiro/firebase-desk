@@ -17,6 +17,14 @@ interface CachedFirestore {
   readonly db: Firestore;
 }
 
+export interface AdminFirestoreConnection {
+  readonly config: FirebaseConnectionConfig;
+  readonly db: Firestore;
+}
+
+const EMULATOR_RPC_TIMEOUT_MS = 5_000;
+const EMULATOR_READ_METHODS = ['GetDocument', 'ListDocuments', 'ListCollectionIds', 'RunQuery'];
+
 export class AdminFirestoreProvider {
   private readonly cache = new Map<string, CachedFirestore>();
   private readonly resolver: FirebaseConnectionResolver;
@@ -27,6 +35,18 @@ export class AdminFirestoreProvider {
 
   async getFirestore(connectionId: string): Promise<Firestore> {
     const config = await this.resolver.resolveConnection(connectionId);
+    return this.getFirestoreForConfig(connectionId, config);
+  }
+
+  async getFirestoreConnection(connectionId: string): Promise<AdminFirestoreConnection> {
+    const config = await this.resolver.resolveConnection(connectionId);
+    return { config, db: await this.getFirestoreForConfig(connectionId, config) };
+  }
+
+  private async getFirestoreForConfig(
+    connectionId: string,
+    config: FirebaseConnectionConfig,
+  ): Promise<Firestore> {
     const cacheKey = cacheKeyFor(config);
     const cached = this.cache.get(connectionId);
     if (cached?.cacheKey === cacheKey) return cached.db;
@@ -74,15 +94,43 @@ function appOptionsFor(config: FirebaseConnectionConfig) {
   };
 }
 
-function firestoreSettingsFor(config: FirebaseConnectionConfig): Settings {
+export function firestoreSettingsFor(config: FirebaseConnectionConfig): Settings {
   const base = { ignoreUndefinedProperties: true, projectId: config.project.projectId };
   if (config.project.target === 'emulator') {
     if (!config.project.emulator?.firestoreHost) {
       throw new Error(`Firestore emulator host is required for ${config.project.name}.`);
     }
-    return base;
+    return {
+      ...base,
+      clientConfig: emulatorClientConfig(),
+    };
   }
   return { ...base, preferRest: true };
+}
+
+function emulatorClientConfig() {
+  return {
+    interfaces: {
+      'google.firestore.v1.Firestore': {
+        methods: Object.fromEntries(
+          EMULATOR_READ_METHODS.map((method) => [method, {
+            timeout_millis: EMULATOR_RPC_TIMEOUT_MS,
+          }]),
+        ),
+        retry_params: {
+          default: {
+            initial_retry_delay_millis: 100,
+            initial_rpc_timeout_millis: EMULATOR_RPC_TIMEOUT_MS,
+            max_retry_delay_millis: 1_000,
+            max_rpc_timeout_millis: EMULATOR_RPC_TIMEOUT_MS,
+            retry_delay_multiplier: 1.3,
+            rpc_timeout_multiplier: 1,
+            total_timeout_millis: EMULATOR_RPC_TIMEOUT_MS,
+          },
+        },
+      },
+    },
+  };
 }
 
 function withFirestoreEmulatorHost<T>(

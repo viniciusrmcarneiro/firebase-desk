@@ -83,4 +83,54 @@ describe('ExplorerTree', () => {
     expect(onToggle).toHaveBeenCalledWith('doc:one');
     expect(onOpen).toHaveBeenCalledWith('doc:two');
   });
+
+  it('keeps a tabbable row when rows shrink', () => {
+    const { rerender } = render(
+      <ExplorerTree
+        rows={[
+          ...rows,
+          {
+            id: 'doc:two',
+            label: 'two',
+            level: 0,
+            hasChildren: false,
+          },
+        ]}
+        onToggle={vi.fn()}
+      />,
+    );
+
+    const first = screen.getByRole('treeitem', { name: /one/ });
+    fireEvent.keyDown(first, { key: 'ArrowDown' });
+    rerender(<ExplorerTree rows={rows} onToggle={vi.fn()} />);
+
+    expect(screen.getByRole('treeitem', { name: /one/ }).tabIndex).toBe(0);
+  });
+
+  it('does not steal focus from row actions on rerender', () => {
+    const action = vi.fn();
+    const { rerender } = render(
+      <ExplorerTree
+        rows={rows}
+        renderAction={(node) => (
+          <button type='button' onClick={() => action(node.id)}>Action</button>
+        )}
+        onToggle={vi.fn()}
+      />,
+    );
+
+    const button = screen.getByRole('button', { name: 'Action' });
+    button.focus();
+    rerender(
+      <ExplorerTree
+        rows={rows}
+        renderAction={(node) => (
+          <button type='button' onClick={() => action(node.id)}>Action</button>
+        )}
+        onToggle={vi.fn()}
+      />,
+    );
+
+    expect(document.activeElement).toBe(button);
+  });
 });

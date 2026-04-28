@@ -1,7 +1,7 @@
 import type { ProjectSummary } from '@firebase-desk/repo-contracts';
 import type { Firestore } from 'firebase-admin/firestore';
 import { afterEach, describe, expect, it } from 'vitest';
-import { AdminFirestoreProvider } from './admin-firestore-provider.ts';
+import { AdminFirestoreProvider, firestoreSettingsFor } from './admin-firestore-provider.ts';
 
 const originalEmulatorHost = process.env['FIRESTORE_EMULATOR_HOST'];
 
@@ -23,6 +23,20 @@ describe('AdminFirestoreProvider', () => {
         servicePath: '127.0.0.1',
         ssl: false,
       });
+      expect(firestoreSettingsFor({ project: emulatorProject(), credentialJson: null }))
+        .toMatchObject({
+          clientConfig: {
+            interfaces: {
+              'google.firestore.v1.Firestore': {
+                retry_params: {
+                  default: {
+                    total_timeout_millis: 5_000,
+                  },
+                },
+              },
+            },
+          },
+        });
       expect(process.env['FIRESTORE_EMULATOR_HOST']).toBe('localhost:9999');
     } finally {
       await provider.clear();

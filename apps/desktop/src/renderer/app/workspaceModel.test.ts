@@ -123,6 +123,57 @@ describe('workspaceModel', () => {
     ]);
   });
 
+  it('formats sidebar project and collection metadata', () => {
+    const items = buildTreeItems(
+      [
+        {
+          id: 'prod',
+          name: 'acme-prod',
+          projectId: 'acme-prod',
+          target: 'production',
+          hasCredential: true,
+          credentialEncrypted: true,
+          createdAt: '2026-04-27T00:00:00.000Z',
+        },
+        {
+          id: 'emu',
+          name: 'Local Emulator',
+          projectId: 'demo-local',
+          target: 'emulator',
+          emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
+          hasCredential: false,
+          credentialEncrypted: null,
+          createdAt: '2026-04-27T00:00:00.000Z',
+        },
+      ],
+      new Set([projectNodeId('emu'), 'firestore:emu']),
+      {
+        tools: { emu: { status: 'success', items: ['tools'] } },
+        roots: {
+          emu: {
+            status: 'success',
+            items: [{ id: 'orders', path: 'orders', documentCount: 99 }],
+          },
+        },
+      },
+      null,
+      '',
+    );
+
+    const prod = items.find((item) => item.id === 'project:prod');
+    const emu = items.find((item) => item.id === 'project:emu');
+    const collection = items.find((item) => item.id === 'collection:emu:orders');
+
+    expect(prod?.label).toBe('acme-prod');
+    expect('projectTarget' in (prod ?? {})).toBe(false);
+    expect('secondary' in (prod ?? {})).toBe(false);
+    expect(emu?.label).toBe('Local Emulator (demo-local)');
+    expect(emu?.projectTarget).toBe('emulator');
+    expect('secondary' in (emu ?? {})).toBe(false);
+    expect(collection?.label).toBe('orders');
+    expect('secondary' in (collection ?? {})).toBe(false);
+  });
+
   it('shows an empty root collections state with the Firebase project id', () => {
     const items = buildTreeItems(
       [{

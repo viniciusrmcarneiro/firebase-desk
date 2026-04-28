@@ -1,5 +1,12 @@
 import { ChevronRight } from 'lucide-react';
-import { type KeyboardEvent, type ReactNode, useCallback, useState } from 'react';
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { cn } from '../cn.ts';
 import { ContextMenu, ContextMenuTrigger } from '../context-menu/index.ts';
 import { VirtualList } from '../VirtualList.tsx';
@@ -30,6 +37,15 @@ export function ExplorerTree<TNode extends ExplorerTreeRowModel = ExplorerTreeRo
     ExplorerTreeProps<TNode>,
 ) {
   const [focusedIndex, setFocusedIndex] = useState(0);
+  const clampedFocusedIndex = rows.length === 0 ? 0 : Math.min(focusedIndex, rows.length - 1);
+
+  useEffect(() => {
+    setFocusedIndex((current) => {
+      if (rows.length === 0) return 0;
+      return Math.min(Math.max(current, 0), rows.length - 1);
+    });
+  }, [rows.length]);
+
   const handleKeyDown = useCallback(
     (event: KeyboardEvent<HTMLDivElement>, index: number, node: TNode) => {
       if (event.key === 'ArrowDown') {
@@ -69,7 +85,7 @@ export function ExplorerTree<TNode extends ExplorerTreeRowModel = ExplorerTreeRo
         renderItem={(item, index) => (
           <ExplorerTreeRow
             contextMenu={contextMenu}
-            focused={index === focusedIndex}
+            focused={index === clampedFocusedIndex}
             index={index}
             node={item}
             renderAction={renderAction}
@@ -102,6 +118,16 @@ function ExplorerTreeRow<TNode extends ExplorerTreeRowModel>(
       readonly onToggle: (id: string) => void;
     },
 ) {
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = rowRef.current;
+    if (!element || !focused) return;
+    const activeElement = element.ownerDocument.activeElement;
+    if (activeElement === element || element.contains(activeElement)) return;
+    if (element.parentElement?.contains(activeElement)) element.focus();
+  }, [focused]);
+
   const row = (
     <div
       className='grid min-h-8 grid-cols-[16px_16px_minmax(140px,0.8fr)_minmax(160px,1fr)_112px_auto] items-center gap-2 border-b border-border-subtle pr-3 text-text-primary transition-colors hover:bg-action-ghost-hover'
@@ -110,10 +136,7 @@ function ExplorerTreeRow<TNode extends ExplorerTreeRowModel>(
       style={{ paddingLeft: 12 + node.level * 22 }}
       aria-expanded={node.hasChildren ? Boolean(node.expanded) : undefined}
       aria-level={node.level + 1}
-      ref={(element) => {
-        if (!element || !focused || element.ownerDocument.activeElement === element) return;
-        if (element.parentElement?.contains(element.ownerDocument.activeElement)) element.focus();
-      }}
+      ref={rowRef}
       onClick={() => {
         setFocusedIndex(index);
         if (node.hasChildren) onToggle(node.id);

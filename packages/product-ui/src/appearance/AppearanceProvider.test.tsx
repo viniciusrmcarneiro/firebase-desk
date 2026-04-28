@@ -16,6 +16,7 @@ class TestSettingsRepository implements SettingsRepository {
     dataMode: 'mock',
     theme: 'system',
     resultTableLayouts: {},
+    firestoreFieldCatalogs: {},
   };
 
   async load(): Promise<SettingsSnapshot> {
@@ -30,6 +31,7 @@ class TestSettingsRepository implements SettingsRepository {
       dataMode: patch.dataMode ?? this.snapshot.dataMode,
       hotkeyOverrides: patch.hotkeyOverrides ?? this.snapshot.hotkeyOverrides,
       resultTableLayouts: patch.resultTableLayouts ?? this.snapshot.resultTableLayouts,
+      firestoreFieldCatalogs: patch.firestoreFieldCatalogs ?? this.snapshot.firestoreFieldCatalogs,
     };
     return this.snapshot;
   }

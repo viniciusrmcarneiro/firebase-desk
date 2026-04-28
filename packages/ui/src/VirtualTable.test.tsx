@@ -66,4 +66,19 @@ describe('VirtualTable', () => {
       'before:bg-border-subtle',
     );
   });
+
+  it('uses column id for resize labels when headers are not text', () => {
+    render(
+      <VirtualTable
+        rows={rows}
+        columns={[
+          { id: 'displayName', header: <span>Name</span>, cell: (r) => r.name, width: 120 },
+        ]}
+        enableColumnResize
+        rowHeight={24}
+      />,
+    );
+
+    expect(screen.getByRole('separator', { name: 'Resize displayName' })).toBeDefined();
+  });
 });

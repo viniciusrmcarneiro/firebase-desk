@@ -265,6 +265,7 @@ function FirestoreQueryStorySurface() {
       rows={documents}
       selectedDocument={selectedDocument}
       selectedDocumentPath='orders/ord_1024'
+      settings={settings}
       onDraftChange={setDraft}
       onLoadMore={() => {}}
       onOpenDocumentInNewTab={() => {}}

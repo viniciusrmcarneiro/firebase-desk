@@ -99,7 +99,7 @@ test('Firestore reads real emulator collections, documents, queries, cursors, an
     await tree.getByRole('treeitem', { name: /orders/ }).click();
     await expect(page.getByLabel('Query path')).toHaveValue('orders');
 
-    await page.getByLabel('Sort field').fill('');
+    await queryField(page, 'Sort field').fill('');
     await page.getByLabel('Result limit').fill('2');
     await page.getByRole('button', { name: 'Run' }).click();
     await expect(page.getByText('Document ID')).toBeVisible();
@@ -110,7 +110,8 @@ test('Firestore reads real emulator collections, documents, queries, cursors, an
     await page.getByRole('button', { name: 'Load more' }).click();
     await expect(page.getByText('ord_1026')).toBeVisible();
 
-    await page.getByLabel('Filter 1 field').fill('status');
+    await ensureFilterRow(page);
+    await queryField(page, 'Filter 1 field').fill('status');
     await page.getByLabel('Filter 1 value').fill('paid');
     await page.getByLabel('Result limit').fill('3');
     await page.getByRole('button', { name: 'Run' }).click();
@@ -123,7 +124,7 @@ test('Firestore reads real emulator collections, documents, queries, cursors, an
     await expect(page.getByRole('button', { name: /events/ })).toBeVisible();
 
     await page.getByLabel('Query path').fill('orders/ord_1024/events');
-    await page.getByLabel('Filter 1 field').fill('');
+    await queryField(page, 'Filter 1 field').fill('');
     await page.getByLabel('Filter 1 value').fill('');
     await page.getByRole('button', { name: 'Run' }).click();
     await expect(page.getByText('evt_created')).toBeVisible();
@@ -138,7 +139,7 @@ test('Firestore reads real emulator collections, documents, queries, cursors, an
 
     await page.getByLabel('Query path').fill('orders');
     await page.getByLabel('Result limit').fill('1');
-    await page.getByLabel('Sort field').fill('total');
+    await queryField(page, 'Sort field').fill('total');
     await page.getByLabel('Sort direction').selectOption('desc');
     await page.getByRole('button', { name: 'Run' }).click();
     await expect(page.getByText('ord_1123')).toBeVisible();
@@ -184,6 +185,16 @@ async function expandFirestoreRoots(page: Page): Promise<void> {
   await tree.getByRole('treeitem', { name: new RegExp(EMULATOR_ACCOUNT_NAME) }).click();
   await expect(tree.getByRole('treeitem', { name: /Firestore/ })).toBeVisible();
   await tree.getByRole('treeitem', { name: /Firestore/ }).click();
+}
+
+async function ensureFilterRow(page: Page): Promise<void> {
+  if (await queryField(page, 'Filter 1 field').count()) return;
+  await page.getByRole('button', { name: 'Filter' }).click();
+  await expect(queryField(page, 'Filter 1 field')).toBeVisible();
+}
+
+function queryField(page: Page, name: string) {
+  return page.getByRole('combobox', { name });
 }
 
 async function readFirestoreThroughIpc(page: Page, connectionId: string) {

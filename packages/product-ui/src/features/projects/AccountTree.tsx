@@ -147,14 +147,14 @@ function AccountTreeRow({ item, onEditItem, onRefreshItem, onRemoveItem }: Accou
       {item.status === 'error'
         ? <AlertCircle className='text-status-danger-text' size={14} aria-label='Load failed' />
         : null}
-      {item.secondary
+      {item.secondary && item.kind !== 'collection'
         ? (
           <span className='max-w-24 truncate rounded-full bg-bg-subtle px-1.5 py-0.5 font-mono text-[10px] text-text-muted'>
             {item.secondary}
           </span>
         )
         : null}
-      {item.projectTarget
+      {item.projectTarget === 'emulator'
         ? <Badge variant={item.projectTarget}>{item.projectTarget}</Badge>
         : null}
       {item.canRefresh

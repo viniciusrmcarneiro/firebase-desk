@@ -5,6 +5,7 @@ import type {
 } from '@firebase-desk/repo-contracts';
 import { useState } from 'react';
 import { DocumentEditorModal } from './DocumentEditorModal.tsx';
+import { useFirestoreFieldCatalog } from './fieldCatalog.ts';
 import { FirestoreDocumentBrowser } from './FirestoreDocumentBrowser.tsx';
 import { QueryBuilder } from './QueryBuilder.tsx';
 import type { FirestoreQueryDraft, FirestoreResultView } from './types.ts';
@@ -65,6 +66,11 @@ export function FirestoreQuerySurface(
 ) {
   const [resultView, setResultView] = useState<FirestoreResultView>('table');
   const [editorDocument, setEditorDocument] = useState<FirestoreDocumentResult | null>(null);
+  const fieldSuggestions = useFirestoreFieldCatalog({
+    queryPath: draft.path,
+    rows,
+    settings,
+  });
 
   return (
     <div className='h-full min-h-0 p-2'>
@@ -74,6 +80,7 @@ export function FirestoreQuerySurface(
         header={
           <QueryBuilder
             draft={draft}
+            fieldSuggestions={fieldSuggestions}
             isLoading={isLoading}
             onDraftChange={onDraftChange}
             onReset={onReset}

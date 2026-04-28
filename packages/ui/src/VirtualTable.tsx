@@ -202,7 +202,7 @@ function ColumnResizeHandle<T>(
 
   return (
     <span
-      aria-label={`Resize ${String(column.header)}`}
+      aria-label={`Resize ${columnResizeLabel(column)}`}
       className='absolute -right-1 bottom-0 top-0 z-20 w-2 cursor-col-resize before:absolute before:bottom-1 before:left-1/2 before:top-1 before:w-px before:-translate-x-1/2 before:bg-border-subtle hover:before:bg-border-focus'
       role='separator'
       tabIndex={-1}
@@ -213,6 +213,13 @@ function ColumnResizeHandle<T>(
 
 function columnFlex<T>(column: VirtualTableColumn<T>): string | number {
   return column.width === undefined ? 1 : `0 0 ${column.width}px`;
+}
+
+function columnResizeLabel<T>(column: VirtualTableColumn<T>): string {
+  if (typeof column.header === 'string' || typeof column.header === 'number') {
+    return String(column.header);
+  }
+  return column.id;
 }
 
 function tableContentWidth<T>(columns: ReadonlyArray<VirtualTableColumn<T>>): number | undefined {

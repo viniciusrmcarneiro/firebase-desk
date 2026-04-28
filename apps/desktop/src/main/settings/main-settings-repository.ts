@@ -34,6 +34,9 @@ export class MainSettingsRepository implements SettingsRepository {
       resultTableLayouts: patch.resultTableLayouts
         ? cloneResultTableLayouts(patch.resultTableLayouts)
         : cloneResultTableLayouts(current.resultTableLayouts),
+      firestoreFieldCatalogs: patch.firestoreFieldCatalogs
+        ? cloneFirestoreFieldCatalogs(patch.firestoreFieldCatalogs)
+        : cloneFirestoreFieldCatalogs(current.firestoreFieldCatalogs),
     });
   }
 
@@ -56,6 +59,21 @@ function cloneResultTableLayouts(
         columnOrder: [...value.columnOrder],
         columnSizing: { ...value.columnSizing },
       },
+    ]),
+  );
+}
+
+function cloneFirestoreFieldCatalogs(
+  catalogs: SettingsSnapshot['firestoreFieldCatalogs'],
+): SettingsSnapshot['firestoreFieldCatalogs'] {
+  return Object.fromEntries(
+    Object.entries(catalogs).map(([key, entries]) => [
+      key,
+      entries.map((entry) => ({
+        count: entry.count,
+        field: entry.field,
+        types: [...entry.types],
+      })),
     ]),
   );
 }

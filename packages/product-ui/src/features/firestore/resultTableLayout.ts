@@ -62,6 +62,7 @@ export function useResultTableLayout<TData>(
       if (!settings) return;
       if (saveTimeoutRef.current) clearTimeout(saveTimeoutRef.current);
       saveTimeoutRef.current = setTimeout(() => {
+        saveTimeoutRef.current = null;
         settings.load()
           .then((snapshot) => {
             const next = { ...snapshot.resultTableLayouts };
@@ -77,6 +78,15 @@ export function useResultTableLayout<TData>(
     },
     [key, settings],
   );
+
+  useEffect(() => {
+    return () => {
+      if (saveTimeoutRef.current) {
+        clearTimeout(saveTimeoutRef.current);
+        saveTimeoutRef.current = null;
+      }
+    };
+  }, [settings]);
 
   const saveLayout = useCallback(
     (layout: ResultTableLayout) => {

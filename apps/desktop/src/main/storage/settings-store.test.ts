@@ -72,6 +72,7 @@ describe('SettingsStore', () => {
       ...DEFAULT_SETTINGS_SNAPSHOT,
       dataMode: 'mock',
       resultTableLayouts: {},
+      firestoreFieldCatalogs: {},
     });
   });
 });

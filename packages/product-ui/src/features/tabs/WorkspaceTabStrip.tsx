@@ -10,8 +10,19 @@ import {
   ContextMenuTrigger,
   IconButton,
 } from '@firebase-desk/ui';
-import { ArrowLeft, ArrowRight, Code2, Database, Folder, Trash2, Users, X } from 'lucide-react';
-import { type ReactNode } from 'react';
+import {
+  ArrowLeft,
+  ArrowRight,
+  ChevronLeft,
+  ChevronRight,
+  Code2,
+  Database,
+  Folder,
+  Trash2,
+  Users,
+  X,
+} from 'lucide-react';
+import { type ReactNode, useCallback, useEffect, useRef, useState } from 'react';
 
 export type WorkspaceTabKind = 'firestore-query' | 'auth-users' | 'js-query';
 
@@ -54,6 +65,39 @@ export function WorkspaceTabStrip(
   }: WorkspaceTabStripProps,
 ) {
   const sensors = useSensors(useSensor(PointerSensor, { activationConstraint: { distance: 6 } }));
+  const scrollRef = useRef<HTMLDivElement>(null);
+  const [scrollState, setScrollState] = useState({
+    canScrollLeft: false,
+    canScrollRight: false,
+    hasOverflow: false,
+  });
+
+  const updateScrollState = useCallback(() => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const maxScrollLeft = Math.max(0, element.scrollWidth - element.clientWidth);
+    setScrollState({
+      canScrollLeft: element.scrollLeft > 1,
+      canScrollRight: element.scrollLeft < maxScrollLeft - 1,
+      hasOverflow: maxScrollLeft > 1,
+    });
+  }, []);
+
+  useEffect(() => {
+    updateScrollState();
+    const element = scrollRef.current;
+    if (!element) return;
+    element.addEventListener('scroll', updateScrollState, { passive: true });
+    const resizeObserver = typeof ResizeObserver === 'undefined'
+      ? null
+      : new ResizeObserver(updateScrollState);
+    resizeObserver?.observe(element);
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(updateScrollState);
+    return () => {
+      element.removeEventListener('scroll', updateScrollState);
+      resizeObserver?.disconnect();
+    };
+  }, [tabs.length, updateScrollState]);
 
   const handleDragEnd = (event: DragEndEvent) => {
     if (event.over && event.active.id !== event.over.id) {
@@ -61,11 +105,38 @@ export function WorkspaceTabStrip(
     }
   };
 
+  const scrollTabs = (direction: -1 | 1) => {
+    const element = scrollRef.current;
+    if (!element) return;
+    const distance = Math.max(180, Math.floor(element.clientWidth * 0.7));
+    if (typeof element.scrollBy === 'function') {
+      element.scrollBy({ left: direction * distance, behavior: 'smooth' });
+    } else {
+      element.scrollLeft += direction * distance;
+    }
+    if (typeof requestAnimationFrame === 'function') requestAnimationFrame(updateScrollState);
+    else updateScrollState();
+  };
+
   return (
     <div className='flex h-[var(--density-compact-tab-height)] min-w-0 items-stretch border-b border-border-subtle bg-gradient-to-b from-bg-subtle to-bg-panel'>
+      {scrollState.hasOverflow
+        ? (
+          <IconButton
+            disabled={!scrollState.canScrollLeft}
+            icon={<ChevronLeft size={14} aria-hidden='true' />}
+            label='Scroll tabs left'
+            size='xs'
+            variant='ghost'
+            className='h-full rounded-none border-r border-border-subtle'
+            onClick={() => scrollTabs(-1)}
+          />
+        )
+        : null}
       <DndContext sensors={sensors} onDragEnd={handleDragEnd}>
         <SortableContext items={tabs.map((tab) => tab.id)} strategy={horizontalListSortingStrategy}>
           <div
+            ref={scrollRef}
             className='flex min-w-0 flex-1 overflow-x-auto overflow-y-hidden [scrollbar-width:none] [&::-webkit-scrollbar]:hidden'
             role='tablist'
           >
@@ -87,6 +158,19 @@ export function WorkspaceTabStrip(
           </div>
         </SortableContext>
       </DndContext>
+      {scrollState.hasOverflow
+        ? (
+          <IconButton
+            disabled={!scrollState.canScrollRight}
+            icon={<ChevronRight size={14} aria-hidden='true' />}
+            label='Scroll tabs right'
+            size='xs'
+            variant='ghost'
+            className='h-full rounded-none border-l border-border-subtle'
+            onClick={() => scrollTabs(1)}
+          />
+        )
+        : null}
     </div>
   );
 }
@@ -133,7 +217,7 @@ function SortableTab(
           {...attributes}
           {...listeners}
           className={cn(
-            'relative grid h-full min-w-[clamp(140px,18vw,172px)] max-w-[260px] grid-cols-[minmax(0,1fr)_22px] items-center gap-2 border-r border-border-subtle px-2 text-left text-sm text-text-secondary transition-colors hover:bg-action-ghost-hover',
+            'relative grid h-full min-w-[clamp(150px,18vw,190px)] max-w-[260px] shrink-0 grid-cols-[minmax(0,1fr)_22px] items-center gap-2 border-r border-border-subtle px-2 text-left text-sm text-text-secondary transition-colors hover:bg-action-ghost-hover',
             'cursor-grab active:cursor-grabbing',
             active
               && 'bg-bg-panel text-text-primary after:absolute after:bottom-0 after:left-2 after:right-2 after:h-0.5 after:rounded-full after:bg-action-primary',

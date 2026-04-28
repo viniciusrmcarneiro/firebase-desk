@@ -55,6 +55,7 @@ describe('desktop App', () => {
       dataMode: 'mock',
       hotkeyOverrides: {},
       resultTableLayouts: {},
+      firestoreFieldCatalogs: {},
     });
 
     render(<App />);

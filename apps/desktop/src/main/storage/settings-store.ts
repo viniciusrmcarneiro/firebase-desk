@@ -11,6 +11,7 @@ export const DEFAULT_SETTINGS_SNAPSHOT: SettingsSnapshot = {
   dataMode: 'live',
   hotkeyOverrides: {},
   resultTableLayouts: {},
+  firestoreFieldCatalogs: {},
 };
 
 export class SettingsStore {
@@ -51,6 +52,16 @@ function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
   return {
     ...snapshot,
     hotkeyOverrides: { ...snapshot.hotkeyOverrides },
+    firestoreFieldCatalogs: Object.fromEntries(
+      Object.entries(snapshot.firestoreFieldCatalogs).map(([key, entries]) => [
+        key,
+        entries.map((entry) => ({
+          count: entry.count,
+          field: entry.field,
+          types: [...entry.types],
+        })),
+      ]),
+    ),
     resultTableLayouts: Object.fromEntries(
       Object.entries(snapshot.resultTableLayouts).map(([key, value]) => [
         key,

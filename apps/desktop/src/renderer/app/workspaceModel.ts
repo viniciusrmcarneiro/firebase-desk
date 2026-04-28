@@ -1,8 +1,4 @@
-import type {
-  AccountTreeItem,
-  FirestoreQueryDraft,
-  FirestoreQueryFilterDraft,
-} from '@firebase-desk/product-ui';
+import type { AccountTreeItem, FirestoreQueryDraft } from '@firebase-desk/product-ui';
 import type {
   FirestoreCollectionNode,
   FirestoreQuery,
@@ -41,7 +37,7 @@ export const MIN_WORKSPACE_WIDTH = 360;
 export const initialTreeCache: TreeCache = { roots: {}, tools: {} };
 export const DEFAULT_FIRESTORE_DRAFT: FirestoreQueryDraft = {
   path: 'orders',
-  filters: [{ id: 'filter-1', field: '', op: '==', value: '' }],
+  filters: [],
   filterField: '',
   filterOp: '==',
   filterValue: '',
@@ -72,12 +68,11 @@ export function buildTreeItems(
     items.push({
       id: projectId,
       kind: 'project',
-      label: project.name,
+      label: projectTreeLabel(project),
       depth: 0,
       hasChildren: true,
       expanded: expandedIds.has(projectId),
-      projectTarget: project.target,
-      secondary: project.projectId,
+      ...(project.target === 'emulator' ? { projectTarget: project.target } : {}),
       selected: selectedId === projectId,
       canRemove: true,
     });
@@ -162,10 +157,7 @@ export function draftToQuery(connectionId: string, draft: FirestoreQueryDraft): 
 export function queryFiltersForDraft(
   draft: FirestoreQueryDraft,
 ): NonNullable<FirestoreQuery['filters']> {
-  const filters: ReadonlyArray<FirestoreQueryFilterDraft> = draft.filters?.length
-    ? draft.filters
-    : [{ id: 'filter-1', field: draft.filterField, op: draft.filterOp, value: draft.filterValue }];
-  return filters
+  return (draft.filters ?? [])
     .filter((filter) => filter.field.trim())
     .map((filter) => ({
       field: filter.field.trim(),
@@ -293,11 +285,13 @@ function appendCollection(
     depth,
     hasChildren: false,
     expanded: false,
-    secondary: collection.documentCount === undefined
-      ? collection.path
-      : String(collection.documentCount),
     selected: selectedId === id,
   });
+}
+
+function projectTreeLabel(project: ProjectSummary): string {
+  if (project.name === project.projectId) return project.name;
+  return `${project.name} (${project.projectId})`;
 }
 
 function appendEmptyRootState(

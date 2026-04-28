@@ -9,6 +9,7 @@ const snapshot: SettingsSnapshot = {
   dataMode: 'mock',
   hotkeyOverrides: {},
   resultTableLayouts: {},
+  firestoreFieldCatalogs: {},
 };
 
 describe('data mode config', () => {
