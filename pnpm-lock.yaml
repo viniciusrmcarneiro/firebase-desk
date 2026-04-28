@@ -413,6 +413,9 @@ importers:
       '@dnd-kit/utilities':
         specifier: 3.2.2
         version: 3.2.2(react@19.2.5)
+      '@firebase-desk/data-format':
+        specifier: workspace:*
+        version: link:../data-format
       '@firebase-desk/design-tokens':
         specifier: workspace:*
         version: link:../design-tokens

@@ -1,3 +1,9 @@
+import {
+  FirestoreBytes,
+  FirestoreGeoPoint,
+  FirestoreReference,
+  FirestoreTimestamp,
+} from '@firebase-desk/data-format';
 import { type ReactNode } from 'react';
 
 interface TypedValueSummary {
@@ -5,16 +11,6 @@ interface TypedValueSummary {
   readonly title?: string;
   readonly value: string;
 }
-
-const timestampFormatOptions: Intl.DateTimeFormatOptions = {
-  day: '2-digit',
-  hour: '2-digit',
-  minute: '2-digit',
-  month: 'short',
-  second: '2-digit',
-  timeZoneName: 'short',
-  year: 'numeric',
-};
 
 export function FirestoreValueCell({ value }: { readonly value: unknown; }): ReactNode {
   const typed = typedValueSummary(value);
@@ -44,6 +40,8 @@ export function formatFirestoreValue(value: unknown): string {
 export function firestoreValueType(value: unknown): string {
   if (value === null) return 'null';
   if (Array.isArray(value)) return 'array';
+  const nativeType = nativeValueType(value);
+  if (nativeType) return nativeType;
   if (isPlainObject(value) && typeof value['__type__'] === 'string') return value['__type__'];
   return typeof value;
 }
@@ -53,6 +51,18 @@ export function isFirestoreTypedValue(value: unknown): boolean {
 }
 
 function typedValueSummary(value: unknown): TypedValueSummary | null {
+  if (value instanceof FirestoreTimestamp) {
+    return timestampSummary({ value: value.isoString });
+  }
+  if (value instanceof FirestoreGeoPoint) {
+    return geoPointSummary({ latitude: value.latitude, longitude: value.longitude });
+  }
+  if (value instanceof FirestoreReference) {
+    return referenceSummary({ path: value.path });
+  }
+  if (value instanceof FirestoreBytes) {
+    return bytesSummary({ base64: value.base64 });
+  }
   if (!isPlainObject(value)) return null;
   const type = value['__type__'];
   if (typeof type !== 'string') return null;
@@ -78,6 +88,14 @@ function typedValueSummary(value: unknown): TypedValueSummary | null {
       };
     }
   }
+}
+
+function nativeValueType(value: unknown): string | null {
+  if (value instanceof FirestoreTimestamp) return 'timestamp';
+  if (value instanceof FirestoreGeoPoint) return 'geoPoint';
+  if (value instanceof FirestoreReference) return 'reference';
+  if (value instanceof FirestoreBytes) return 'bytes';
+  return null;
 }
 
 function timestampSummary(value: Record<string, unknown>): TypedValueSummary {
@@ -138,7 +156,20 @@ function formatUserTimestamp(value: string): string {
   if (!value) return 'Invalid timestamp';
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return value;
-  return new Intl.DateTimeFormat(undefined, timestampFormatOptions).format(date);
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+    + `T${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`
+    + formatTimezoneOffset(date);
+}
+
+function formatTimezoneOffset(date: Date): string {
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const absoluteMinutes = Math.abs(offsetMinutes);
+  return `${sign}${pad2(Math.floor(absoluteMinutes / 60))}:${pad2(absoluteMinutes % 60)}`;
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
 }
 
 function formatCoordinate(value: number): string {

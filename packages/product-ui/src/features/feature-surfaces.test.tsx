@@ -1,3 +1,8 @@
+import {
+  FirestoreGeoPoint,
+  FirestoreReference,
+  FirestoreTimestamp,
+} from '@firebase-desk/data-format';
 import type {
   FirestoreCollectionNode,
   FirestoreDocumentResult,
@@ -5,11 +10,12 @@ import type {
   ScriptRunResult,
 } from '@firebase-desk/repo-contracts';
 import { AUTH_USERS, MockSettingsRepository } from '@firebase-desk/repo-mocks';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Key, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppearanceProvider } from '../appearance/AppearanceProvider.tsx';
 import { AuthUsersSurface } from './auth/AuthUsersSurface.tsx';
+import { FirestoreDocumentBrowser } from './firestore/FirestoreDocumentBrowser.tsx';
 import {
   type FirestoreQueryDraft,
   FirestoreQuerySurface,
@@ -97,6 +103,45 @@ vi.mock('@firebase-desk/ui', async (importOriginal) => {
           </div>
         )
         : <>{emptyState ?? null}</>,
+    ExplorerTree: (
+      {
+        onToggle,
+        renderAction,
+        rows,
+      }: {
+        readonly onToggle: (id: string) => void;
+        readonly renderAction?: (node: {
+          readonly id: string;
+          readonly label: ReactNode;
+        }) => ReactNode;
+        readonly rows: ReadonlyArray<{
+          readonly expanded?: boolean;
+          readonly hasChildren?: boolean;
+          readonly id: string;
+          readonly label: ReactNode;
+          readonly meta?: ReactNode;
+          readonly value?: ReactNode;
+        }>;
+      },
+    ) => (
+      <div role='tree'>
+        {rows.map((node) => (
+          <div
+            key={node.id}
+            aria-expanded={node.hasChildren ? Boolean(node.expanded) : undefined}
+            role='treeitem'
+            onClick={() => {
+              if (node.hasChildren) onToggle(node.id);
+            }}
+          >
+            <span>{node.label}</span>
+            <span>{node.value}</span>
+            <span>{node.meta}</span>
+            {renderAction?.(node)}
+          </div>
+        ))}
+      </div>
+    ),
     VirtualList: (
       {
         getItemKey,
@@ -256,15 +301,17 @@ const scriptResult: ScriptRunResult = {
 };
 
 function expectedUserTimestamp(iso: string): string {
-  return new Intl.DateTimeFormat(undefined, {
-    day: '2-digit',
-    hour: '2-digit',
-    minute: '2-digit',
-    month: 'short',
-    second: '2-digit',
-    timeZoneName: 'short',
-    year: 'numeric',
-  }).format(new Date(iso));
+  const date = new Date(iso);
+  const offsetMinutes = -date.getTimezoneOffset();
+  const sign = offsetMinutes >= 0 ? '+' : '-';
+  const absoluteMinutes = Math.abs(offsetMinutes);
+  return `${date.getFullYear()}-${pad2(date.getMonth() + 1)}-${pad2(date.getDate())}`
+    + `T${pad2(date.getHours())}:${pad2(date.getMinutes())}:${pad2(date.getSeconds())}`
+    + `${sign}${pad2(Math.floor(absoluteMinutes / 60))}:${pad2(absoluteMinutes % 60)}`;
+}
+
+function pad2(value: number): string {
+  return String(value).padStart(2, '0');
 }
 
 function renderWithAppearance(ui: ReactNode) {
@@ -460,6 +507,39 @@ describe('feature surfaces', () => {
     expect(screen.queryByText(/__type__/)).toBeNull();
   });
 
+  it('FirestoreDocumentBrowser renders native Firestore values as scalar cells', () => {
+    const nativeUpdatedAt = new FirestoreTimestamp('2026-04-24T09:30:12.058Z');
+    renderWithAppearance(
+      <div className='h-[640px]'>
+        <FirestoreDocumentBrowser
+          hasMore={false}
+          queryPath='orders'
+          resultView='table'
+          rows={[{
+            id: 'ord_native',
+            path: 'orders/ord_native',
+            data: {
+              updatedAt: nativeUpdatedAt,
+              deliveryLocation: new FirestoreGeoPoint(-36.8485, 174.7633),
+              customerRef: new FirestoreReference('customers/cus_ada'),
+            },
+            hasSubcollections: false,
+          }]}
+          onLoadMore={() => {}}
+          onResultViewChange={() => {}}
+        />
+      </div>,
+    );
+
+    expect(screen.getAllByText('time').length).toBeGreaterThan(0);
+    expect(screen.getByText(expectedUserTimestamp(nativeUpdatedAt.isoString))).toBeTruthy();
+    expect(screen.getByText('geo')).toBeTruthy();
+    expect(screen.getByText('-36.8485, 174.7633')).toBeTruthy();
+    expect(screen.getByText('ref')).toBeTruthy();
+    expect(screen.getByText('customers/cus_ada')).toBeTruthy();
+    expect(screen.queryByText('isoString')).toBeNull();
+  });
+
   it('FirestoreQuerySurface lazy loads subcollections from result rows', async () => {
     const onLoadSubcollections = vi.fn().mockResolvedValue([
       { id: 'events', path: 'orders/ord_lazy/events' },
@@ -523,6 +603,71 @@ describe('feature surfaces', () => {
     expect(await screen.findByText('events')).toBeTruthy();
   });
 
+  it('FirestoreDocumentBrowser caps subcollection chips and opens collection paths', () => {
+    const onOpenDocumentInNewTab = vi.fn();
+    const subcollections = Array.from({ length: 12 }, (_, index) => ({
+      id: `sub_${String(index).padStart(2, '0')}`,
+      path: `orders/ord_chips/sub_${String(index).padStart(2, '0')}`,
+    }));
+    renderWithAppearance(
+      <div className='h-[640px]'>
+        <FirestoreDocumentBrowser
+          hasMore={false}
+          queryPath='orders'
+          resultView='table'
+          rows={[{
+            id: 'ord_chips',
+            path: 'orders/ord_chips',
+            data: { status: 'paid' },
+            hasSubcollections: true,
+            subcollections,
+          }]}
+          onLoadMore={() => {}}
+          onOpenDocumentInNewTab={onOpenDocumentInNewTab}
+          onResultViewChange={() => {}}
+        />
+      </div>,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: /sub_00/ }));
+
+    expect(screen.getByText('+2')).toBeTruthy();
+    expect(screen.queryByRole('button', { name: /sub_10/ })).toBeNull();
+    expect(onOpenDocumentInNewTab).toHaveBeenCalledWith('orders/ord_chips/sub_00');
+  });
+
+  it('FirestoreDocumentBrowser groups tree fields and subcollections without count rows', () => {
+    renderWithAppearance(
+      <div className='h-[640px]'>
+        <FirestoreDocumentBrowser
+          hasMore={false}
+          queryPath='orders'
+          resultView='tree'
+          rows={[{
+            id: 'ord_tree',
+            path: 'orders/ord_tree',
+            data: { team: 'Wanaka' },
+            hasSubcollections: true,
+            subcollections: [{ id: 'skiers', path: 'orders/ord_tree/skiers', documentCount: 3 }],
+          }]}
+          onLoadMore={() => {}}
+          onOpenDocumentInNewTab={() => {}}
+          onResultViewChange={() => {}}
+        />
+      </div>,
+    );
+
+    const tree = screen.getByRole('tree');
+    fireEvent.click(within(tree).getByText('orders'));
+    fireEvent.click(within(tree).getByText('ord_tree'));
+    expect(within(tree).getByText('Fields')).toBeTruthy();
+    expect(within(tree).getByText('Subcollections')).toBeTruthy();
+
+    expect(within(tree).getByText('skiers')).toBeTruthy();
+    expect(within(tree).queryByText('Documents')).toBeNull();
+    expect(within(tree).queryByText('count')).toBeNull();
+  });
+
   it('FirestoreQuerySurface disables query controls and shows running state while loading', () => {
     renderWithAppearance(
       <FirestoreQuerySurface
@@ -573,6 +718,8 @@ describe('feature surfaces', () => {
     expect(onRun).toHaveBeenCalledTimes(1);
     expect(await screen.findByTestId('monaco')).toBeTruthy();
     await waitFor(() => expect(screen.getByText('yield DocumentSnapshot')).toBeTruthy());
+    fireEvent.click(screen.getByText('yield QuerySnapshot'));
+    expect(await screen.findByRole('tab', { name: /Tree/ })).toBeTruthy();
     expect(screen.getByRole('tab', { name: /Logs/ })).toBeTruthy();
   });
 });

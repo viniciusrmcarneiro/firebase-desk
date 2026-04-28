@@ -106,6 +106,16 @@ describe('repo-mocks contract conformance', () => {
     const result = await repo.run({ projectId: 'p', source: 'noop' });
     expect(result.logs.length).toBeGreaterThan(0);
     expect(result.stream?.some((item) => item.label.includes('QuerySnapshot'))).toBe(true);
+    const querySnapshot = result.stream?.find((item) => item.label === 'yield QuerySnapshot');
+    expect(querySnapshot?.value).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          data: expect.objectContaining({
+            updatedAt: expect.objectContaining({ __type__: 'timestamp' }),
+          }),
+        }),
+      ]),
+    );
 
     await expect(repo.run({ projectId: 'p', source: 'throw new Error()' })).resolves
       .toMatchObject({ errors: [{ code: 'permission-denied' }] });

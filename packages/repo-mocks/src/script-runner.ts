@@ -1,3 +1,4 @@
+import { encode } from '@firebase-desk/data-format';
 import type {
   ScriptRunnerRepository,
   ScriptRunRequest,
@@ -57,7 +58,7 @@ export class MockScriptRunnerRepository implements ScriptRunnerRepository {
       };
     }
     if (source.includes('array')) {
-      const value = returnedOrders.map((doc) => doc.data.status);
+      const value = orders.map((doc) => doc.data.status);
       return {
         returnValue: value,
         stream: [{
@@ -168,6 +169,6 @@ function resultDocument(collectionPath: string, document: FixtureDocument) {
   return {
     id: document.id,
     path: `${collectionPath}/${document.id}`,
-    data: document.data,
+    data: encode(document.data as never) as Record<string, unknown>,
   };
 }

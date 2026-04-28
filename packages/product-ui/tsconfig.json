@@ -2,6 +2,7 @@
   "extends": "../config-tsconfig/react.json",
   "include": ["src/**/*"],
   "references": [
+    { "path": "../data-format" },
     { "path": "../design-tokens" },
     { "path": "../hotkeys" },
     { "path": "../repo-contracts" },

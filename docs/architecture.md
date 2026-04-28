@@ -24,6 +24,15 @@ The Electron shell gives the JavaScript Query feature access to Node and the Fir
 - `packages/config-*` — shared oxlint/dprint/tsconfig/vitest presets.
 - `e2e/` — Playwright + Electron specs against the emulator suite.
 
+## UI Layers
+
+The UI is split into generic primitives and product-aware components.
+
+- `packages/ui` must stay domain-free. It can expose reusable primitives such as tables, panels, chips, inspector sections, and generic tree renderers, but must not depend on Firebase concepts or `repo-contracts`.
+- `packages/product-ui` owns Firebase Desk behavior and can depend on repository contracts. Firestore-aware browsing belongs here.
+- Firestore Query and JavaScript Query share the product-level Firestore result browser for Firestore-shaped results. Do not duplicate table/tree/json/inspector result browsers inside individual surfaces.
+- Feature surfaces should mostly orchestrate state and repository callbacks; reusable result browsing behavior should live in product-level components.
+
 ## Process Boundaries
 
 ### Main Process
