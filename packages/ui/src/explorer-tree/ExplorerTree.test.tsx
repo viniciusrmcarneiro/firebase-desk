@@ -49,6 +49,7 @@ describe('ExplorerTree', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Action' }));
 
     expect(onToggle).toHaveBeenCalledWith('doc:one');
+    expect(onToggle).toHaveBeenCalledTimes(1);
     expect(onOpen).toHaveBeenCalledWith('doc:one');
     expect(onAction).toHaveBeenCalledWith('doc:one');
   });

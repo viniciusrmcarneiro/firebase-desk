@@ -84,7 +84,12 @@ function ExplorerTreeRow<TNode extends ExplorerTreeRowModel>(
       <span className='min-w-0 truncate font-medium'>{node.label}</span>
       <span className='min-w-0 truncate text-text-muted'>{node.value ?? ''}</span>
       <code className='text-text-muted'>{node.meta ?? ''}</code>
-      <span>{renderAction?.(node)}</span>
+      <span
+        onClick={(event) => event.stopPropagation()}
+        onDoubleClick={(event) => event.stopPropagation()}
+      >
+        {renderAction?.(node)}
+      </span>
     </div>
   );
   const content = contextMenu?.(node);
