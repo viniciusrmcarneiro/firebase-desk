@@ -5,6 +5,7 @@ import {
   DataTable,
   type DataTableColumn,
   EmptyState,
+  InlineAlert,
   Input,
   Panel,
   PanelBody,
@@ -17,6 +18,7 @@ import { ShieldCheck, UserRound, Users } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 
 export interface AuthUsersSurfaceProps {
+  readonly errorMessage?: string | null;
   readonly filterValue: string;
   readonly hasMore: boolean;
   readonly isFetchingMore?: boolean;
@@ -32,6 +34,7 @@ export interface AuthUsersSurfaceProps {
 export function AuthUsersSurface(
   {
     filterValue,
+    errorMessage = null,
     hasMore,
     isFetchingMore = false,
     isLoading = false,
@@ -81,6 +84,13 @@ export function AuthUsersSurface(
               </span>
             </PanelHeader>
             <PanelBody className='min-h-0 p-0'>
+              {errorMessage
+                ? (
+                  <div className='border-b border-border-subtle p-2'>
+                    <InlineAlert variant='danger'>{errorMessage}</InlineAlert>
+                  </div>
+                )
+                : null}
               <AuthUsersTable
                 hasMore={hasMore}
                 isFetchingMore={isFetchingMore}

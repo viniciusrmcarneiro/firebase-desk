@@ -86,7 +86,7 @@ export function App() {
                 height: '100vh',
               } as CSSProperties}
             >
-              <AppShell initialSidebarWidth={snapshot.sidebarWidth} />
+              <AppShell dataMode={dataMode ?? 'mock'} initialSidebarWidth={snapshot.sidebarWidth} />
             </div>
           </AppearanceProvider>
         </HotkeysProvider>

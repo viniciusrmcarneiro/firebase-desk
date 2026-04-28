@@ -230,11 +230,11 @@ export const WorkspaceTabStripDefault: Story = {
           id: 'tab-firestore',
           kind: 'firestore-query',
           title: 'orders',
-          projectId: 'emu',
+          connectionId: 'emu',
           canGoBack: true,
         },
-        { id: 'tab-auth', kind: 'auth-users', title: 'Auth', projectId: 'emu' },
-        { id: 'tab-js', kind: 'js-query', title: 'JS Query', projectId: 'prod' },
+        { id: 'tab-auth', kind: 'auth-users', title: 'Auth', connectionId: 'emu' },
+        { id: 'tab-js', kind: 'js-query', title: 'JS Query', connectionId: 'prod' },
       ]}
       onCloseAllTabs={() => {}}
       onCloseTab={() => {}}

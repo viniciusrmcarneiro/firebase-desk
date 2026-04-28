@@ -45,7 +45,7 @@ Open it directly from `file://`. No build step is required for the current proto
 - Clicking Authentication opens an Auth users tab for that account.
 - Single-clicking JavaScript Query focuses an existing matching script tab, or opens one if none exists.
 - Double-clicking JavaScript Query always opens a new script tab and does not add history.
-- Clicking non-query tool items may focus an existing account-bound tab when practical.
+- Clicking non-query tool items may focus an existing connection-bound tab when practical.
 
 ## Navigation History
 
@@ -124,7 +124,7 @@ Open it directly from `file://`. No build step is required for the current proto
 
 ### JavaScript Query
 
-- Account-bound script tab.
+- Connection-bound script tab.
 - Script editor.
 - Run button.
 - Streamed result view that appends each yielded or returned document, collection, or query result.
@@ -138,7 +138,7 @@ Open it directly from `file://`. No build step is required for the current proto
 
 ### Authentication
 
-- Account-bound Auth tab.
+- Connection-bound Auth tab.
 - Users table.
 - Filter/search controls.
 - User detail panel.
@@ -200,7 +200,7 @@ Open it directly from `file://`. No build step is required for the current proto
 - Query path input keeps focus while the user edits it.
 - Query tab has a numeric limit input beside Run for collection queries.
 - Query controls hide when the path is not a collection name.
-- Clicking tree items opens account-bound tabs on the right.
+- Clicking tree items opens connection-bound tabs on the right.
 - Each tab has an account/project dropdown that changes only that tab.
 - Same view can be open for different accounts at the same time.
 - Views use mock repositories, not hard-coded component data.

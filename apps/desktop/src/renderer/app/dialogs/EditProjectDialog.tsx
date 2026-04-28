@@ -13,6 +13,7 @@ export function EditProjectDialog(
   { onOpenChange, onSubmit, open, project }: EditProjectDialogProps,
 ) {
   const [name, setName] = useState('');
+  const [projectId, setProjectId] = useState('');
   const [firestoreHost, setFirestoreHost] = useState('');
   const [authHost, setAuthHost] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -21,6 +22,7 @@ export function EditProjectDialog(
   useEffect(() => {
     if (!project || !open) return;
     setName(project.name);
+    setProjectId(project.projectId);
     setFirestoreHost(project.emulator?.firestoreHost ?? '127.0.0.1:8080');
     setAuthHost(project.emulator?.authHost ?? '127.0.0.1:9099');
     setError(null);
@@ -34,7 +36,10 @@ export function EditProjectDialog(
       await onSubmit(project.id, {
         name: name.trim(),
         ...(project.target === 'emulator'
-          ? { emulator: { firestoreHost: firestoreHost.trim(), authHost: authHost.trim() } }
+          ? {
+            projectId: projectId.trim(),
+            emulator: { firestoreHost: firestoreHost.trim(), authHost: authHost.trim() },
+          }
           : {}),
       });
       onOpenChange(false);
@@ -63,12 +68,25 @@ export function EditProjectDialog(
             onChange={(event) => setName(event.currentTarget.value)}
           />
         </label>
-        <div className='grid gap-1 rounded-md border border-border-subtle bg-bg-subtle p-3 text-sm'>
-          <span className='text-text-muted'>Firebase project id</span>
-          <span className='font-mono text-xs text-text-primary'>
-            {project?.projectId ?? 'unknown'}
-          </span>
-        </div>
+        {project?.target === 'emulator'
+          ? (
+            <label className='grid gap-1.5'>
+              <span className='text-xs font-semibold text-text-secondary'>Firebase project id</span>
+              <Input
+                aria-label='Firebase project id'
+                value={projectId}
+                onChange={(event) => setProjectId(event.currentTarget.value)}
+              />
+            </label>
+          )
+          : (
+            <div className='grid gap-1 rounded-md border border-border-subtle bg-bg-subtle p-3 text-sm'>
+              <span className='text-text-muted'>Firebase project id</span>
+              <span className='font-mono text-xs text-text-primary'>
+                {project?.projectId ?? 'unknown'}
+              </span>
+            </div>
+          )}
         {project?.target === 'emulator'
           ? (
             <div className='grid grid-cols-1 gap-3 sm:grid-cols-2'>
@@ -94,7 +112,12 @@ export function EditProjectDialog(
         {error ? <InlineAlert variant='danger'>{error}</InlineAlert> : null}
         <div className='flex justify-end gap-2'>
           <Button variant='ghost' onClick={() => onOpenChange(false)}>Cancel</Button>
-          <Button disabled={isSaving || !name.trim()} variant='primary' onClick={handleSubmit}>
+          <Button
+            disabled={isSaving || !name.trim()
+              || (project?.target === 'emulator' && !projectId.trim())}
+            variant='primary'
+            onClick={handleSubmit}
+          >
             {isSaving ? 'Saving' : 'Save'}
           </Button>
         </div>

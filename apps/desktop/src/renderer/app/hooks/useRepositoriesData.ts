@@ -12,28 +12,28 @@ export function useProjects() {
   });
 }
 
-export function useRootCollections(projectId: string | null | undefined, enabled = true) {
+export function useRootCollections(connectionId: string | null | undefined, enabled = true) {
   const repositories = useRepositories();
   return useQuery({
-    enabled: enabled && Boolean(projectId),
-    queryKey: ['firestore', projectId, 'rootCollections'],
-    queryFn: () => repositories.firestore.listRootCollections(projectId ?? ''),
+    enabled: enabled && Boolean(connectionId),
+    queryKey: ['firestore', connectionId, 'rootCollections'],
+    queryFn: () => repositories.firestore.listRootCollections(connectionId ?? ''),
   });
 }
 
 export function useCollectionDocuments(
-  projectId: string | null | undefined,
+  connectionId: string | null | undefined,
   collectionPath: string | null | undefined,
   enabled = true,
 ) {
   const repositories = useRepositories();
   return useInfiniteQuery({
-    enabled: enabled && Boolean(projectId && collectionPath),
+    enabled: enabled && Boolean(connectionId && collectionPath),
     initialPageParam: undefined as PageRequest['cursor'] | undefined,
-    queryKey: ['firestore', projectId, 'documents', collectionPath],
+    queryKey: ['firestore', connectionId, 'documents', collectionPath],
     queryFn: ({ pageParam }) =>
       repositories.firestore.listDocuments(
-        projectId ?? '',
+        connectionId ?? '',
         collectionPath ?? '',
         pageRequest(pageParam, DEFAULT_PAGE_SIZE),
       ),
@@ -42,46 +42,55 @@ export function useCollectionDocuments(
 }
 
 export function useSubcollections(
-  projectId: string | null | undefined,
+  connectionId: string | null | undefined,
   documentPath: string | null | undefined,
   enabled = true,
 ) {
   const repositories = useRepositories();
   return useQuery({
-    enabled: enabled && Boolean(projectId && documentPath),
-    queryKey: ['firestore', projectId, 'subcollections', documentPath],
-    queryFn: () => repositories.firestore.listSubcollections(projectId ?? '', documentPath ?? ''),
+    enabled: enabled && Boolean(connectionId && documentPath),
+    queryKey: ['firestore', connectionId, 'subcollections', documentPath],
+    queryFn: () =>
+      repositories.firestore.listSubcollections(connectionId ?? '', documentPath ?? ''),
   });
 }
 
 export function useRunQuery(
   query: FirestoreQuery | null,
   limit = DEFAULT_PAGE_SIZE,
+  runId = 0,
   enabled = true,
 ) {
   const repositories = useRepositories();
   return useInfiniteQuery({
     enabled: enabled && Boolean(query),
+    gcTime: 0,
     initialPageParam: undefined as PageRequest['cursor'] | undefined,
-    queryKey: ['firestore', 'query', query, limit],
+    queryKey: ['firestore', 'query', query, limit, runId],
     queryFn: ({ pageParam }) =>
       repositories.firestore.runQuery(
-        query ?? { projectId: '', path: '' },
+        query ?? { connectionId: '', path: '' },
         pageRequest(pageParam, limit),
       ),
+    refetchOnWindowFocus: false,
     getNextPageParam: (lastPage) => lastPage.nextCursor ?? undefined,
+    staleTime: 0,
   });
 }
 
 export function useGetDocument(
-  projectId: string | null | undefined,
+  connectionId: string | null | undefined,
   documentPath: string | null | undefined,
+  runId = 0,
 ) {
   const repositories = useRepositories();
   return useQuery({
-    enabled: Boolean(projectId && documentPath),
-    queryKey: ['firestore', projectId, 'document', documentPath],
-    queryFn: () => repositories.firestore.getDocument(projectId ?? '', documentPath ?? ''),
+    enabled: Boolean(connectionId && documentPath),
+    gcTime: 0,
+    queryKey: ['firestore', connectionId, 'document', documentPath, runId],
+    queryFn: () => repositories.firestore.getDocument(connectionId ?? '', documentPath ?? ''),
+    refetchOnWindowFocus: false,
+    staleTime: 0,
   });
 }
 

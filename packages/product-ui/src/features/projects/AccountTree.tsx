@@ -128,6 +128,7 @@ function AccountTreeRow({ item, onEditItem, onRefreshItem, onRemoveItem }: Accou
           && 'bg-action-selected text-action-primary shadow-[inset_0_0_0_1px_var(--color-action-primary)]',
         item.status && 'text-text-muted',
       )}
+      title={item.secondary ? `${item.label}: ${item.secondary}` : item.label}
     >
       <span className='grid size-4 shrink-0 place-items-center text-text-muted'>
         {item.hasChildren

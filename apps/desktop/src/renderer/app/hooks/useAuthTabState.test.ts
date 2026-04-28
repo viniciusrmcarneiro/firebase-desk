@@ -14,7 +14,7 @@ const tab: WorkspaceTab = {
   id: 'tab-auth-1',
   kind: 'auth-users',
   title: 'Auth',
-  projectId: 'emu',
+  connectionId: 'emu',
   history: ['auth/users'],
   historyIndex: 0,
   inspectorWidth: 360,

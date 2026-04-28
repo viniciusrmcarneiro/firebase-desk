@@ -33,7 +33,7 @@ const activeTab: WorkspaceTab = {
   id: 'tab-firestore-1',
   kind: 'firestore-query',
   title: 'orders',
-  projectId: 'emu',
+  connectionId: 'emu',
   history: ['orders'],
   historyIndex: 0,
   inspectorWidth: 360,
@@ -112,7 +112,7 @@ describe('useWorkspaceTree', () => {
     );
 
     expect(fetchQuery).toHaveBeenCalledWith({
-      queryKey: ['firestore', 'demo-local', 'rootCollections'],
+      queryKey: ['firestore', 'emu', 'rootCollections'],
       queryFn: expect.any(Function),
     });
   });
@@ -145,9 +145,12 @@ describe('useWorkspaceTree', () => {
 
     act(() => result.current.handleToggleItem('firestore:emu'));
     await waitFor(() =>
-      expect(result.current.treeItems.some((item) => item.id === 'status:firestore:emu')).toBe(
-        true,
-      )
+      expect(result.current.treeItems).toContainEqual(expect.objectContaining({
+        id: 'status:firestore:emu',
+        label: 'Load failed',
+        secondary: expect.stringContaining('permission denied'),
+        status: 'error',
+      }))
     );
 
     act(() => result.current.handleRefreshItem('firestore:emu'));
@@ -158,8 +161,11 @@ describe('useWorkspaceTree', () => {
     );
 
     expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['firestore', 'demo-local', 'rootCollections'],
+      queryKey: ['firestore', 'emu', 'rootCollections'],
     });
     expect(setLastAction).toHaveBeenCalledWith('Retried Local Emulator');
+    expect(setLastAction).toHaveBeenCalledWith(
+      expect.stringContaining('Firestore load failed: permission denied'),
+    );
   });
 });

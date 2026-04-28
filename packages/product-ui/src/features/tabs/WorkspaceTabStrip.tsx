@@ -19,7 +19,7 @@ export interface WorkspaceTabModel {
   readonly id: string;
   readonly kind: WorkspaceTabKind;
   readonly title: string;
-  readonly projectId: string;
+  readonly connectionId: string;
   readonly canGoBack?: boolean;
   readonly canGoForward?: boolean;
 }
@@ -121,7 +121,7 @@ function SortableTab(
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: tab.id,
   });
-  const project = projects.find((item) => item.id === tab.projectId);
+  const project = projects.find((item) => item.id === tab.connectionId);
   const style = { transform: CSS.Transform.toString(transform), transition };
   const icon = iconForTabKind(tab.kind);
 
@@ -178,7 +178,7 @@ function SortableTab(
           <ArrowRight size={13} aria-hidden='true' /> Close Tabs to Right
         </ContextMenuItem>
         <ContextMenuItem onSelect={onSortByProject}>
-          <Database size={13} aria-hidden='true' /> Sort by Account
+          <Database size={13} aria-hidden='true' /> Sort by Connection
         </ContextMenuItem>
         <ContextMenuItem onSelect={onCloseAllTabs}>
           <Trash2 size={13} aria-hidden='true' /> Close All

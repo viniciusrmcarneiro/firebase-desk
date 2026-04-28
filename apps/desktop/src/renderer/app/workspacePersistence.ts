@@ -16,15 +16,27 @@ const WorkspaceTabSchema = z.object({
   id: z.string().min(1),
   kind: WorkspaceTabKindSchema,
   title: z.string(),
-  projectId: z.string().min(1),
+  connectionId: z.string().min(1).optional(),
+  projectId: z.string().min(1).optional(),
   history: z.array(z.string()).min(1),
   historyIndex: z.number().int().nonnegative(),
   inspectorWidth: z.number().finite().nonnegative(),
 }).superRefine((tab, context) => {
+  if (!tab.connectionId && !tab.projectId) {
+    context.addIssue({ code: 'custom', message: 'Tab connection id is required' });
+  }
   if (tab.historyIndex >= tab.history.length) {
     context.addIssue({ code: 'custom', message: 'Tab history index out of range' });
   }
-}).transform((tab): WorkspaceTab => tab);
+}).transform((tab): WorkspaceTab => ({
+  id: tab.id,
+  kind: tab.kind,
+  title: tab.title,
+  connectionId: tab.connectionId ?? tab.projectId ?? '',
+  history: tab.history,
+  historyIndex: tab.historyIndex,
+  inspectorWidth: tab.inspectorWidth,
+}));
 
 const InteractionHistoryEntrySchema = z.object({
   activeTabId: z.string().min(1),

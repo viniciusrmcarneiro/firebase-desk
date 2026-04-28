@@ -24,6 +24,7 @@
     "@firebase-desk/ipc-schemas": "workspace:*",
     "@firebase-desk/product-ui": "workspace:*",
     "@firebase-desk/repo-contracts": "workspace:*",
+    "@firebase-desk/repo-firebase": "workspace:*",
     "@firebase-desk/repo-mocks": "workspace:*",
     "@firebase-desk/ui": "workspace:*",
     "@tanstack/react-query": "5.90.12",

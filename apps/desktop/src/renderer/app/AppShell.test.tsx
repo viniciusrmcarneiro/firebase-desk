@@ -126,7 +126,7 @@ describe('desktop AppShell', () => {
   });
 
   it('shows the active project name, id, and target in the status bar', async () => {
-    renderShell({ initialTab: { kind: 'auth-users', projectId: 'emu' } });
+    renderShell({ initialTab: { kind: 'auth-users', connectionId: 'emu' } });
 
     expect((await screen.findAllByText('Local Emulator')).length).toBeGreaterThan(0);
     expect(screen.getByText('demo-local')).toBeTruthy();
@@ -134,7 +134,7 @@ describe('desktop AppShell', () => {
   });
 
   it('confirms before closing a tab', async () => {
-    renderShell({ initialTab: { kind: 'auth-users', projectId: 'emu' } });
+    renderShell({ initialTab: { kind: 'auth-users', connectionId: 'emu' } });
     fireEvent.click(await screen.findByRole('button', { name: 'Close Auth' }));
     expect(screen.getByRole('dialog', { name: 'Close tab' })).toBeTruthy();
 
@@ -148,7 +148,7 @@ describe('desktop AppShell', () => {
     const runQuery = vi.spyOn(repositories.firestore, 'runQuery');
     renderShell({
       repositories,
-      initialTab: { kind: 'firestore-query', projectId: 'emu', path: 'orders' },
+      initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
     fireEvent.change(await screen.findByRole('textbox', { name: 'Query path' }), {
@@ -156,14 +156,14 @@ describe('desktop AppShell', () => {
     });
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
-    await waitFor(() => expect(getDocument).toHaveBeenCalledWith('demo-local', 'orders/ord_1024'));
+    await waitFor(() => expect(getDocument).toHaveBeenCalledWith('emu', 'orders/ord_1024'));
     expect(runQuery).not.toHaveBeenCalled();
   });
 
   it('uses repository search for auth filtering', async () => {
     const repositories = createMockRepositories();
     const searchUsers = vi.spyOn(repositories.auth, 'searchUsers');
-    renderShell({ repositories, initialTab: { kind: 'auth-users', projectId: 'emu' } });
+    renderShell({ repositories, initialTab: { kind: 'auth-users', connectionId: 'emu' } });
 
     fireEvent.change(await screen.findByRole('textbox', { name: 'Filter users' }), {
       target: { value: 'grace' },
@@ -177,7 +177,7 @@ describe('desktop AppShell', () => {
     const run = vi.spyOn(repositories.scriptRunner, 'run');
     renderShell({
       repositories,
-      initialTab: { kind: 'js-query', projectId: 'emu' },
+      initialTab: { kind: 'js-query', connectionId: 'emu' },
     });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
@@ -246,20 +246,20 @@ describe('desktop AppShell', () => {
     const runQuery = vi.spyOn(repositories.firestore, 'runQuery');
     renderShell({
       repositories,
-      initialTab: { kind: 'firestore-query', projectId: 'emu', path: 'orders' },
+      initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
     await waitFor(() =>
       expect(runQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ projectId: 'demo-local', path: 'orders' }),
+        expect.objectContaining({ connectionId: 'emu', path: 'orders' }),
         expect.anything(),
       )
     );
 
-    const accountButton = await screen.findByRole('button', { name: 'Select account' });
-    fireEvent.mouseDown(accountButton);
-    fireEvent.keyDown(accountButton, { key: 'ArrowDown' });
+    const connectionButton = await screen.findByRole('button', { name: 'Select connection' });
+    fireEvent.mouseDown(connectionButton);
+    fireEvent.keyDown(connectionButton, { key: 'ArrowDown' });
     fireEvent.click(await screen.findByRole('menuitem', { name: /Acme Prod/ }));
 
     await waitFor(() => expect(screen.getAllByText('0 docs').length).toBeGreaterThan(0));
@@ -268,7 +268,7 @@ describe('desktop AppShell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
     await waitFor(() =>
       expect(runQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ projectId: 'acme-prod', path: 'orders' }),
+        expect.objectContaining({ connectionId: 'prod', path: 'orders' }),
         expect.anything(),
       )
     );
@@ -280,7 +280,7 @@ describe('desktop AppShell', () => {
     const runQuery = vi.spyOn(repositories.firestore, 'runQuery');
     renderShell({
       repositories,
-      initialTab: { kind: 'firestore-query', projectId: 'emu', path: 'orders' },
+      initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
@@ -288,7 +288,7 @@ describe('desktop AppShell', () => {
 
     act(() => {
       selectionActions.selectDocument('orders/ord_1024');
-      tabActions.openTab({ kind: 'firestore-query', projectId: 'emu', path: 'customers' });
+      tabActions.openTab({ kind: 'firestore-query', connectionId: 'emu', path: 'customers' });
     });
 
     await waitFor(() => expect(screen.getAllByText('0 docs').length).toBeGreaterThan(0));
@@ -304,7 +304,7 @@ describe('desktop AppShell', () => {
     const runQuery = vi.spyOn(repositories.firestore, 'runQuery');
     renderShell({
       repositories,
-      initialTab: { kind: 'firestore-query', projectId: 'emu', path: 'orders' },
+      initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
@@ -322,7 +322,7 @@ describe('desktop AppShell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
     await waitFor(() => expect(runQuery).toHaveBeenCalledTimes(2));
     expect(runQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ projectId: 'demo-local', path: 'orders' }),
+      expect.objectContaining({ connectionId: 'emu', path: 'orders' }),
       expect.objectContaining({ limit: 1 }),
     );
   });
@@ -347,7 +347,7 @@ describe('desktop AppShell', () => {
           id: tabId,
           kind: 'firestore-query',
           title: 'customers',
-          projectId: 'emu',
+          connectionId: 'emu',
           history: ['customers'],
           historyIndex: 0,
           inspectorWidth: 360,
@@ -379,7 +379,7 @@ describe('desktop AppShell', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
     await waitFor(() =>
       expect(runQuery).toHaveBeenCalledWith(
-        expect.objectContaining({ projectId: 'demo-local', path: 'customers' }),
+        expect.objectContaining({ connectionId: 'emu', path: 'customers' }),
         expect.objectContaining({ limit: 7 }),
       )
     );
@@ -390,7 +390,7 @@ describe('desktop AppShell', () => {
     const runQuery = vi.spyOn(repositories.firestore, 'runQuery');
     renderShell({
       repositories,
-      initialTab: { kind: 'firestore-query', projectId: 'emu', path: 'orders' },
+      initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));

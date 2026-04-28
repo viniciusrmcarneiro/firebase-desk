@@ -18,6 +18,7 @@ export interface ProjectSummary {
 
 export interface ProjectUpdatePatch {
   readonly name?: string | undefined;
+  readonly projectId?: string | undefined;
   readonly emulator?: EmulatorConnectionProfile | undefined;
 }
 

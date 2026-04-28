@@ -40,9 +40,13 @@ export class MockProjectsRepository implements ProjectsRepository {
     const idx = this.projects.findIndex((p) => p.id === id);
     if (idx < 0) throw new Error(`Project not found: ${id}`);
     const current = this.projects[idx]!;
+    if (patch.projectId !== undefined && current.target !== 'emulator') {
+      throw new Error('Production project ID comes from the service account JSON.');
+    }
     const next: ProjectSummary = {
       ...current,
       ...(patch.name !== undefined ? { name: normalizeName(patch.name) } : {}),
+      ...(patch.projectId !== undefined ? { projectId: normalizeProjectId(patch.projectId) } : {}),
       ...(patch.emulator !== undefined ? { emulator: normalizeEmulator(patch.emulator) } : {}),
     };
     this.projects.splice(idx, 1, next);
@@ -76,6 +80,12 @@ export class MockProjectsRepository implements ProjectsRepository {
 function normalizeName(name: string): string {
   const value = name.trim();
   if (!value) throw new Error('Project display name is required.');
+  return value;
+}
+
+function normalizeProjectId(projectId: string): string {
+  const value = projectId.trim();
+  if (!value) throw new Error('Project ID is required.');
   return value;
 }
 

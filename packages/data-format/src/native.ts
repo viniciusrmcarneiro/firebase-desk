@@ -4,19 +4,37 @@
  */
 
 export class FirestoreTimestamp {
-  constructor(public readonly isoString: string) {}
+  readonly isoString: string;
+
+  constructor(isoString: string) {
+    this.isoString = isoString;
+  }
 }
 
 export class FirestoreGeoPoint {
-  constructor(public readonly latitude: number, public readonly longitude: number) {}
+  readonly latitude: number;
+  readonly longitude: number;
+
+  constructor(latitude: number, longitude: number) {
+    this.latitude = latitude;
+    this.longitude = longitude;
+  }
 }
 
 export class FirestoreReference {
-  constructor(public readonly path: string) {}
+  readonly path: string;
+
+  constructor(path: string) {
+    this.path = path;
+  }
 }
 
 export class FirestoreBytes {
-  constructor(public readonly base64: string) {}
+  readonly base64: string;
+
+  constructor(base64: string) {
+    this.base64 = base64;
+  }
 }
 
 export type NativeValue =

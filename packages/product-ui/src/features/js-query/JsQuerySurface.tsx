@@ -1,4 +1,6 @@
 import type {
+  FirestoreCollectionNode,
+  FirestoreDocumentResult,
   ScriptLogEntry,
   ScriptRunResult,
   ScriptStreamItem,
@@ -7,8 +9,6 @@ import {
   Badge,
   Button,
   cn,
-  DataTable,
-  type DataTableColumn,
   EmptyState,
   Panel,
   PanelBody,
@@ -22,9 +22,11 @@ import {
   TabsTrigger,
 } from '@firebase-desk/ui';
 import { Bug, FileText, Play, Table2, TerminalSquare } from 'lucide-react';
-import { type ReactNode, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { CodeEditor } from '../../code-editor/CodeEditor.tsx';
-import { FirestoreValueCell, formatFirestoreValue } from '../firestore/FirestoreValueCell.tsx';
+import { FirestoreDocumentBrowser } from '../firestore/FirestoreDocumentBrowser.tsx';
+import { formatFirestoreValue } from '../firestore/FirestoreValueCell.tsx';
+import type { FirestoreResultView } from '../firestore/types.ts';
 
 export const JS_QUERY_SAMPLE_SOURCE = `const db = admin.firestore();
 const snapshot = await db.collection('orders')
@@ -187,49 +189,40 @@ function ScriptStreamCard({ item }: { readonly item: ScriptStreamItem; }) {
         <Badge>{item.badge}</Badge>
       </summary>
       {item.view === 'table'
-        ? <DocumentPreviewTable value={item.value} />
+        ? <ScriptFirestorePreview value={item.value} />
         : <JsonPreview className='m-3' value={item.value} />}
     </details>
   );
 }
 
-function DocumentPreviewTable({ value }: { readonly value: unknown; }) {
-  const rows = documentsFromValue(value);
+function ScriptFirestorePreview({ value }: { readonly value: unknown; }) {
+  const rows = useMemo(() => firestoreDocumentsFromValue(value), [value]);
+  const [resultView, setResultView] = useState<FirestoreResultView>('table');
+  const [selectedDocumentPath, setSelectedDocumentPath] = useState<string | null>(
+    () => rows[0]?.path ?? null,
+  );
+
+  useEffect(() => {
+    setSelectedDocumentPath((current) =>
+      current && rows.some((row) => row.path === current) ? current : rows[0]?.path ?? null
+    );
+  }, [rows]);
+
   if (!rows.length) return <JsonPreview className='m-3' value={value} />;
 
-  const columns: ReadonlyArray<DataTableColumn<DocumentPreview>> = [
-    {
-      id: 'id',
-      header: 'Document ID',
-      width: 180,
-      cell: ({ row }) => (
-        <span className='font-mono text-xs text-text-primary'>{row.original.id}</span>
-      ),
-    },
-    {
-      id: 'primary',
-      header: 'Primary',
-      cell: ({ row }) => primaryValue(row.original.data),
-    },
-    {
-      id: 'secondary',
-      header: 'Secondary',
-      cell: ({ row }) => secondaryValue(row.original.data),
-    },
-    {
-      id: 'fields',
-      header: 'Fields',
-      width: 90,
-      cell: ({ row }) => `${Object.keys(row.original.data).length} fields`,
-    },
-  ];
-
+  const selectedDocument = rows.find((row) => row.path === selectedDocumentPath) ?? rows[0] ?? null;
   return (
-    <div className='h-72'>
-      <DataTable
-        columns={columns}
-        data={rows}
-        getRowId={(row) => row.path ?? row.id}
+    <div className='h-[420px] border-t border-border-subtle'>
+      <FirestoreDocumentBrowser
+        hasMore={false}
+        queryPath={queryPathForRows(rows)}
+        resultView={resultView}
+        rows={rows}
+        selectedDocument={selectedDocument}
+        selectedDocumentPath={selectedDocumentPath}
+        onLoadMore={() => {}}
+        onResultViewChange={setResultView}
+        onSelectDocument={setSelectedDocumentPath}
       />
     </div>
   );
@@ -270,13 +263,7 @@ function JsonPreview(
   );
 }
 
-interface DocumentPreview {
-  readonly id: string;
-  readonly path?: string;
-  readonly data: Record<string, unknown>;
-}
-
-function documentsFromValue(value: unknown): ReadonlyArray<DocumentPreview> {
+function firestoreDocumentsFromValue(value: unknown): ReadonlyArray<FirestoreDocumentResult> {
   if (!Array.isArray(value)) return [];
   return value.flatMap((entry) => {
     if (!entry || typeof entry !== 'object') return [];
@@ -285,13 +272,40 @@ function documentsFromValue(value: unknown): ReadonlyArray<DocumentPreview> {
     if (typeof record.id !== 'string' || !data || typeof data !== 'object' || Array.isArray(data)) {
       return [];
     }
-    const path = stringOrUndefined(record.path);
-    return [
-      path
-        ? { id: record.id, path, data: data as Record<string, unknown> }
-        : { id: record.id, data: data as Record<string, unknown> },
-    ];
+    const id = record.id;
+    const path = stringOrUndefined(record.path) ?? id;
+    const subcollections = subcollectionsFromValue(record.subcollections);
+    return [{
+      id,
+      path,
+      data: data as Record<string, unknown>,
+      hasSubcollections: typeof record.hasSubcollections === 'boolean'
+        ? record.hasSubcollections
+        : (subcollections?.length ?? 0) > 0,
+      ...(subcollections ? { subcollections } : {}),
+    }];
   });
+}
+
+function subcollectionsFromValue(
+  value: unknown,
+): ReadonlyArray<FirestoreCollectionNode> | undefined {
+  if (!Array.isArray(value)) return undefined;
+  return value.flatMap((entry) => {
+    if (!entry || typeof entry !== 'object') return [];
+    const record = entry as Record<string, unknown>;
+    const id = stringOrUndefined(record.id);
+    const path = stringOrUndefined(record.path);
+    if (!id || !path) return [];
+    return [{ id, path }];
+  });
+}
+
+function queryPathForRows(rows: ReadonlyArray<FirestoreDocumentResult>): string {
+  const path = rows[0]?.path;
+  if (!path) return 'results';
+  const parts = path.split('/').filter(Boolean);
+  return parts.length > 1 ? parts.slice(0, -1).join('/') : 'results';
 }
 
 function streamItemsFor(result: ScriptRunResult | null): ReadonlyArray<ScriptStreamItem> {
@@ -331,25 +345,11 @@ function toFirebaseError(error: ScriptRunResult['errors'][number]) {
     readonly name?: string;
   };
   return {
-    name: record.name ?? 'FirebaseError',
-    code: record.code ?? 'permission-denied',
+    name: record.name ?? 'Error',
+    ...(record.code ? { code: record.code } : {}),
     message: error.message,
     ...(error.stack ? { stack: error.stack } : {}),
   };
-}
-
-function primaryValue(data: Record<string, unknown>): ReactNode {
-  const value = data.status ?? data.name ?? data.email ?? data.type ?? data.enabled;
-  return previewValue(value);
-}
-
-function secondaryValue(data: Record<string, unknown>): ReactNode {
-  const value = data.total ?? data.plan ?? data.channel ?? data.owner ?? data.updatedAt;
-  return previewValue(value);
-}
-
-function previewValue(value: unknown): ReactNode {
-  return value === undefined ? '' : <FirestoreValueCell value={value} />;
 }
 
 function stringOrUndefined(value: unknown): string | undefined {

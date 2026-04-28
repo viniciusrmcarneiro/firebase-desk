@@ -4,6 +4,9 @@ import { fileURLToPath } from 'node:url';
 import { registerIpcHandlers } from './ipc/registry.ts';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
+const userDataDir = process.env['FIREBASE_DESK_USER_DATA_DIR'];
+
+if (userDataDir) app.setPath('userData', userDataDir);
 
 async function createWindow(): Promise<void> {
   const window = new BrowserWindow({

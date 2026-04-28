@@ -4,7 +4,7 @@ import {
   createFixtureCollection,
   createFixtureDocument,
   createProjectFixture,
-  MOCK_ACCOUNT_LOAD_ERROR_PROJECT_ID,
+  MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID,
   MockAuthRepository,
   MockFirebaseError,
   MockFirestoreRepository,
@@ -25,8 +25,15 @@ describe('repo-mocks contract conformance', () => {
       emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
     });
     expect((await repo.get(added.id))?.id).toBe(added.id);
-    const updated = await repo.update(added.id, { name: 'Tmp Renamed' });
+    const updated = await repo.update(added.id, {
+      name: 'Tmp Renamed',
+      projectId: 'tmp-renamed',
+    });
     expect(updated.name).toBe('Tmp Renamed');
+    expect(updated.projectId).toBe('tmp-renamed');
+    await expect(repo.update('prod', { projectId: 'other-prod' })).rejects.toThrow(
+      'Production project ID comes from the service account JSON.',
+    );
     await expect(repo.update(added.id, { name: ' ' })).rejects.toThrow(
       'Project display name is required.',
     );
@@ -44,7 +51,7 @@ describe('repo-mocks contract conformance', () => {
     expect(docs.items).toHaveLength(1);
     expect(docs.nextCursor?.token).toBe('1');
 
-    const page = await repo.runQuery({ projectId: 'p', path: 'orders' }, { limit: 2 });
+    const page = await repo.runQuery({ connectionId: 'p', path: 'orders' }, { limit: 2 });
     expect(page.items).toHaveLength(2);
     expect(page.items[0]?.data).toBeDefined();
     expect(page.items[0]?.subcollections?.[0]?.path).toBe('orders/ord_1024/events');
@@ -62,7 +69,7 @@ describe('repo-mocks contract conformance', () => {
     await repo.saveDocument('p', 'objects/a', { value: { score: 2, toJSON: 'not callable' } });
     await repo.saveDocument('p', 'objects/b', { value: { score: 1 } });
     await expect(repo.runQuery({
-      projectId: 'p',
+      connectionId: 'p',
       path: 'objects',
       sorts: [{ field: 'value', direction: 'asc' }],
     })).resolves.toMatchObject({ items: expect.any(Array) });
@@ -70,7 +77,7 @@ describe('repo-mocks contract conformance', () => {
     await repo.deleteDocument('p', 'orders/ord_saved');
     expect(await repo.getDocument('p', 'orders/ord_saved')).toBeNull();
 
-    await expect(repo.listRootCollections(MOCK_ACCOUNT_LOAD_ERROR_PROJECT_ID)).rejects
+    await expect(repo.listRootCollections(MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID)).rejects
       .toBeInstanceOf(MockFirebaseError);
   });
 
@@ -99,6 +106,16 @@ describe('repo-mocks contract conformance', () => {
     const result = await repo.run({ projectId: 'p', source: 'noop' });
     expect(result.logs.length).toBeGreaterThan(0);
     expect(result.stream?.some((item) => item.label.includes('QuerySnapshot'))).toBe(true);
+    const querySnapshot = result.stream?.find((item) => item.label === 'yield QuerySnapshot');
+    expect(querySnapshot?.value).toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          data: expect.objectContaining({
+            updatedAt: expect.objectContaining({ __type__: 'timestamp' }),
+          }),
+        }),
+      ]),
+    );
 
     await expect(repo.run({ projectId: 'p', source: 'throw new Error()' })).resolves
       .toMatchObject({ errors: [{ code: 'permission-denied' }] });
