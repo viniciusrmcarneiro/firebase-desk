@@ -175,11 +175,14 @@ export function registerIpcHandlers(): void {
 
 function scriptRunnerWorkerPath(): string {
   const currentDir = dirname(fileURLToPath(import.meta.url));
-  const builtPath = resolve(currentDir, 'script-runner-worker.js');
-  if (existsSync(builtPath)) return builtPath;
-  const sourcePath = resolve(currentDir, '../script-runner-worker.ts');
-  if (existsSync(sourcePath)) return sourcePath;
-  return builtPath;
+  const candidatePaths = [
+    resolve(currentDir, 'script-runner-worker.js'),
+    resolve(currentDir, '..', 'script-runner-worker.js'),
+    resolve(currentDir, '../script-runner-worker.ts'),
+  ];
+  const workerPath = candidatePaths.find((path) => existsSync(path));
+  if (workerPath) return workerPath;
+  throw new Error(`Unable to locate script runner worker. Checked ${candidatePaths.join(', ')}.`);
 }
 
 function errorText(error: unknown): string {

@@ -63,6 +63,23 @@ describe('runUserScript', () => {
     expect(result.returnValue).toEqual({ done: true });
   });
 
+  it('drains many yielded values without recursion depth growth', async () => {
+    const result = await runUserScript(
+      `
+      for (let index = 0; index < 2000; index += 1) {
+        yield index;
+      }
+      return 'done';
+    `,
+      runtime,
+    );
+
+    expect(result.errors).toEqual([]);
+    expect(result.stream).toHaveLength(2000);
+    expect(result.stream?.[1999]).toMatchObject({ label: 'yield 2000', value: 1999 });
+    expect(result.returnValue).toBe('done');
+  });
+
   it('reports syntax and thrown errors', async () => {
     await expect(runUserScript('const = broken', runtime)).resolves.toMatchObject({
       returnValue: null,

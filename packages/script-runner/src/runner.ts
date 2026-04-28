@@ -54,13 +54,16 @@ export async function runUserScript(
 async function drainGenerator(
   generator: AsyncGenerator<unknown, unknown, unknown>,
   stream: ScriptStreamItem[],
-  yieldIndex: number,
+  initialYieldIndex: number,
 ): Promise<unknown> {
-  const next = await generator.next();
-  if (next.done) return next.value;
-  const item = normalizeStreamItem(next.value, yieldIndex);
-  if (item) stream.push(item);
-  return await drainGenerator(generator, stream, yieldIndex + 1);
+  let yieldIndex = initialYieldIndex;
+  while (true) {
+    const next = await generator.next();
+    if (next.done) return next.value;
+    const item = normalizeStreamItem(next.value, yieldIndex);
+    if (item) stream.push(item);
+    yieldIndex += 1;
+  }
 }
 
 function createUserGenerator(

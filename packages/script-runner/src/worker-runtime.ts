@@ -37,7 +37,7 @@ function applyEmulatorEnvironment(connection: ScriptRunnerConnection): void {
   if (!connection.project.emulator?.firestoreHost) {
     throw new Error(`Firestore emulator host is required for ${connection.project.name}.`);
   }
-  if (!connection.project.emulator.authHost) {
+  if (!connection.project.emulator?.authHost) {
     throw new Error(`Auth emulator host is required for ${connection.project.name}.`);
   }
   process.env['FIRESTORE_EMULATOR_HOST'] = connection.project.emulator.firestoreHost;

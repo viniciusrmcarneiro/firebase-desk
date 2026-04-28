@@ -79,6 +79,17 @@ describe('FirebaseAuthRepository', () => {
     expect(firebaseMocks.auth.getUserByEmail).toHaveBeenCalledWith('ada@example.com');
   });
 
+  it('treats invalid uid as a search miss before exact email lookup', async () => {
+    const user = userRecord({ email: 'ada@example.com', uid: 'u_ada' });
+    firebaseMocks.auth.getUser.mockRejectedValue(authError('auth/invalid-uid'));
+    firebaseMocks.auth.getUserByEmail.mockResolvedValue(user);
+    const { repository } = createRepository();
+
+    await expect(repository.searchUsers('emu', 'ada@example.com')).resolves.toEqual([
+      expect.objectContaining({ email: 'ada@example.com', uid: 'u_ada' }),
+    ]);
+  });
+
   it('returns null or empty results for missing users', async () => {
     firebaseMocks.auth.getUser.mockRejectedValue(authError('auth/user-not-found'));
     firebaseMocks.auth.getUserByEmail.mockRejectedValue(authError('auth/user-not-found'));

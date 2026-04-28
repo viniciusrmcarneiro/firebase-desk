@@ -101,7 +101,14 @@ export function useJsTabState(
     updateActiveRuns((current) => omitKey(current, tabId));
     cancelScriptMutation.mutate(run.runId, {
       onError: (error) => {
-        setScriptResults((current) => ({ ...current, [tabId]: scriptErrorResult(error) }));
+        setScriptResults((current) => {
+          const tab = tabsStore.state.tabs.find((item) => item.id === tabId);
+          const latestRun = activeRunsRef.current[tabId];
+          if (!tab || tab.connectionId !== run.connectionId) return current;
+          if (current[tabId]?.cancelled !== true) return current;
+          if (latestRun && latestRun.runId !== run.runId) return current;
+          return { ...current, [tabId]: scriptErrorResult(error) };
+        });
       },
     });
     return true;

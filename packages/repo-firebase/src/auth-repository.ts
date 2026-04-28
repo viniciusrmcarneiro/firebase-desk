@@ -94,7 +94,9 @@ function limitFor(request?: PageRequest): number {
 }
 
 function isUserLookupMiss(error: unknown): boolean {
-  return isUserNotFound(error) || errorCode(error) === 'auth/invalid-email';
+  return isUserNotFound(error)
+    || errorCode(error) === 'auth/invalid-email'
+    || errorCode(error) === 'auth/invalid-uid';
 }
 
 function isUserNotFound(error: unknown): boolean {

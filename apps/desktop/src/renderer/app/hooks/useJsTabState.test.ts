@@ -184,6 +184,42 @@ describe('useJsTabState', () => {
     expect(result.current.isTabRunning(tabId)).toBe(false);
     expect(result.current.scripts[tabId]).toBeUndefined();
   });
+
+  it('does not repopulate a cleared tab when cancel fails later', () => {
+    const mutate = vi.fn();
+    const cancelMutate = vi.fn();
+    vi.mocked(useRunScript).mockReturnValue({
+      isPending: true,
+      mutate,
+      reset: vi.fn(),
+    } as unknown as ReturnType<typeof useRunScript>);
+    vi.mocked(useCancelScript).mockReturnValue({
+      mutate: cancelMutate,
+    } as unknown as ReturnType<typeof useCancelScript>);
+    const tabId = tabActions.openTab({ kind: 'js-query', connectionId: 'emu' });
+    const tab = tabsStore.state.tabs.find((item) => item.id === tabId)!;
+    const { result } = renderHook(() =>
+      useJsTabState({
+        activeTab: tab,
+        selectedTreeItemId: 'script:emu',
+      })
+    );
+
+    act(() => {
+      expect(result.current.runScript()).toBe(true);
+    });
+    act(() => {
+      expect(result.current.cancelScript()).toBe(true);
+    });
+    const options = cancelMutate.mock.calls[0]?.[1] as {
+      readonly onError: (error: unknown) => void;
+    };
+
+    act(() => result.current.clearTab(tabId));
+    act(() => options.onError(new Error('cancel failed')));
+
+    expect(result.current.scriptResult).toBeUndefined();
+  });
 });
 
 function runScriptResult() {
