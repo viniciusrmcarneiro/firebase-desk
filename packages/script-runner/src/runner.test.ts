@@ -1,3 +1,4 @@
+import type { ScriptRunEvent } from '@firebase-desk/repo-contracts';
 import { GeoPoint, Timestamp } from 'firebase-admin/firestore';
 import { describe, expect, it } from 'vitest';
 import { runUserScript } from './runner.ts';
@@ -59,8 +60,46 @@ describe('runUserScript', () => {
         label: 'yield 1',
         value: { ok: true, projectId: 'demo-local', hasTimestamp: true },
       }),
+      expect.objectContaining({
+        label: 'return value',
+        value: { done: true },
+      }),
     ]);
     expect(result.returnValue).toEqual({ done: true });
+  });
+
+  it('emits logs, yielded output, return output, and errors as live events', async () => {
+    const events: ScriptRunEvent[] = [];
+    const result = await runUserScript(
+      `
+      console.info('ready');
+      yield { ok: true };
+      return { done: true };
+    `,
+      runtime,
+      { runId: 'run-1', onEvent: (event) => events.push(event) },
+    );
+
+    expect(result.errors).toEqual([]);
+    expect(events).toMatchObject([
+      { type: 'log', runId: 'run-1', log: { level: 'info', message: 'ready' } },
+      { type: 'output', runId: 'run-1', item: { label: 'yield 1' } },
+      { type: 'output', runId: 'run-1', item: { label: 'return value' } },
+    ]);
+
+    events.length = 0;
+    await runUserScript("throw new Error('boom')", runtime, {
+      runId: 'run-2',
+      onEvent: (event) => events.push(event),
+    });
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'error',
+        runId: 'run-2',
+        error: expect.objectContaining({ message: 'boom' }),
+      }),
+    ]);
   });
 
   it('drains many yielded values without recursion depth growth', async () => {
@@ -75,8 +114,9 @@ describe('runUserScript', () => {
     );
 
     expect(result.errors).toEqual([]);
-    expect(result.stream).toHaveLength(2000);
+    expect(result.stream).toHaveLength(2001);
     expect(result.stream?.[1999]).toMatchObject({ label: 'yield 2000', value: 1999 });
+    expect(result.stream?.[2000]).toMatchObject({ label: 'return value', value: 'done' });
     expect(result.returnValue).toBe('done');
   });
 

@@ -93,6 +93,22 @@ describe('runScriptInWorker', () => {
     expect(process.env['FIRESTORE_EMULATOR_HOST']).toBe('previous-firestore');
     expect(process.env['FIREBASE_AUTH_EMULATOR_HOST']).toBe('previous-auth');
   });
+
+  it('forwards live event callbacks to the script executor', async () => {
+    const onEvent = vi.fn();
+
+    await runScriptInWorker(request(), connection(), onEvent);
+
+    expect(firebaseMocks.runUserScript).toHaveBeenCalledWith(
+      'return 1;',
+      expect.objectContaining({
+        auth: { kind: 'auth' },
+        db: firebaseMocks.db,
+        project: expect.objectContaining({ id: 'emu' }),
+      }),
+      { runId: 'run-1', onEvent },
+    );
+  });
 });
 
 function request(): ScriptRunRequest {

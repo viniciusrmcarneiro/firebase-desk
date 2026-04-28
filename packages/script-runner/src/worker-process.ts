@@ -17,7 +17,11 @@ async function handleMessage(message: unknown): Promise<void> {
   }
 
   try {
-    const result = await runScriptInWorker(parsed.request, parsed.connection);
+    const result = await runScriptInWorker(
+      parsed.request,
+      parsed.connection,
+      (event) => send({ type: 'event', event }),
+    );
     send({ type: 'result', result });
     process.exit(0);
   } catch (error) {

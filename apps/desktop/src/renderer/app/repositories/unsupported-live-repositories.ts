@@ -1,4 +1,5 @@
 import type {
+  ScriptRunEventListener,
   ScriptRunnerRepository,
   ScriptRunRequest,
   ScriptRunResult,
@@ -13,5 +14,9 @@ export class UnsupportedLiveScriptRunnerRepository implements ScriptRunnerReposi
 
   async cancel(_runId: string): Promise<void> {
     throw new Error(SCRIPT_RUNNER_UNAVAILABLE_MESSAGE);
+  }
+
+  subscribe(_listener: ScriptRunEventListener): () => void {
+    return () => {};
   }
 }

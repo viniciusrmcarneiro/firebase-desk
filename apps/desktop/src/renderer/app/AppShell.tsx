@@ -502,6 +502,7 @@ export function AppShell(
         queryRows={firestoreTab.queryRows}
         scriptIsRunning={jsTab.isRunning}
         scriptResult={jsTab.scriptResult}
+        scriptRunId={jsTab.scriptRunId}
         scriptStartedAt={jsTab.scriptStartedAt}
         scriptSource={jsTab.scriptSource}
         selectedDocument={firestoreTab.selectedDocument}
@@ -1098,6 +1099,7 @@ interface TabViewProps {
   readonly queryRows: ReadonlyArray<FirestoreDocumentResult>;
   readonly scriptIsRunning: boolean;
   readonly scriptResult: ScriptRunResult | undefined;
+  readonly scriptRunId: string | null;
   readonly scriptStartedAt: number | null;
   readonly scriptSource: string;
   readonly selectedDocument: FirestoreDocumentResult | null;
@@ -1134,6 +1136,7 @@ function TabView(props: TabViewProps) {
       <JsQuerySurface
         isRunning={props.scriptIsRunning}
         result={props.scriptResult ?? null}
+        runId={props.scriptRunId}
         runStartedAt={props.scriptStartedAt}
         source={props.scriptSource}
         onCancel={props.onCancelScript}

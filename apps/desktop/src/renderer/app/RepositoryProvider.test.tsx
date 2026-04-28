@@ -58,6 +58,7 @@ describe('createRepositories', () => {
       scriptRunner: {
         run: runScript,
         cancel: vi.fn(async () => {}),
+        subscribe: vi.fn(() => () => {}),
       },
       settings: {
         load: vi.fn(async () => ({ ...snapshot, dataMode: 'live' as const })),

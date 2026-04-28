@@ -3,8 +3,11 @@ import {
   type IpcChannel,
   type IpcRequest,
   type IpcResponse,
+  SCRIPT_RUN_EVENT_CHANNEL,
+  ScriptRunEventSchema,
 } from '@firebase-desk/ipc-schemas';
-import { contextBridge, ipcRenderer } from 'electron';
+import type { ScriptRunEvent, ScriptRunEventListener } from '@firebase-desk/repo-contracts';
+import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
 function invoke<C extends IpcChannel>(channel: C, request: IpcRequest<C>): Promise<IpcResponse<C>> {
   return ipcRenderer.invoke(channel, request) as Promise<IpcResponse<C>>;
@@ -49,6 +52,13 @@ const api = {
   scriptRunner: {
     run: (request: IpcRequest<'scriptRunner.run'>) => invoke('scriptRunner.run', request),
     cancel: (request: IpcRequest<'scriptRunner.cancel'>) => invoke('scriptRunner.cancel', request),
+    subscribe: (listener: ScriptRunEventListener) => {
+      const handler = (_event: IpcRendererEvent, raw: unknown) => {
+        listener(ScriptRunEventSchema.parse(raw) as ScriptRunEvent);
+      };
+      ipcRenderer.on(SCRIPT_RUN_EVENT_CHANNEL, handler);
+      return () => ipcRenderer.removeListener(SCRIPT_RUN_EVENT_CHANNEL, handler);
+    },
   },
   auth: {
     listUsers: (request: IpcRequest<'auth.listUsers'>) => invoke('auth.listUsers', request),

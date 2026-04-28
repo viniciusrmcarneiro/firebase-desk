@@ -1,5 +1,7 @@
 import type {
   ScriptLogEntry,
+  ScriptRunError,
+  ScriptRunEvent,
   ScriptRunResult,
   ScriptStreamItem,
 } from '@firebase-desk/repo-contracts';
@@ -14,7 +16,11 @@ import {
 } from 'firebase-admin/firestore';
 import { format } from 'node:util';
 import { createContext, Script } from 'node:vm';
-import { normalizeReturnValue, normalizeStreamItem } from './normalize.ts';
+import {
+  normalizeReturnStreamItem,
+  normalizeReturnValue,
+  normalizeStreamItem,
+} from './normalize.ts';
 
 export interface ScriptRuntimeContext {
   readonly auth: Auth;
@@ -22,30 +28,48 @@ export interface ScriptRuntimeContext {
   readonly project: ProjectSummary;
 }
 
+export interface ScriptRunEventSink {
+  readonly runId: string;
+  readonly onEvent: (event: ScriptRunEvent) => void;
+}
+
+type ScriptRunEventPayload =
+  | { readonly type: 'output'; readonly item: ScriptStreamItem; }
+  | { readonly type: 'log'; readonly log: ScriptLogEntry; }
+  | { readonly type: 'error'; readonly error: ScriptRunError; };
+
 export async function runUserScript(
   source: string,
   context: ScriptRuntimeContext,
+  events?: ScriptRunEventSink,
 ): Promise<ScriptRunResult> {
   const startedAt = Date.now();
   const logs: ScriptLogEntry[] = [];
   const stream: ScriptStreamItem[] = [];
 
   try {
-    const generator = createUserGenerator(source, context, logs);
-    const returnValue = await drainGenerator(generator, stream, 1);
+    const generator = createUserGenerator(source, context, logs, events);
+    const rawReturnValue = await drainGenerator(generator, stream, 1, events);
+    const returnItem = normalizeReturnStreamItem(rawReturnValue);
+    if (returnItem) {
+      stream.push(returnItem);
+      emitRunEvent(events, { type: 'output', item: returnItem });
+    }
     return {
-      returnValue: normalizeReturnValue(returnValue),
+      returnValue: normalizeReturnValue(rawReturnValue),
       stream,
       logs,
       errors: [],
       durationMs: Date.now() - startedAt,
     };
   } catch (error) {
+    const scriptRunError = scriptError(error);
+    emitRunEvent(events, { type: 'error', error: scriptRunError });
     return {
       returnValue: null,
       stream,
       logs,
-      errors: [scriptError(error)],
+      errors: [scriptRunError],
       durationMs: Date.now() - startedAt,
     };
   }
@@ -55,13 +79,18 @@ async function drainGenerator(
   generator: AsyncGenerator<unknown, unknown, unknown>,
   stream: ScriptStreamItem[],
   initialYieldIndex: number,
+  events?: ScriptRunEventSink,
 ): Promise<unknown> {
   let yieldIndex = initialYieldIndex;
   while (true) {
+    // eslint-disable-next-line no-await-in-loop -- async generator yields must be consumed sequentially.
     const next = await generator.next();
     if (next.done) return next.value;
     const item = normalizeStreamItem(next.value, yieldIndex);
-    if (item) stream.push(item);
+    if (item) {
+      stream.push(item);
+      emitRunEvent(events, { type: 'output', item });
+    }
     yieldIndex += 1;
   }
 }
@@ -70,6 +99,7 @@ function createUserGenerator(
   source: string,
   runtime: ScriptRuntimeContext,
   logs: ScriptLogEntry[],
+  events?: ScriptRunEventSink,
 ): AsyncGenerator<unknown, unknown, unknown> {
   const script = new Script(wrappedSource(source), {
     filename: 'firebase-desk-script.js',
@@ -77,7 +107,7 @@ function createUserGenerator(
   const vmContext = createContext({
     admin: adminFacade(runtime),
     auth: runtime.auth,
-    console: consoleFacade(logs),
+    console: consoleFacade(logs, events),
     db: runtime.db,
     project: {
       id: runtime.project.id,
@@ -104,13 +134,15 @@ function wrappedSource(source: string): string {
   return `(async function* __firebaseDeskScript__() {\n'use strict';\n${source}\n})`;
 }
 
-function consoleFacade(logs: ScriptLogEntry[]): Console {
+function consoleFacade(logs: ScriptLogEntry[], events?: ScriptRunEventSink): Console {
   const write = (level: ScriptLogEntry['level'], args: unknown[]) => {
-    logs.push({
+    const log = {
       level,
       message: format(...args),
       timestamp: new Date().toISOString(),
-    });
+    };
+    logs.push(log);
+    emitRunEvent(events, { type: 'log', log });
   };
   return {
     log: (...args: unknown[]) => write('log', args),
@@ -118,6 +150,14 @@ function consoleFacade(logs: ScriptLogEntry[]): Console {
     warn: (...args: unknown[]) => write('warn', args),
     error: (...args: unknown[]) => write('error', args),
   } as Console;
+}
+
+function emitRunEvent(
+  events: ScriptRunEventSink | undefined,
+  event: ScriptRunEventPayload,
+): void {
+  if (!events) return;
+  events.onEvent({ ...event, runId: events.runId });
 }
 
 function adminFacade(runtime: ScriptRuntimeContext) {

@@ -1,4 +1,8 @@
-import type { ScriptRunRequest, ScriptRunResult } from '@firebase-desk/repo-contracts';
+import type {
+  ScriptRunEvent,
+  ScriptRunRequest,
+  ScriptRunResult,
+} from '@firebase-desk/repo-contracts';
 import { type App, cert, deleteApp, initializeApp, type ServiceAccount } from 'firebase-admin/app';
 import { getAuth } from 'firebase-admin/auth';
 import { type Firestore, initializeFirestore, type Settings } from 'firebase-admin/firestore';
@@ -8,6 +12,7 @@ import type { ScriptRunnerConnection } from './types.ts';
 export async function runScriptInWorker(
   request: ScriptRunRequest,
   connection: ScriptRunnerConnection,
+  onEvent?: (event: ScriptRunEvent) => void,
 ): Promise<ScriptRunResult> {
   let app: App | null = null;
   let db: Firestore | null = null;
@@ -19,7 +24,11 @@ export async function runScriptInWorker(
     app = initializeApp(appOptionsFor(connection), appNameFor(request.runId));
     db = initializeFirestore(app, firestoreSettingsFor(connection));
     const auth = getAuth(app);
-    return await runUserScript(request.source, { auth, db, project: connection.project });
+    return await runUserScript(
+      request.source,
+      { auth, db, project: connection.project },
+      onEvent ? { runId: request.runId, onEvent } : undefined,
+    );
   } finally {
     restoreEnv('FIRESTORE_EMULATOR_HOST', previousFirestoreHost);
     restoreEnv('FIREBASE_AUTH_EMULATOR_HOST', previousAuthHost);

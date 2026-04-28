@@ -12,6 +12,7 @@ describe('IpcScriptRunnerRepository', () => {
         durationMs: 5,
       }),
       cancel: vi.fn().mockResolvedValue(undefined),
+      subscribe: vi.fn(() => () => {}),
     } satisfies DesktopScriptRunnerApi;
     Object.defineProperty(window, 'firebaseDesk', {
       configurable: true,
@@ -25,6 +26,9 @@ describe('IpcScriptRunnerRepository', () => {
       source: 'return { ok: true };',
     })).resolves.toMatchObject({ returnValue: { ok: true } });
     await expect(repository.cancel('run-1')).resolves.toBeUndefined();
+    const listener = vi.fn();
+    const unsubscribe = repository.subscribe(listener);
+    unsubscribe();
 
     expect(scriptRunner.run).toHaveBeenCalledWith({
       runId: 'run-1',
@@ -32,5 +36,6 @@ describe('IpcScriptRunnerRepository', () => {
       source: 'return { ok: true };',
     });
     expect(scriptRunner.cancel).toHaveBeenCalledWith({ runId: 'run-1' });
+    expect(scriptRunner.subscribe).toHaveBeenCalledWith(listener);
   });
 });

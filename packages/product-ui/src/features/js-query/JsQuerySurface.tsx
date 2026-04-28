@@ -13,6 +13,7 @@ export interface JsQuerySurfaceProps {
   readonly onRun: () => void;
   readonly onSourceChange: (source: string) => void;
   readonly result?: ScriptRunResult | null;
+  readonly runId?: string | null;
   readonly source: string;
 }
 
@@ -23,6 +24,7 @@ export function JsQuerySurface(
     onRun,
     onSourceChange,
     result,
+    runId = null,
     runStartedAt = null,
     source,
   }: JsQuerySurfaceProps,
@@ -56,7 +58,12 @@ export function JsQuerySurface(
           defaultSize={isWide ? '50%' : '48%'}
           minSize={isWide ? '320px' : '180px'}
         >
-          <ScriptOutput isRunning={isRunning} result={result ?? null} startedAt={runStartedAt} />
+          <ScriptOutput
+            isRunning={isRunning}
+            result={result ?? null}
+            runId={runId}
+            startedAt={runStartedAt}
+          />
         </ResizablePanel>
       </ResizablePanelGroup>
     </div>

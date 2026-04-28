@@ -1,4 +1,5 @@
 import type {
+  ScriptRunEventListener,
   ScriptRunnerRepository,
   ScriptRunRequest,
   ScriptRunResult,
@@ -24,5 +25,9 @@ export class IpcScriptRunnerRepository implements ScriptRunnerRepository {
 
   async cancel(runId: string): Promise<void> {
     await window.firebaseDesk.scriptRunner.cancel({ runId });
+  }
+
+  subscribe(listener: ScriptRunEventListener): () => void {
+    return window.firebaseDesk.scriptRunner.subscribe(listener);
   }
 }

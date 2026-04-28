@@ -1,5 +1,6 @@
 import { encode } from '@firebase-desk/data-format';
 import type {
+  ScriptRunEventListener,
   ScriptRunnerRepository,
   ScriptRunRequest,
   ScriptRunResult,
@@ -7,6 +8,8 @@ import type {
 import { COLLECTIONS, type FixtureDocument } from './fixtures/index.ts';
 
 export class MockScriptRunnerRepository implements ScriptRunnerRepository {
+  private readonly listeners = new Set<ScriptRunEventListener>();
+
   async run(request: ScriptRunRequest): Promise<ScriptRunResult> {
     const startedAt = Date.now();
     const source = request.source.toLowerCase();
@@ -22,7 +25,7 @@ export class MockScriptRunnerRepository implements ScriptRunnerRepository {
       },
     ];
     if (source.includes('empty')) {
-      return {
+      const result: ScriptRunResult = {
         returnValue: null,
         stream: [],
         logs: [
@@ -36,6 +39,8 @@ export class MockScriptRunnerRepository implements ScriptRunnerRepository {
         errors: [],
         durationMs: Date.now() - startedAt,
       };
+      this.emitResultEvents(request.runId, result);
+      return result;
     }
     if (source.includes('plain')) {
       const value = {
@@ -43,7 +48,7 @@ export class MockScriptRunnerRepository implements ScriptRunnerRepository {
         connectionId: request.connectionId,
         summary: { paidOrders: returnedOrders.length, customers: customers.length },
       };
-      return {
+      const result: ScriptRunResult = {
         returnValue: value,
         stream: [{
           id: 'yield-plain-object',
@@ -56,10 +61,12 @@ export class MockScriptRunnerRepository implements ScriptRunnerRepository {
         errors: [],
         durationMs: Date.now() - startedAt,
       };
+      this.emitResultEvents(request.runId, result);
+      return result;
     }
     if (source.includes('array')) {
       const value = orders.map((doc) => doc.data.status);
-      return {
+      const result: ScriptRunResult = {
         returnValue: value,
         stream: [{
           id: 'yield-array',
@@ -72,10 +79,12 @@ export class MockScriptRunnerRepository implements ScriptRunnerRepository {
         errors: [],
         durationMs: Date.now() - startedAt,
       };
+      this.emitResultEvents(request.runId, result);
+      return result;
     }
     if (source.includes('document')) {
       const value = orders[0] ? resultDocument('orders', orders[0]) : null;
-      return {
+      const result: ScriptRunResult = {
         returnValue: value,
         stream: [{
           id: 'yield-document-like-value',
@@ -88,8 +97,10 @@ export class MockScriptRunnerRepository implements ScriptRunnerRepository {
         errors: [],
         durationMs: Date.now() - startedAt,
       };
+      this.emitResultEvents(request.runId, result);
+      return result;
     }
-    return {
+    const result: ScriptRunResult = {
       returnValue: hasError ? null : returnedOrders,
       stream: hasError
         ? []
@@ -158,9 +169,27 @@ export class MockScriptRunnerRepository implements ScriptRunnerRepository {
         : [],
       durationMs: Date.now() - startedAt,
     };
+    this.emitResultEvents(request.runId, result);
+    return result;
   }
 
   async cancel(_runId: string): Promise<void> {}
+
+  subscribe(listener: ScriptRunEventListener): () => void {
+    this.listeners.add(listener);
+    return () => this.listeners.delete(listener);
+  }
+
+  private emitResultEvents(runId: string, result: ScriptRunResult): void {
+    for (const log of result.logs) this.emit({ type: 'log', runId, log });
+    for (const item of result.stream ?? []) this.emit({ type: 'output', runId, item });
+    for (const error of result.errors) this.emit({ type: 'error', runId, error });
+    this.emit({ type: 'complete', runId, result });
+  }
+
+  private emit(event: Parameters<ScriptRunEventListener>[0]): void {
+    for (const listener of this.listeners) listener(event);
+  }
 }
 
 function docsFor(path: string): ReadonlyArray<FixtureDocument> {

@@ -1,5 +1,5 @@
 import type { ScriptRunResult } from '@firebase-desk/repo-contracts';
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { ScriptOutput } from './ScriptOutput.tsx';
 
@@ -46,11 +46,56 @@ describe('ScriptOutput', () => {
     render(
       <ScriptOutput
         isRunning={false}
-        result={{ ...result, cancelled: true }}
+        result={{ ...result, returnValue: null, cancelled: true }}
       />,
     );
 
     expect(screen.getByText('cancelled')).toBeTruthy();
+    expect(screen.getByText(/\[01:02:03\] done/)).toBeTruthy();
+  });
+
+  it('auto-opens results when live output arrives', () => {
+    render(
+      <ScriptOutput
+        isRunning
+        result={{
+          ...result,
+          stream: [{ id: 'yield-1', label: 'yield 1', badge: 'number', view: 'json', value: 1 }],
+        }}
+        runId='run-1'
+      />,
+    );
+
+    expect(screen.getByText('yield 1')).toBeTruthy();
+  });
+
+  it('does not steal manual output tab choice during live updates', () => {
+    const { rerender } = render(
+      <ScriptOutput
+        isRunning
+        result={{
+          ...result,
+          stream: [{ id: 'yield-1', label: 'yield 1', badge: 'number', view: 'json', value: 1 }],
+        }}
+        runId='run-1'
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('tab', { name: /Logs/ }));
+    rerender(
+      <ScriptOutput
+        isRunning
+        result={{
+          ...result,
+          stream: [
+            { id: 'yield-1', label: 'yield 1', badge: 'number', view: 'json', value: 1 },
+            { id: 'yield-2', label: 'yield 2', badge: 'number', view: 'json', value: 2 },
+          ],
+        }}
+        runId='run-1'
+      />,
+    );
+
     expect(screen.getByText(/\[01:02:03\] done/)).toBeTruthy();
   });
 });

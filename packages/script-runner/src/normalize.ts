@@ -39,6 +39,18 @@ export function normalizeReturnValue(value: unknown): unknown {
   return normalizeScriptValue(value)?.value ?? null;
 }
 
+export function normalizeReturnStreamItem(value: unknown): ScriptStreamItem | null {
+  const normalized = normalizeScriptValue(value);
+  if (!normalized) return null;
+  return {
+    id: 'return-value',
+    label: 'return value',
+    badge: normalized.badge,
+    view: normalized.view,
+    value: normalized.value,
+  };
+}
+
 export function normalizeStreamItem(
   value: unknown,
   index: number,
