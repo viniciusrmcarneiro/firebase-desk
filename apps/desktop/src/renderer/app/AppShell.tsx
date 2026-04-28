@@ -18,6 +18,7 @@ import {
 } from '@firebase-desk/product-ui';
 import type {
   AuthUser,
+  FirestoreCollectionNode,
   FirestoreDocumentResult,
   ProjectAddInput,
   ProjectSummary,
@@ -96,10 +97,13 @@ interface DestructiveAction {
 }
 
 export interface AppShellProps {
+  readonly dataMode?: 'live' | 'mock';
   readonly initialSidebarWidth?: number;
 }
 
-export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShellProps) {
+export function AppShell(
+  { dataMode = 'mock', initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShellProps,
+) {
   const [persistedWorkspace] = useState(() => {
     const persisted = loadPersistedWorkspaceState();
     if (!persisted) return null;
@@ -128,6 +132,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
   const [addProjectOpen, setAddProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [credentialWarning, setCredentialWarning] = useState<string | null>(null);
+  const [firestoreActionError, setFirestoreActionError] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState('Ready');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pendingDestructiveAction, setPendingDestructiveAction] = useState<
@@ -304,7 +309,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
       confirmLabel: 'Close',
       description: isLastTab
         ? `Close ${tab.title}? The workspace will have no open tabs.`
-        : `Close ${tab.title}? Unsaved mocked tab state for this tab will be discarded.`,
+        : `Close ${tab.title}? Unsaved tab state for this tab will be discarded.`,
       onConfirm: () => {
         tabActions.closeTab(tabId);
         setLastAction(`Closed ${tab.title}`);
@@ -321,7 +326,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
       confirmLabel: 'Close others',
       description: `Close ${count} other tab${
         count === 1 ? '' : 's'
-      }? Their mocked tab state will be discarded.`,
+      }? Their tab state will be discarded.`,
       onConfirm: () => {
         tabActions.closeOtherTabs(tabId);
         setLastAction(`Closed other tabs around ${tab.title}`);
@@ -337,7 +342,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
       confirmLabel: 'Close tabs',
       description: `Close ${index} tab${
         index === 1 ? '' : 's'
-      } to the left? Their mocked tab state will be discarded.`,
+      } to the left? Their tab state will be discarded.`,
       onConfirm: () => {
         tabActions.closeTabsToLeft(tabId);
         setLastAction('Closed tabs to left');
@@ -354,7 +359,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
       confirmLabel: 'Close tabs',
       description: `Close ${count} tab${
         count === 1 ? '' : 's'
-      } to the right? Their mocked tab state will be discarded.`,
+      } to the right? Their tab state will be discarded.`,
       onConfirm: () => {
         tabActions.closeTabsToRight(tabId);
         setLastAction('Closed tabs to right');
@@ -420,6 +425,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
   }
 
   function handleRunQuery() {
+    setFirestoreActionError(null);
     const path = firestoreTab.runQuery();
     if (path) setLastAction(`Ran query ${path}`);
   }
@@ -452,9 +458,10 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
     ? (
       <TabView
         activeTab={activeTab}
+        authErrorMessage={authTab.errorMessage}
         authFilter={authTab.authFilter}
         draft={firestoreTab.activeDraft}
-        firestoreErrorMessage={firestoreTab.errorMessage}
+        firestoreErrorMessage={firestoreTab.errorMessage ?? firestoreActionError}
         hasMore={firestoreTab.hasMore}
         isFetchingMore={firestoreTab.isFetchingMore}
         isLoading={firestoreTab.isLoading}
@@ -475,6 +482,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
         onDraftChange={firestoreTab.setDraft}
         onLoadMore={firestoreTab.loadMore}
         onLoadMoreUsers={authTab.loadMore}
+        onLoadSubcollections={handleLoadSubcollections}
         onOpenDocumentInNewTab={(path) => {
           const tabId = openFirestoreTabInNewTab(activeTab.connectionId, path);
           tabActions.recordInteraction({
@@ -496,6 +504,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
     : null;
 
   function handleSelectTab(tabId: string) {
+    setFirestoreActionError(null);
     tabActions.selectTab(tabId);
     const tab = tabsStore.state.tabs.find((item) => item.id === tabId);
     const selectedTreeItemId = tab ? treeItemIdForTab(tab) : selection.treeItemId;
@@ -511,6 +520,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
   function handleActiveProjectChange(connectionId: string) {
     if (!activeTab) return;
     if (activeTab.connectionId === connectionId) return;
+    setFirestoreActionError(null);
     tabActions.updateConnection(activeTab.id, connectionId);
     clearConnectionScopedTabState(activeTab.id);
     const nextTreeItemId = treeItemIdForTab({ ...activeTab, connectionId });
@@ -538,21 +548,42 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
     setLastAction(`Refreshed ${activeTab.title}`);
   }
 
-  function handleSaveDocument(documentPath: string, data: Record<string, unknown>) {
+  async function handleSaveDocument(documentPath: string, data: Record<string, unknown>) {
     if (!activeProject) return;
-    void repositories.firestore.saveDocument(activeProject.id, documentPath, data).then(() =>
-      queryClient.invalidateQueries({ queryKey: ['firestore'] })
-    );
-    setLastAction(`Saved ${documentPath}`);
+    setFirestoreActionError(null);
+    try {
+      await repositories.firestore.saveDocument(activeProject.id, documentPath, data);
+      await queryClient.invalidateQueries({ queryKey: ['firestore'] });
+      setLastAction(`Saved ${documentPath}`);
+    } catch (error) {
+      const message = messageFromError(error, 'Could not save document.');
+      setFirestoreActionError(message);
+      setLastAction(`Save failed: ${message}`);
+      throw error instanceof Error ? error : new Error(message);
+    }
   }
 
   function handleDeleteDocument(documentPath: string) {
     if (!activeProject || !activeTab) return;
-    void repositories.firestore.deleteDocument(activeProject.id, documentPath).then(() =>
-      queryClient.invalidateQueries({ queryKey: ['firestore'] })
-    );
-    firestoreTab.selectDocument(activeTab.id, null);
-    setLastAction(`Deleted ${documentPath}`);
+    setFirestoreActionError(null);
+    void repositories.firestore.deleteDocument(activeProject.id, documentPath)
+      .then(() => queryClient.invalidateQueries({ queryKey: ['firestore'] }))
+      .then(() => {
+        firestoreTab.selectDocument(activeTab.id, null);
+        setLastAction(`Deleted ${documentPath}`);
+      })
+      .catch((error: unknown) => {
+        const message = messageFromError(error, 'Could not delete document.');
+        setFirestoreActionError(message);
+        setLastAction(`Delete failed: ${message}`);
+      });
+  }
+
+  async function handleLoadSubcollections(
+    documentPath: string,
+  ): Promise<ReadonlyArray<FirestoreCollectionNode>> {
+    if (!activeProject) throw new Error('Choose a project before loading subcollections.');
+    return await repositories.firestore.listSubcollections(activeProject.id, documentPath);
   }
 
   async function handleOpenDataDirectory(): Promise<void> {
@@ -569,6 +600,7 @@ export function AppShell({ initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShe
       <AppHeader
         canGoBack={tabsState.interactionHistoryIndex > 0}
         canGoForward={tabsState.interactionHistoryIndex < tabsState.interactionHistory.length - 1}
+        dataMode={dataMode}
         mode={appearance.mode}
         resolvedTheme={appearance.resolvedTheme}
         onAddProject={() => setAddProjectOpen(true)}
@@ -784,6 +816,7 @@ function DestructiveActionDialog(
 interface AppHeaderProps {
   readonly canGoBack: boolean;
   readonly canGoForward: boolean;
+  readonly dataMode: 'live' | 'mock';
   readonly mode: AppearanceMode;
   readonly onAddProject: () => void;
   readonly onBack: () => void;
@@ -797,6 +830,7 @@ function AppHeader(
   {
     canGoBack,
     canGoForward,
+    dataMode,
     mode,
     onAddProject,
     onBack,
@@ -831,7 +865,7 @@ function AppHeader(
           <img src={appIconUrl} alt='' className='size-full object-cover' />
         </span>
         <strong className='truncate text-sm font-semibold text-text-primary'>Firebase Desk</strong>
-        <Badge>mock</Badge>
+        <Badge variant={dataMode === 'live' ? 'warning' : 'neutral'}>{dataMode}</Badge>
       </div>
       <div className='ml-auto flex shrink-0 items-center gap-2'>
         <Button variant='secondary' onClick={onOpenSettings}>
@@ -931,6 +965,7 @@ function ProjectSwitcher({ activeProject, onConnectionChange, projects }: Projec
 
 interface TabViewProps {
   readonly activeTab: WorkspaceTab;
+  readonly authErrorMessage: string | null;
   readonly authFilter: string;
   readonly draft: FirestoreQueryDraft;
   readonly firestoreErrorMessage: string | null;
@@ -942,11 +977,17 @@ interface TabViewProps {
   readonly onDraftChange: (draft: FirestoreQueryDraft) => void;
   readonly onLoadMore: () => void;
   readonly onLoadMoreUsers: () => void;
+  readonly onLoadSubcollections: (
+    documentPath: string,
+  ) => Promise<ReadonlyArray<FirestoreCollectionNode>>;
   readonly onOpenDocumentInNewTab: (documentPath: string) => void;
   readonly onReset: () => void;
   readonly onRunQuery: () => void;
   readonly onRunScript: () => void;
-  readonly onSaveDocument: (documentPath: string, data: Record<string, unknown>) => void;
+  readonly onSaveDocument: (
+    documentPath: string,
+    data: Record<string, unknown>,
+  ) => Promise<void> | void;
   readonly onScriptChange: (source: string) => void;
   readonly onSelectDocument: (documentPath: string) => void;
   readonly onSelectUser: (uid: string) => void;
@@ -968,6 +1009,7 @@ function TabView(props: TabViewProps) {
   if (props.activeTab.kind === 'auth-users') {
     return (
       <AuthUsersSurface
+        errorMessage={props.authErrorMessage}
         filterValue={props.authFilter}
         hasMore={props.usersHasMore}
         isFetchingMore={props.usersIsFetchingMore}
@@ -1005,6 +1047,7 @@ function TabView(props: TabViewProps) {
       onDraftChange={props.onDraftChange}
       onDeleteDocument={props.onDeleteDocument}
       onLoadMore={props.onLoadMore}
+      onLoadSubcollections={props.onLoadSubcollections}
       onOpenDocumentInNewTab={props.onOpenDocumentInNewTab}
       onReset={props.onReset}
       onRun={props.onRunQuery}
@@ -1022,4 +1065,9 @@ function persistSidebarWidth(repositories: RepositorySet, size: number) {
   const width = clampSidebarWidth(size);
   document.documentElement.style.setProperty('--sidebar-width', `${width}px`);
   void repositories.settings.save({ sidebarWidth: width });
+}
+
+function messageFromError(error: unknown, fallback: string): string {
+  if (error instanceof Error) return error.message;
+  return fallback;
 }

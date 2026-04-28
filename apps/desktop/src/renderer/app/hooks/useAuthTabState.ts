@@ -12,6 +12,7 @@ interface UseAuthTabStateInput {
 
 export interface AuthTabState {
   readonly authFilter: string;
+  readonly errorMessage: string | null;
   readonly selectedUser: AuthUser | null;
   readonly users: ReadonlyArray<AuthUser>;
   readonly usersHasMore: boolean;
@@ -38,6 +39,9 @@ export function useAuthTabState(
     ? usersSearchQuery.data ?? []
     : usersQuery.data?.pages.flatMap((page) => page.items) ?? [];
   const selectedUser = users.find((user) => user.uid === selectedUserId) ?? null;
+  const errorMessage = authSearchText
+    ? messageFromError(usersSearchQuery.error)
+    : messageFromError(usersQuery.error);
 
   function loadMore() {
     if (!authSearchText) void usersQuery.fetchNextPage();
@@ -49,6 +53,7 @@ export function useAuthTabState(
 
   return {
     authFilter,
+    errorMessage,
     selectedUser,
     users,
     usersHasMore: !authSearchText && Boolean(usersQuery.hasNextPage),
@@ -59,4 +64,10 @@ export function useAuthTabState(
     refetch,
     setAuthFilter,
   };
+}
+
+function messageFromError(error: unknown): string | null {
+  if (!error) return null;
+  if (error instanceof Error) return error.message;
+  return 'Could not load Authentication data.';
 }

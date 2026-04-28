@@ -429,7 +429,7 @@ describe('feature surfaces', () => {
     fireEvent.mouseDown(tableTab, { button: 0, ctrlKey: false });
     fireEvent.doubleClick(screen.getAllByText('ord_1024')[0]!);
     expect(await screen.findByRole('dialog', { name: 'Document editor' })).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Save mock' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(onSaveDocument).toHaveBeenCalledWith(
       'orders/ord_1024',
       expect.objectContaining({ status: 'paid' }),
@@ -458,6 +458,69 @@ describe('feature surfaces', () => {
     expect(screen.getByText('ref')).toBeTruthy();
     expect(screen.getByText('customers/cus_ada')).toBeTruthy();
     expect(screen.queryByText(/__type__/)).toBeNull();
+  });
+
+  it('FirestoreQuerySurface lazy loads subcollections from result rows', async () => {
+    const onLoadSubcollections = vi.fn().mockResolvedValue([
+      { id: 'events', path: 'orders/ord_lazy/events' },
+    ]);
+    renderWithAppearance(
+      <FirestoreQuerySurface
+        draft={draft}
+        hasMore={false}
+        rows={[{
+          id: 'ord_lazy',
+          path: 'orders/ord_lazy',
+          data: { status: 'paid' },
+          hasSubcollections: true,
+        }]}
+        onDraftChange={() => {}}
+        onLoadMore={() => {}}
+        onLoadSubcollections={onLoadSubcollections}
+        onOpenDocumentInNewTab={() => {}}
+        onReset={() => {}}
+        onRun={() => {}}
+        onSelectDocument={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Load' }));
+
+    await waitFor(() => expect(onLoadSubcollections).toHaveBeenCalledWith('orders/ord_lazy'));
+    expect(await screen.findByRole('button', { name: /events/ })).toBeTruthy();
+  });
+
+  it('FirestoreQuerySurface lazy loads subcollections when tree documents expand', async () => {
+    const onLoadSubcollections = vi.fn().mockResolvedValue([
+      { id: 'events', path: 'orders/ord_lazy/events' },
+    ]);
+    renderWithAppearance(
+      <FirestoreQuerySurface
+        draft={draft}
+        hasMore={false}
+        rows={[{
+          id: 'ord_lazy',
+          path: 'orders/ord_lazy',
+          data: { status: 'paid' },
+          hasSubcollections: true,
+        }]}
+        onDraftChange={() => {}}
+        onLoadMore={() => {}}
+        onLoadSubcollections={onLoadSubcollections}
+        onOpenDocumentInNewTab={() => {}}
+        onReset={() => {}}
+        onRun={() => {}}
+        onSelectDocument={() => {}}
+      />,
+    );
+
+    const treeTab = screen.getByRole('tab', { name: /Tree/ });
+    fireEvent.mouseDown(treeTab, { button: 0, ctrlKey: false });
+    fireEvent.click(screen.getByText('orders'));
+    fireEvent.click(screen.getByText('ord_lazy'));
+
+    await waitFor(() => expect(onLoadSubcollections).toHaveBeenCalledWith('orders/ord_lazy'));
+    expect(await screen.findByText('events')).toBeTruthy();
   });
 
   it('FirestoreQuerySurface disables query controls and shows running state while loading', () => {

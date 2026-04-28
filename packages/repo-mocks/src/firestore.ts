@@ -83,7 +83,7 @@ export class MockFirestoreRepository implements FirestoreRepository {
       path: documentPath,
       data: encode(doc.data as never) as Record<string, unknown>,
       hasSubcollections: subcollections.length > 0,
-      ...(subcollections.length > 0 ? { subcollections } : {}),
+      subcollections,
     };
   }
 
@@ -183,7 +183,7 @@ function pageResults(
         path,
         data: encode(doc.data as never) as Record<string, unknown>,
         hasSubcollections: subcollections.length > 0,
-        ...(subcollections.length > 0 ? { subcollections } : {}),
+        subcollections,
       };
     }),
     nextCursor: page.nextCursor,

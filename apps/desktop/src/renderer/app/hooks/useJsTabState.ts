@@ -55,6 +55,14 @@ export function useJsTabState(
           if (tab?.connectionId !== connectionId) return;
           setScriptResults((current) => ({ ...current, [tabId]: result }));
         },
+        onError: (error) => {
+          const tab = tabsStore.state.tabs.find((item) => item.id === tabId);
+          if (tab?.connectionId !== connectionId) return;
+          setScriptResults((current) => ({
+            ...current,
+            [tabId]: scriptErrorResult(error),
+          }));
+        },
       },
     );
     tabActions.recordInteraction({
@@ -78,5 +86,18 @@ export function useJsTabState(
     clearTab,
     runScript,
     setScriptSource,
+  };
+}
+
+function scriptErrorResult(error: unknown): ScriptRunResult {
+  return {
+    returnValue: null,
+    logs: [],
+    errors: [{
+      name: error instanceof Error ? error.name : 'Error',
+      message: error instanceof Error ? error.message : 'Could not run JavaScript query.',
+      ...(error instanceof Error && error.stack ? { stack: error.stack } : {}),
+    }],
+    durationMs: 0,
   };
 }

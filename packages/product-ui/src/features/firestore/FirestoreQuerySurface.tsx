@@ -84,12 +84,18 @@ export interface FirestoreQuerySurfaceProps {
   readonly isFetchingMore?: boolean;
   readonly isLoading?: boolean;
   readonly onDraftChange: (draft: FirestoreQueryDraft) => void;
-  readonly onDeleteDocument?: (documentPath: string) => void;
+  readonly onDeleteDocument?: (documentPath: string) => Promise<void> | void;
   readonly onLoadMore: () => void;
+  readonly onLoadSubcollections?: (
+    documentPath: string,
+  ) => Promise<ReadonlyArray<FirestoreCollectionNode>>;
   readonly onOpenDocumentInNewTab: (documentPath: string) => void;
   readonly onReset: () => void;
   readonly onRun: () => void;
-  readonly onSaveDocument?: (documentPath: string, data: Record<string, unknown>) => void;
+  readonly onSaveDocument?: (
+    documentPath: string,
+    data: Record<string, unknown>,
+  ) => Promise<void> | void;
   readonly onSelectDocument: (documentPath: string) => void;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocument?: FirestoreDocumentResult | null;
@@ -102,6 +108,12 @@ interface FieldCatalogItem {
   readonly count: number;
   readonly field: string;
   readonly types: ReadonlyArray<string>;
+}
+
+interface SubcollectionLoadState {
+  readonly status: 'error' | 'loading' | 'success';
+  readonly errorMessage?: string;
+  readonly items?: ReadonlyArray<FirestoreCollectionNode>;
 }
 
 const filterOps: ReadonlyArray<FirestoreFilterOp> = [
@@ -119,6 +131,7 @@ const filterOps: ReadonlyArray<FirestoreFilterOp> = [
 
 const selectClassName =
   'h-[var(--density-compact-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary disabled:cursor-not-allowed disabled:opacity-60';
+const MAX_SUBCOLLECTION_CHIPS = 10;
 
 function createEmptyFilter(id = 'filter-1'): FirestoreQueryFilterDraft {
   return { id, field: '', op: '==', value: '' };
@@ -171,6 +184,7 @@ export function FirestoreQuerySurface(
     onDraftChange,
     onDeleteDocument,
     onLoadMore,
+    onLoadSubcollections,
     onOpenDocumentInNewTab,
     onReset,
     onRun,
@@ -184,7 +198,46 @@ export function FirestoreQuerySurface(
   const [resultView, setResultView] = useState<ResultView>('table');
   const [overviewCollapsed, setOverviewCollapsed] = useState(false);
   const [editorDocument, setEditorDocument] = useState<FirestoreDocumentResult | null>(null);
+  const [subcollectionStates, setSubcollectionStates] = useState<
+    Readonly<Record<string, SubcollectionLoadState>>
+  >({});
   const useSplitLayout = useMediaQuery('(min-width: 1024px)');
+  const rowsWithSubcollections = useMemo(
+    () => rows.map((row) => mergeLoadedSubcollections(row, subcollectionStates[row.path])),
+    [rows, subcollectionStates],
+  );
+  const selectedDocumentWithSubcollections = useMemo(
+    () =>
+      rowsWithSubcollections.find((row) => row.path === selectedDocumentPath)
+        ?? mergeLoadedSubcollections(
+          selectedDocument,
+          selectedDocument ? subcollectionStates[selectedDocument.path] : undefined,
+        ),
+    [rowsWithSubcollections, selectedDocument, selectedDocumentPath, subcollectionStates],
+  );
+
+  async function loadSubcollections(documentPath: string) {
+    if (!onLoadSubcollections) return;
+    setSubcollectionStates((current) => ({
+      ...current,
+      [documentPath]: { status: 'loading' },
+    }));
+    try {
+      const items = await onLoadSubcollections(documentPath);
+      setSubcollectionStates((current) => ({
+        ...current,
+        [documentPath]: { status: 'success', items },
+      }));
+    } catch (caught) {
+      setSubcollectionStates((current) => ({
+        ...current,
+        [documentPath]: {
+          status: 'error',
+          errorMessage: messageFromError(caught, 'Could not load subcollections.'),
+        },
+      }));
+    }
+  }
 
   const mainColumn = (
     <div className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2'>
@@ -202,10 +255,12 @@ export function FirestoreQuerySurface(
         isLoading={isLoading}
         queryPath={draft.path}
         resultView={resultView}
-        rows={rows}
+        rows={rowsWithSubcollections}
+        subcollectionStates={subcollectionStates}
         selectedDocumentPath={selectedDocumentPath}
         onEditDocument={setEditorDocument}
         onLoadMore={onLoadMore}
+        onLoadSubcollections={onLoadSubcollections ? loadSubcollections : undefined}
         onOpenDocumentInNewTab={onOpenDocumentInNewTab}
         onResultViewChange={setResultView}
         onSelectDocument={onSelectDocument}
@@ -218,11 +273,12 @@ export function FirestoreQuerySurface(
     : (
       <ResultContextPanel
         resultView={resultView}
-        rows={rows}
-        selectedDocument={selectedDocument}
+        rows={rowsWithSubcollections}
+        selectedDocument={selectedDocumentWithSubcollections}
         onCollapse={() => setOverviewCollapsed(true)}
         onDeleteDocument={onDeleteDocument}
         onEditDocument={setEditorDocument}
+        onOpenDocumentInNewTab={onOpenDocumentInNewTab}
       />
     );
 
@@ -506,6 +562,7 @@ interface ResultPanelProps {
   readonly isLoading: boolean;
   readonly onEditDocument: (document: FirestoreDocumentResult) => void;
   readonly onLoadMore: () => void;
+  readonly onLoadSubcollections?: ((documentPath: string) => Promise<void> | void) | undefined;
   readonly onOpenDocumentInNewTab: (documentPath: string) => void;
   readonly onResultViewChange: (view: ResultView) => void;
   readonly onSelectDocument: (documentPath: string) => void;
@@ -513,6 +570,7 @@ interface ResultPanelProps {
   readonly resultView: ResultView;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocumentPath: string | null;
+  readonly subcollectionStates: Readonly<Record<string, SubcollectionLoadState>>;
 }
 
 function ResultPanel(
@@ -523,6 +581,7 @@ function ResultPanel(
     isLoading,
     onEditDocument,
     onLoadMore,
+    onLoadSubcollections,
     onOpenDocumentInNewTab,
     onResultViewChange,
     onSelectDocument,
@@ -530,6 +589,7 @@ function ResultPanel(
     resultView,
     rows,
     selectedDocumentPath,
+    subcollectionStates,
   }: ResultPanelProps,
 ) {
   const jsonValue = useMemo(() => ({ path: queryPath, documents: rows }), [queryPath, rows]);
@@ -537,7 +597,24 @@ function ResultPanel(
   const [expandedTreeIds, setExpandedTreeIds] = useState<ReadonlySet<string>>(() => new Set());
 
   function toggleTreeNode(id: string) {
-    setExpandedTreeIds((current) => toggleSet(current, id));
+    const willExpand = !expandedTreeIds.has(id);
+    setExpandedTreeIds((current) => {
+      const next = new Set(toggleSet(current, id));
+      if (willExpand && id.startsWith('doc:')) {
+        next.add(`${id}:fields`);
+        next.add(`${id}:subcollections`);
+      }
+      return next;
+    });
+    if (!willExpand || !onLoadSubcollections || !id.startsWith('doc:')) return;
+    const documentPath = id.slice('doc:'.length);
+    const row = rows.find((item) => item.path === documentPath);
+    const state = subcollectionStates[documentPath];
+    if (
+      !row || row.hasSubcollections === false || row.subcollections !== undefined
+      || state?.status === 'loading'
+    ) return;
+    void onLoadSubcollections(documentPath);
   }
 
   return (
@@ -585,8 +662,10 @@ function ResultPanel(
                 isFetchingMore={isFetchingMore}
                 rows={rows}
                 selectedDocumentPath={selectedDocumentPath}
+                subcollectionStates={subcollectionStates}
                 onEditDocument={onEditDocument}
                 onLoadMore={onLoadMore}
+                onLoadSubcollections={onLoadSubcollections}
                 onOpenDocumentInNewTab={onOpenDocumentInNewTab}
                 onSelectDocument={onSelectDocument}
               />
@@ -600,7 +679,9 @@ function ResultPanel(
                     hasMore={showPagination}
                     isFetchingMore={isFetchingMore}
                     rows={rows}
+                    subcollectionStates={subcollectionStates}
                     onLoadMore={onLoadMore}
+                    onLoadSubcollections={onLoadSubcollections}
                     onOpenDocumentInNewTab={onOpenDocumentInNewTab}
                     onToggleNode={toggleTreeNode}
                   />
@@ -627,10 +708,12 @@ interface ResultTableProps {
   readonly isFetchingMore: boolean;
   readonly onEditDocument: (document: FirestoreDocumentResult) => void;
   readonly onLoadMore: () => void;
+  readonly onLoadSubcollections?: ((documentPath: string) => Promise<void> | void) | undefined;
   readonly onOpenDocumentInNewTab: (documentPath: string) => void;
   readonly onSelectDocument: (documentPath: string) => void;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocumentPath: string | null;
+  readonly subcollectionStates: Readonly<Record<string, SubcollectionLoadState>>;
 }
 
 type ResultTableRow = { readonly kind: 'document'; readonly document: FirestoreDocumentResult; };
@@ -641,10 +724,12 @@ function ResultTable(
     isFetchingMore,
     onEditDocument,
     onLoadMore,
+    onLoadSubcollections,
     onOpenDocumentInNewTab,
     onSelectDocument,
     rows,
     selectedDocumentPath,
+    subcollectionStates,
   }: ResultTableProps,
 ) {
   const fieldColumns = useMemo(
@@ -675,9 +760,14 @@ function ResultTable(
       {
         id: 'subcollections',
         header: 'Subcollections',
-        width: 180,
+        width: 420,
         cell: ({ row }) =>
-          renderSubcollectionButtons(row.original.document, onOpenDocumentInNewTab),
+          renderSubcollectionButtons(
+            row.original.document,
+            onOpenDocumentInNewTab,
+            subcollectionStates[row.original.document.path],
+            onLoadSubcollections,
+          ),
       },
       {
         id: 'actions',
@@ -700,7 +790,7 @@ function ResultTable(
         },
       },
     ],
-    [fieldColumns, onOpenDocumentInNewTab],
+    [fieldColumns, onLoadSubcollections, onOpenDocumentInNewTab, subcollectionStates],
   );
 
   return (
@@ -740,9 +830,10 @@ function ResultTable(
 }
 
 interface ResultContextPanelProps {
-  readonly onDeleteDocument?: ((documentPath: string) => void) | undefined;
+  readonly onDeleteDocument?: ((documentPath: string) => Promise<void> | void) | undefined;
   readonly onCollapse: () => void;
   readonly onEditDocument: (document: FirestoreDocumentResult) => void;
+  readonly onOpenDocumentInNewTab: (documentPath: string) => void;
   readonly resultView: ResultView;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocument: FirestoreDocumentResult | null;
@@ -753,6 +844,7 @@ function ResultContextPanel(
     onCollapse,
     onDeleteDocument,
     onEditDocument,
+    onOpenDocumentInNewTab,
     resultView,
     rows,
     selectedDocument,
@@ -805,6 +897,7 @@ function ResultContextPanel(
                   document={selectedDocument}
                   onDelete={() => setConfirmOpen(true)}
                   onEdit={() => selectedDocument && onEditDocument(selectedDocument)}
+                  onOpenDocumentInNewTab={onOpenDocumentInNewTab}
                 />
               </InspectorSection>
             )
@@ -825,8 +918,8 @@ function ResultContextPanel(
       <ConfirmDialog
         confirmLabel='Delete'
         description={selectedDocument
-          ? `Delete ${selectedDocument.path} from the in-memory mock repository?`
-          : 'Delete the selected document from the in-memory mock repository?'}
+          ? `Delete ${selectedDocument.path}?`
+          : 'Delete the selected document?'}
         open={confirmOpen}
         title='Delete document'
         onConfirm={() => {
@@ -916,9 +1009,12 @@ interface SelectionPreviewProps {
   readonly document: FirestoreDocumentResult | null;
   readonly onDelete: () => void;
   readonly onEdit: () => void;
+  readonly onOpenDocumentInNewTab: (documentPath: string) => void;
 }
 
-function SelectionPreview({ document, onDelete, onEdit }: SelectionPreviewProps) {
+function SelectionPreview(
+  { document, onDelete, onEdit, onOpenDocumentInNewTab }: SelectionPreviewProps,
+) {
   if (!document) {
     return (
       <EmptyState icon={<Braces size={20} aria-hidden='true' />} title='No document selected' />
@@ -930,7 +1026,7 @@ function SelectionPreview({ document, onDelete, onEdit }: SelectionPreviewProps)
         <div className='min-w-0 font-mono text-xs text-text-secondary'>{document.path}</div>
         <div className='flex flex-wrap items-center gap-1'>
           <Badge>{Object.keys(document.data).length} fields</Badge>
-          {document.hasSubcollections ? <Badge>subcollections</Badge> : null}
+          {document.hasSubcollections === true ? <Badge>subcollections</Badge> : null}
           <IconButton
             icon={<Edit3 size={14} aria-hidden='true' />}
             label='Edit document'
@@ -948,6 +1044,18 @@ function SelectionPreview({ document, onDelete, onEdit }: SelectionPreviewProps)
         </div>
       </div>
       <NestedValueTree value={document.data} />
+      {document.subcollections?.length
+        ? (
+          <div className='grid gap-2 rounded-md border border-border-subtle p-2'>
+            <div className='text-xs font-semibold text-text-secondary'>Subcollections</div>
+            <SubcollectionChipList
+              collections={document.subcollections}
+              maxItems={MAX_SUBCOLLECTION_CHIPS}
+              onOpenDocumentInNewTab={onOpenDocumentInNewTab}
+            />
+          </div>
+        )
+        : null}
     </div>
   );
 }
@@ -982,24 +1090,37 @@ function ResultTreeView(
     hasMore,
     isFetchingMore,
     onLoadMore,
+    onLoadSubcollections,
     onOpenDocumentInNewTab,
     onToggleNode,
     queryPath,
     rows,
+    subcollectionStates,
   }: {
     readonly expandedIds: ReadonlySet<string>;
     readonly hasMore: boolean;
     readonly isFetchingMore: boolean;
     readonly onLoadMore: () => void;
+    readonly onLoadSubcollections?: ((documentPath: string) => Promise<void> | void) | undefined;
     readonly onOpenDocumentInNewTab: (documentPath: string) => void;
     readonly onToggleNode: (id: string) => void;
     readonly queryPath: string;
     readonly rows: ReadonlyArray<FirestoreDocumentResult>;
+    readonly subcollectionStates: Readonly<Record<string, SubcollectionLoadState>>;
   },
 ) {
+  const canLoadSubcollections = Boolean(onLoadSubcollections);
   const treeRows = useMemo(
-    () => flattenResultTree(queryPath, rows, hasMore, expandedIds),
-    [expandedIds, hasMore, queryPath, rows],
+    () =>
+      flattenResultTree(
+        queryPath,
+        rows,
+        hasMore,
+        expandedIds,
+        subcollectionStates,
+        canLoadSubcollections,
+      ),
+    [canLoadSubcollections, expandedIds, hasMore, queryPath, rows, subcollectionStates],
   );
 
   return (
@@ -1013,6 +1134,7 @@ function ResultTreeView(
             isFetchingMore={isFetchingMore}
             node={item}
             onLoadMore={onLoadMore}
+            onLoadSubcollections={onLoadSubcollections}
             onOpenDocumentInNewTab={onOpenDocumentInNewTab}
             onToggle={onToggleNode}
           />
@@ -1022,7 +1144,7 @@ function ResultTreeView(
   );
 }
 
-type ResultTreeNodeKind = 'branch' | 'leaf' | 'load-more';
+type ResultTreeNodeKind = 'branch' | 'leaf' | 'load-more' | 'load-subcollections';
 
 interface ResultTreeRowModel {
   readonly id: string;
@@ -1031,9 +1153,12 @@ interface ResultTreeRowModel {
   readonly label: string;
   readonly level: number;
   readonly meta: string;
+  readonly documentPath?: string;
   readonly expanded?: boolean;
+  readonly errorMessage?: string;
   readonly hasChildren?: boolean;
   readonly openPath?: string;
+  readonly subcollectionStatus?: SubcollectionLoadState['status'] | 'idle';
   readonly value?: string;
 }
 
@@ -1042,12 +1167,14 @@ function ResultTreeRow(
     isFetchingMore,
     node,
     onLoadMore,
+    onLoadSubcollections,
     onOpenDocumentInNewTab,
     onToggle,
   }: {
     readonly isFetchingMore: boolean;
     readonly node: ResultTreeRowModel;
     readonly onLoadMore: () => void;
+    readonly onLoadSubcollections?: ((documentPath: string) => Promise<void> | void) | undefined;
     readonly onOpenDocumentInNewTab: (documentPath: string) => void;
     readonly onToggle: (id: string) => void;
   },
@@ -1098,6 +1225,23 @@ function ResultTreeRow(
               Load more
             </Button>
           )
+          : node.kind === 'load-subcollections' && node.documentPath && onLoadSubcollections
+          ? (
+            <Button
+              disabled={node.subcollectionStatus === 'loading'}
+              size='xs'
+              variant={node.subcollectionStatus === 'error' ? 'secondary' : 'ghost'}
+              onClick={(event) => {
+                event.stopPropagation();
+                onLoadSubcollections(node.documentPath ?? '');
+              }}
+            >
+              {node.subcollectionStatus === 'loading'
+                ? <Loader2 className='animate-spin' size={13} aria-hidden='true' />
+                : <Folder size={13} aria-hidden='true' />}
+              {subcollectionLoadLabel(node.subcollectionStatus)}
+            </Button>
+          )
           : openPath
           ? (
             <IconButton
@@ -1134,6 +1278,8 @@ function flattenResultTree(
   rows: ReadonlyArray<FirestoreDocumentResult>,
   hasMore: boolean,
   expandedIds: ReadonlySet<string>,
+  subcollectionStates: Readonly<Record<string, SubcollectionLoadState>>,
+  canLoadSubcollections: boolean,
 ): ReadonlyArray<ResultTreeRowModel> {
   const flattened: ResultTreeRowModel[] = [];
   const rootId = `root:${queryPath}`;
@@ -1149,7 +1295,16 @@ function flattenResultTree(
     expanded: rootExpanded,
   });
   if (!rootExpanded) return flattened;
-  for (const row of rows) appendDocumentTreeRows(flattened, row, 1, expandedIds);
+  for (const row of rows) {
+    appendDocumentTreeRows(
+      flattened,
+      row,
+      1,
+      expandedIds,
+      subcollectionStates,
+      canLoadSubcollections,
+    );
+  }
   if (hasMore) {
     flattened.push({
       id: `${rootId}:load-more`,
@@ -1168,6 +1323,8 @@ function appendDocumentTreeRows(
   row: FirestoreDocumentResult,
   level: number,
   expandedIds: ReadonlySet<string>,
+  subcollectionStates: Readonly<Record<string, SubcollectionLoadState>>,
+  canLoadSubcollections: boolean,
 ) {
   const nodeId = `doc:${row.path}`;
   const expanded = expandedIds.has(nodeId);
@@ -1183,21 +1340,76 @@ function appendDocumentTreeRows(
     openPath: row.path,
   });
   if (!expanded) return;
-  for (const [key, value] of Object.entries(row.data)) {
-    appendValueTreeRows(flattened, key, value, level + 1, `${nodeId}:field`, expandedIds);
+  const fields = Object.entries(row.data);
+  const fieldsId = `${nodeId}:fields`;
+  const fieldsExpanded = expandedIds.has(fieldsId);
+  flattened.push({
+    id: fieldsId,
+    icon: 'folder',
+    kind: 'branch',
+    label: 'Fields',
+    level: level + 1,
+    meta: 'Group',
+    value: `${fields.length} field${fields.length === 1 ? '' : 's'}`,
+    hasChildren: fields.length > 0,
+    expanded: fieldsExpanded,
+  });
+  if (fieldsExpanded) {
+    for (const [key, value] of fields) {
+      appendValueTreeRows(flattened, key, value, level + 2, `${fieldsId}:field`, expandedIds);
+    }
   }
-  if (!row.subcollections?.length) {
+  appendSubcollectionTreeRows(
+    flattened,
+    row,
+    level + 1,
+    expandedIds,
+    subcollectionStates,
+    canLoadSubcollections,
+  );
+}
+
+function appendSubcollectionTreeRows(
+  flattened: ResultTreeRowModel[],
+  row: FirestoreDocumentResult,
+  level: number,
+  expandedIds: ReadonlySet<string>,
+  subcollectionStates: Readonly<Record<string, SubcollectionLoadState>>,
+  canLoadSubcollections: boolean,
+) {
+  const nodeId = `doc:${row.path}`;
+  const groupId = `${nodeId}:subcollections`;
+  if (row.subcollections === undefined) {
+    if (!row.hasSubcollections) return;
+    const state = subcollectionStates[row.path];
     flattened.push({
-      id: `${nodeId}:subcollections`,
-      icon: 'field',
-      kind: 'leaf',
+      id: groupId,
+      icon: 'folder',
+      kind: canLoadSubcollections && row.hasSubcollections ? 'load-subcollections' : 'leaf',
       label: 'Subcollections',
-      level: level + 1,
-      meta: 'empty',
-      value: 'none',
+      level,
+      meta: row.hasSubcollections ? subcollectionLoadMeta(state) : 'empty',
+      value: row.hasSubcollections ? subcollectionLoadValue(state) : 'none',
+      ...(canLoadSubcollections && row.hasSubcollections ? { documentPath: row.path } : {}),
+      ...(state?.errorMessage ? { errorMessage: state.errorMessage } : {}),
+      subcollectionStatus: state?.status ?? 'idle',
     });
     return;
   }
+  if (row.subcollections.length === 0) return;
+  const groupExpanded = expandedIds.has(groupId);
+  flattened.push({
+    id: groupId,
+    icon: 'folder',
+    kind: 'branch',
+    label: 'Subcollections',
+    level,
+    meta: 'Group',
+    value: `${row.subcollections.length} item${row.subcollections.length === 1 ? '' : 's'}`,
+    hasChildren: true,
+    expanded: groupExpanded,
+  });
+  if (!groupExpanded) return;
   for (const collection of row.subcollections) {
     const collectionId = `collection:${collection.path}`;
     const collectionExpanded = expandedIds.has(collectionId);
@@ -1205,7 +1417,7 @@ function appendDocumentTreeRows(
     flattened.push({
       id: collectionId,
       icon: 'folder',
-      kind: 'branch',
+      kind: documents.length > 0 ? 'branch' : 'leaf',
       label: collection.id,
       level: level + 1,
       meta: 'Subcollection',
@@ -1215,18 +1427,15 @@ function appendDocumentTreeRows(
     });
     if (documents.length && collectionExpanded) {
       for (const document of documents) {
-        appendDocumentTreeRows(flattened, document, level + 2, expandedIds);
+        appendDocumentTreeRows(
+          flattened,
+          document,
+          level + 2,
+          expandedIds,
+          subcollectionStates,
+          canLoadSubcollections,
+        );
       }
-    } else {
-      flattened.push({
-        id: `${collectionId}:count`,
-        icon: 'field',
-        kind: 'leaf',
-        label: 'Documents',
-        level: level + 2,
-        meta: 'count',
-        value: String(collection.documentCount ?? documents.length),
-      });
     }
   }
 }
@@ -1379,7 +1588,7 @@ function renderValueTreeNode(key: string, value: unknown, level: number): ReactN
 interface DocumentEditorModalProps {
   readonly document: FirestoreDocumentResult | null;
   readonly onSaveDocument?:
-    | ((documentPath: string, data: Record<string, unknown>) => void)
+    | ((documentPath: string, data: Record<string, unknown>) => Promise<void> | void)
     | undefined;
   readonly onOpenChange: (open: boolean) => void;
   readonly open: boolean;
@@ -1391,9 +1600,15 @@ function DocumentEditorModal(
   const [source, setSource] = useState('{}');
   const [fieldName, setFieldName] = useState('newField');
   const [fieldValue, setFieldValue] = useState('"value"');
+  const [error, setError] = useState<string | null>(null);
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
-    if (document) setSource(JSON.stringify(document.data, null, 2));
+    if (document) {
+      setSource(JSON.stringify(document.data, null, 2));
+      setError(null);
+      setIsSaving(false);
+    }
   }, [document]);
 
   const fields = document ? Object.entries(document.data) : [];
@@ -1445,14 +1660,19 @@ function DocumentEditorModal(
               <Button
                 variant='secondary'
                 onClick={() => {
-                  const parsed = parseEditorJson(source);
-                  setSource(
-                    JSON.stringify(
-                      { ...parsed, [fieldName]: parseEditorValue(fieldValue) },
-                      null,
-                      2,
-                    ),
-                  );
+                  try {
+                    const parsed = parseEditorJson(source);
+                    setSource(
+                      JSON.stringify(
+                        { ...parsed, [fieldName]: parseEditorValue(fieldValue) },
+                        null,
+                        2,
+                      ),
+                    );
+                    setError(null);
+                  } catch (caught) {
+                    setError(messageFromError(caught, 'Could not add field.'));
+                  }
                 }}
               >
                 Add field
@@ -1460,16 +1680,29 @@ function DocumentEditorModal(
             </div>
           </div>
         </div>
+        {error ? <InlineAlert variant='danger'>{error}</InlineAlert> : null}
         <div className='flex justify-end gap-2'>
-          <Button variant='ghost' onClick={() => onOpenChange(false)}>Cancel</Button>
+          <Button disabled={isSaving} variant='ghost' onClick={() => onOpenChange(false)}>
+            Cancel
+          </Button>
           <Button
+            disabled={isSaving}
             variant='primary'
-            onClick={() => {
-              if (document) onSaveDocument?.(document.path, parseEditorJson(source));
-              onOpenChange(false);
+            onClick={async () => {
+              if (!document) return;
+              setIsSaving(true);
+              setError(null);
+              try {
+                await onSaveDocument?.(document.path, parseEditorJson(source));
+                onOpenChange(false);
+              } catch (caught) {
+                setError(messageFromError(caught, 'Could not save document.'));
+              } finally {
+                setIsSaving(false);
+              }
             }}
           >
-            Save mock
+            {isSaving ? 'Saving' : 'Save'}
           </Button>
         </div>
       </DialogContent>
@@ -1552,14 +1785,87 @@ function toggleSet(values: ReadonlySet<string>, value: string): ReadonlySet<stri
   return next;
 }
 
+function mergeLoadedSubcollections(
+  document: FirestoreDocumentResult,
+  state?: SubcollectionLoadState,
+): FirestoreDocumentResult;
+function mergeLoadedSubcollections(
+  document: FirestoreDocumentResult | null,
+  state?: SubcollectionLoadState,
+): FirestoreDocumentResult | null;
+function mergeLoadedSubcollections(
+  document: FirestoreDocumentResult | null,
+  state?: SubcollectionLoadState,
+): FirestoreDocumentResult | null {
+  if (!document || state?.status !== 'success') return document;
+  const items = state.items ?? [];
+  return {
+    ...document,
+    hasSubcollections: items.length > 0,
+    subcollections: items,
+  };
+}
+
 function renderSubcollectionButtons(
   row: FirestoreDocumentResult,
   onOpenDocumentInNewTab: (documentPath: string) => void,
+  state?: SubcollectionLoadState,
+  onLoadSubcollections?: ((documentPath: string) => Promise<void> | void) | undefined,
 ): ReactNode {
-  if (!row.subcollections?.length) return <span className='text-text-muted'>none</span>;
+  if (row.subcollections === undefined) {
+    if (!onLoadSubcollections || !row.hasSubcollections) {
+      return (
+        <span className='text-text-muted'>{row.hasSubcollections ? 'not loaded' : 'none'}</span>
+      );
+    }
+    return (
+      <span className='flex min-w-0 flex-wrap items-center gap-1'>
+        <Button
+          disabled={state?.status === 'loading'}
+          size='xs'
+          variant={state?.status === 'error' ? 'secondary' : 'ghost'}
+          onClick={(event) => {
+            event.stopPropagation();
+            onLoadSubcollections(row.path);
+          }}
+        >
+          {state?.status === 'loading'
+            ? <Loader2 className='animate-spin' size={13} aria-hidden='true' />
+            : <Folder size={13} aria-hidden='true' />}
+          {subcollectionLoadLabel(state?.status)}
+        </Button>
+        {state?.status === 'error' && state.errorMessage
+          ? <span className='max-w-36 truncate text-text-muted'>{state.errorMessage}</span>
+          : null}
+      </span>
+    );
+  }
+  if (row.subcollections.length === 0) return <span className='text-text-muted'>none</span>;
   return (
-    <span className='flex flex-wrap gap-1'>
-      {row.subcollections.map((collection) => (
+    <SubcollectionChipList
+      collections={row.subcollections}
+      maxItems={MAX_SUBCOLLECTION_CHIPS}
+      onOpenDocumentInNewTab={onOpenDocumentInNewTab}
+    />
+  );
+}
+
+function SubcollectionChipList(
+  {
+    collections,
+    maxItems,
+    onOpenDocumentInNewTab,
+  }: {
+    readonly collections: ReadonlyArray<FirestoreCollectionNode>;
+    readonly maxItems: number;
+    readonly onOpenDocumentInNewTab: (documentPath: string) => void;
+  },
+): ReactNode {
+  const visibleCollections = collections.slice(0, maxItems);
+  const hiddenCount = collections.length - visibleCollections.length;
+  return (
+    <span className='flex min-w-0 flex-wrap gap-1'>
+      {visibleCollections.map((collection) => (
         <Button
           key={collection.path}
           size='xs'
@@ -1572,8 +1878,27 @@ function renderSubcollectionButtons(
           <Folder size={13} aria-hidden='true' /> {collection.id}
         </Button>
       ))}
+      {hiddenCount > 0 ? <Badge>+{hiddenCount}</Badge> : null}
     </span>
   );
+}
+
+function subcollectionLoadLabel(status?: SubcollectionLoadState['status'] | 'idle'): string {
+  if (status === 'loading') return 'Loading';
+  if (status === 'error') return 'Retry';
+  return 'Load';
+}
+
+function subcollectionLoadMeta(state?: SubcollectionLoadState): string {
+  if (state?.status === 'loading') return 'loading';
+  if (state?.status === 'error') return 'error';
+  return 'unknown';
+}
+
+function subcollectionLoadValue(state?: SubcollectionLoadState): string {
+  if (state?.status === 'loading') return 'loading';
+  if (state?.status === 'error') return state.errorMessage ?? 'load failed';
+  return 'not loaded';
 }
 
 function isCollectionPath(path: string): boolean {
@@ -1582,14 +1907,11 @@ function isCollectionPath(path: string): boolean {
 }
 
 function parseEditorJson(source: string): Record<string, unknown> {
-  try {
-    const value = JSON.parse(source) as unknown;
-    return value && typeof value === 'object' && !Array.isArray(value)
-      ? value as Record<string, unknown>
-      : {};
-  } catch {
-    return {};
+  const value = JSON.parse(source) as unknown;
+  if (value && typeof value === 'object' && !Array.isArray(value)) {
+    return value as Record<string, unknown>;
   }
+  throw new Error('Document JSON must be an object.');
 }
 
 function parseEditorValue(value: string): unknown {
@@ -1610,4 +1932,9 @@ function valueType(value: unknown): string {
 
 function formatValue(value: unknown): string {
   return formatFirestoreValue(value);
+}
+
+function messageFromError(error: unknown, fallback: string): string {
+  if (error instanceof Error) return error.message;
+  return fallback;
 }

@@ -124,12 +124,13 @@ function collectionNode(collection: CollectionReference): FirestoreCollectionNod
 
 async function documentResult(snapshot: DocumentSnapshot): Promise<FirestoreDocumentResult> {
   const subcollections = await snapshot.ref.listCollections();
+  const collectionNodes = subcollections.map(collectionNode);
   return {
     id: snapshot.id,
     path: snapshot.ref.path,
     data: encodeAdminData(snapshot.data() ?? {}),
-    hasSubcollections: subcollections.length > 0,
-    ...(subcollections.length > 0 ? { subcollections: subcollections.map(collectionNode) } : {}),
+    hasSubcollections: collectionNodes.length > 0,
+    subcollections: collectionNodes,
   };
 }
 

@@ -96,6 +96,7 @@ test('Firestore reads real emulator collections, documents, queries, cursors, an
     await page.getByRole('tab', { name: 'JSON' }).click();
     await expect(page.getByLabel('JSON results')).toHaveValue(/orders\/ord_1024\/events/);
     await page.getByRole('tab', { name: 'Table' }).click();
+    await expect(page.getByRole('button', { name: /events/ })).toBeVisible();
 
     await page.getByLabel('Query path').fill('orders/ord_1024/events');
     await page.getByLabel('Filter 1 field').fill('');

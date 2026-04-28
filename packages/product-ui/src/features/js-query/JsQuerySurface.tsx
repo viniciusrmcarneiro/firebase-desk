@@ -331,8 +331,8 @@ function toFirebaseError(error: ScriptRunResult['errors'][number]) {
     readonly name?: string;
   };
   return {
-    name: record.name ?? 'FirebaseError',
-    code: record.code ?? 'permission-denied',
+    name: record.name ?? 'Error',
+    ...(record.code ? { code: record.code } : {}),
     message: error.message,
     ...(error.stack ? { stack: error.stack } : {}),
   };

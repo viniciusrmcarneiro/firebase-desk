@@ -20,6 +20,10 @@ import { createContext, type ReactNode, useContext } from 'react';
 import { IpcFirestoreRepository } from './repositories/ipc-firestore-repository.ts';
 import { IpcProjectsRepository } from './repositories/ipc-projects-repository.ts';
 import { IpcSettingsRepository } from './repositories/ipc-settings-repository.ts';
+import {
+  UnsupportedLiveAuthRepository,
+  UnsupportedLiveScriptRunnerRepository,
+} from './repositories/unsupported-live-repositories.ts';
 
 export interface RepositorySet {
   readonly auth: AuthRepository;
@@ -54,16 +58,17 @@ export function createMockRepositories(): RepositorySet {
 export function createRepositories(
   { dataMode, onDataModeChange }: CreateRepositoriesOptions,
 ): RepositorySet {
-  const mockRepositories = createMockRepositories();
   const desktopApiAvailable = hasDesktopApi();
-  const liveCapable = dataMode === 'live' && desktopApiAvailable;
-  const repositories: RepositorySet = {
-    ...mockRepositories,
-    ...(liveCapable
-      ? { firestore: new IpcFirestoreRepository(), projects: new IpcProjectsRepository() }
-      : {}),
-    ...(desktopApiAvailable ? { settings: new IpcSettingsRepository() } : {}),
-  };
+  const settings = desktopApiAvailable ? new IpcSettingsRepository() : new MockSettingsRepository();
+  const repositories: RepositorySet = dataMode === 'live'
+    ? {
+      auth: new UnsupportedLiveAuthRepository(),
+      firestore: new IpcFirestoreRepository(),
+      projects: new IpcProjectsRepository(),
+      scriptRunner: new UnsupportedLiveScriptRunnerRepository(),
+      settings,
+    }
+    : { ...createMockRepositories(), settings };
 
   return {
     ...repositories,
