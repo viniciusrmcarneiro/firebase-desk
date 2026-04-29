@@ -101,6 +101,7 @@ describe('ResultTreeView', () => {
     expect(screen.getAllByText('Document').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Delete field').length).toBeGreaterThan(0);
     expect(screen.getAllByText('Delete document').length).toBeGreaterThan(0);
+    expect(screen.queryByRole('button', { name: 'Delete total' })).toBeNull();
   });
 
   it('selects the owning document from field rows', () => {

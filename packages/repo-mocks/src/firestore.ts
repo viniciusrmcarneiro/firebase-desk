@@ -408,7 +408,7 @@ function assertConnectionAvailable(connectionId: string) {
 }
 
 function splitDocumentPath(documentPath: string) {
-  const parts = documentPath.split('/').filter(Boolean);
+  const parts = pathParts(documentPath);
   if (parts.length === 0 || parts.length % 2 !== 0) {
     throw new MockFirebaseError('invalid-argument', `Invalid document path: ${documentPath}`);
   }
@@ -419,7 +419,7 @@ function splitDocumentPath(documentPath: string) {
 }
 
 function assertCollectionPath(collectionPath: string) {
-  const parts = collectionPath.split('/').filter(Boolean);
+  const parts = pathParts(collectionPath);
   if (parts.length === 0 || parts.length % 2 === 0) {
     throw new MockFirebaseError('invalid-argument', `Invalid collection path: ${collectionPath}`);
   }
@@ -432,8 +432,8 @@ function assertDocumentId(documentId: string) {
 }
 
 function assertDirectSubcollectionPath(documentPath: string, collectionPath: string) {
-  const documentParts = documentPath.split('/').filter(Boolean);
-  const collectionParts = collectionPath.split('/').filter(Boolean);
+  const documentParts = pathParts(documentPath);
+  const collectionParts = pathParts(collectionPath);
   if (collectionParts.length === 0 || collectionParts.length % 2 === 0) {
     throw new MockFirebaseError('invalid-argument', `Invalid collection path: ${collectionPath}`);
   }
@@ -446,6 +446,11 @@ function assertDirectSubcollectionPath(documentPath: string, collectionPath: str
       `Invalid subcollection path ${collectionPath} for document ${documentPath}`,
     );
   }
+}
+
+function pathParts(path: string): ReadonlyArray<string> {
+  const parts = path.split('/');
+  return parts.some((part) => part.length === 0) ? [] : parts;
 }
 
 function decodeDocumentData(data: Record<string, unknown>): Record<string, unknown> {

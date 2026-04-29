@@ -178,7 +178,7 @@ function TreeRowAction(
       </Button>
     );
   }
-  if (node.documentPath && documentsByPath.has(node.documentPath)) {
+  if (isDocumentRow(node) && node.documentPath && documentsByPath.has(node.documentPath)) {
     return (
       <span className='flex items-center gap-1'>
         {onOpenDocumentInNewTab
@@ -228,6 +228,10 @@ function TreeRowAction(
     );
   }
   return null;
+}
+
+function isDocumentRow(node: ResultTreeRowModel): boolean {
+  return Boolean(node.documentPath && node.id === `doc:${node.documentPath}`);
 }
 
 function documentsByPathMap(

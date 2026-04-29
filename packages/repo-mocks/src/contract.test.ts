@@ -72,10 +72,16 @@ describe('repo-mocks contract conformance', () => {
     await expect(repo.generateDocumentId('p', 'orders')).resolves.toEqual({
       documentId: 'mock_1',
     });
+    await expect(repo.generateDocumentId('p', '/orders')).rejects.toThrow(
+      'Invalid collection path',
+    );
     const created = await repo.createDocument('p', 'orders', 'ord_created', { status: 'new' });
     expect(created.path).toBe('orders/ord_created');
     await expect(repo.createDocument('p', 'orders', 'ord_created', { status: 'again' }))
       .rejects.toThrow('already exists');
+    await expect(repo.createDocument('p', 'orders/', 'ord_invalid', {})).rejects.toThrow(
+      'Invalid collection path',
+    );
 
     await repo.saveDocument('p', 'orders/ord_fields', {
       id: 'data-id',
@@ -106,6 +112,9 @@ describe('repo-mocks contract conformance', () => {
         place: { __type__: 'geoPoint', latitude: -36.8485, longitude: 174.7633 },
       },
     });
+    await expect(repo.saveDocument('p', '/orders/ord_invalid', {})).rejects.toThrow(
+      'Invalid document path',
+    );
 
     const conflictBase = await repo.getDocument('p', 'orders/ord_encoded');
     expect(conflictBase?.updateTime).toBeDefined();
@@ -137,6 +146,9 @@ describe('repo-mocks contract conformance', () => {
     await repo.saveDocument('p', 'orders/ord_nested', { status: 'draft' });
     await repo.saveDocument('p', 'orders/ord_nested/events/evt_1', { type: 'deleted' });
     await repo.saveDocument('p', 'orders/ord_nested/audit/aud_1', { type: 'kept' });
+    await expect(repo.deleteDocument('p', 'orders/ord_nested', {
+      deleteSubcollectionPaths: ['orders/ord_nested/events/'],
+    })).rejects.toThrow('Invalid collection path');
     await repo.deleteDocument('p', 'orders/ord_nested', {
       deleteSubcollectionPaths: ['orders/ord_nested/events'],
     });

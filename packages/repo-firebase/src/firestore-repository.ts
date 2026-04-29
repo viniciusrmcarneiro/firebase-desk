@@ -301,7 +301,8 @@ function assertDirectSubcollectionPath(documentPath: string, collectionPath: str
 }
 
 function pathParts(path: string): ReadonlyArray<string> {
-  return path.split('/').filter(Boolean);
+  const parts = path.split('/');
+  return parts.some((part) => part.length === 0) ? [] : parts;
 }
 
 function firestoreOperationError(caught: unknown, config: FirebaseConnectionConfig): Error {
