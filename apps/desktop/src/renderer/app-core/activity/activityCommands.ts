@@ -27,7 +27,7 @@ export async function loadActivity(
 ): Promise<void> {
   updateActivityStore(store, activityLoadStarted);
   try {
-    const entries = await env.repository.list(selectActivityListRequest(store.state));
+    const entries = await env.repository.list(selectActivityListRequest(store.get()));
     updateActivityStore(store, (state) => activityLoadSucceeded(state, entries));
   } catch (error) {
     const message = messageFromError(error, 'Could not load activity.');
@@ -83,7 +83,7 @@ export async function exportActivity(
   env: ActivityCommandEnvironment,
 ): Promise<void> {
   try {
-    const result = await env.repository.export(selectActivityListRequest(store.state));
+    const result = await env.repository.export(selectActivityListRequest(store.get()));
     if (!result.canceled) {
       env.onStatus?.(`Exported activity ${result.filePath ?? ''}`.trim());
     }

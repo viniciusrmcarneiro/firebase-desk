@@ -3,6 +3,11 @@ import { AppearanceProvider } from '@firebase-desk/product-ui';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  type ActivityState,
+  createActivityStore,
+  createInitialActivityState,
+} from '../app-core/activity/index.ts';
 import { AppShell } from './AppShell.tsx';
 import { createAppQueryClient } from './queryClient.ts';
 import {
@@ -59,12 +64,14 @@ type InitialTab = Parameters<typeof tabActions.openTab>[0];
 
 function renderShell(
   {
+    activityState,
     dataMode = 'mock',
     initialTab,
     repositories = createMockRepositories(),
     savedWorkspace,
   }: {
     readonly dataMode?: 'live' | 'mock';
+    readonly activityState?: ActivityState | undefined;
     readonly initialTab?: InitialTab;
     readonly repositories?: RepositorySet;
     readonly savedWorkspace?: PersistedWorkspaceState;
@@ -94,12 +101,13 @@ function renderShell(
     },
   );
   const queryClient = createAppQueryClient();
+  const activityStore = activityState ? createActivityStore(activityState) : undefined;
   render(
     <RepositoryProvider repositories={repositories}>
       <QueryClientProvider client={queryClient}>
         <HotkeysProvider settings={repositories.settings}>
           <AppearanceProvider settings={repositories.settings}>
-            <AppShell dataMode={dataMode} />
+            <AppShell activityStore={activityStore} dataMode={dataMode} />
           </AppearanceProvider>
         </HotkeysProvider>
       </QueryClientProvider>
@@ -109,6 +117,19 @@ function renderShell(
 
 async function waitForLocalEmulatorProject() {
   await screen.findByText('demo-local');
+}
+
+function activityIssueState() {
+  return createInitialActivityState({
+    unreadIssue: {
+      action: 'Run query',
+      area: 'firestore',
+      id: 'activity-test-issue',
+      status: 'failure',
+      summary: 'Failed to load orders',
+      timestamp: '2026-04-29T00:00:00.000Z',
+    },
+  });
 }
 
 describe('desktop AppShell', () => {
@@ -130,14 +151,7 @@ describe('desktop AppShell', () => {
   });
 
   it('clears the activity issue indicator when Activity is opened', async () => {
-    const repositories = createMockRepositories();
-    await repositories.activity.append({
-      action: 'Run query',
-      area: 'firestore',
-      status: 'failure',
-      summary: 'Failed to load orders',
-    });
-    renderShell({ repositories });
+    renderShell({ activityState: activityIssueState() });
 
     const activityButton = await screen.findByRole('button', { name: /Activity.*failure/ });
     fireEvent.click(activityButton);
@@ -146,14 +160,9 @@ describe('desktop AppShell', () => {
   });
 
   it('keeps the activity issue indicator until Activity is opened', async () => {
-    const repositories = createMockRepositories();
-    await repositories.activity.append({
-      action: 'Run query',
-      area: 'firestore',
-      status: 'failure',
-      summary: 'Failed to load orders',
+    renderShell({
+      activityState: activityIssueState(),
     });
-    renderShell({ repositories });
 
     const activityButton = await screen.findByRole('button', { name: /Activity.*failure/ });
     fireEvent.click(screen.getByRole('button', { name: 'Dark theme' }));

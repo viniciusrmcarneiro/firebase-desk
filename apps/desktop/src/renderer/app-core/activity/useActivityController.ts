@@ -5,8 +5,8 @@ import type {
   ActivityLogRepository,
   ActivityLogStatus,
 } from '@firebase-desk/repo-contracts';
-import { useSelector } from '@tanstack/react-store';
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useAppCoreStore } from '../shared/reactStore.ts';
 import {
   clearActivity,
   createActivityOpenTargetIntent,
@@ -16,7 +16,7 @@ import {
   recordActivity,
 } from './activityCommands.ts';
 import { selectActivityButtonModel, selectActivityDrawerModel } from './activitySelectors.ts';
-import { createActivityStore } from './activityStore.ts';
+import { type ActivityStore, createActivityStore } from './activityStore.ts';
 import {
   activityClosed,
   activityExpandedChanged,
@@ -25,15 +25,23 @@ import {
 } from './activityTransitions.ts';
 
 export interface UseActivityControllerInput {
+  readonly loadIssuePreviewOnMount?: boolean | undefined;
   readonly onStatus?: ((message: string) => void) | undefined;
   readonly repository: ActivityLogRepository;
+  readonly store?: ActivityStore | undefined;
 }
 
 export function useActivityController(
-  { onStatus, repository }: UseActivityControllerInput,
+  {
+    loadIssuePreviewOnMount = true,
+    onStatus,
+    repository,
+    store: inputStore,
+  }: UseActivityControllerInput,
 ) {
-  const [store] = useState(createActivityStore);
-  const state = useSelector(store, (value) => value);
+  const [ownedStore] = useState(createActivityStore);
+  const store = inputStore ?? ownedStore;
+  const state = useAppCoreStore(store);
   const env = useMemo(() => ({ onStatus, repository }), [onStatus, repository]);
 
   const load = useCallback(() => {
@@ -41,39 +49,40 @@ export function useActivityController(
   }, [env, store]);
 
   useEffect(() => {
+    if (!loadIssuePreviewOnMount) return;
     void loadLatestActivityIssue(store, env);
-  }, [env, store]);
+  }, [env, loadIssuePreviewOnMount, store]);
 
   useEffect(() => {
     if (state.open) load();
   }, [load, state.filters, state.open]);
 
   const open = useCallback(() => {
-    store.setState(activityOpened);
+    store.update(activityOpened);
   }, [store]);
 
   const close = useCallback(() => {
-    store.setState(activityClosed);
+    store.update(activityClosed);
   }, [store]);
 
   const toggle = useCallback(() => {
-    store.setState((current) => current.open ? activityClosed(current) : activityOpened(current));
+    store.update((current) => current.open ? activityClosed(current) : activityOpened(current));
   }, [store]);
 
   const setExpanded = useCallback((expanded: boolean) => {
-    store.setState((current) => activityExpandedChanged(current, expanded));
+    store.update((current) => activityExpandedChanged(current, expanded));
   }, [store]);
 
   const setArea = useCallback((area: ActivityLogArea | 'all') => {
-    store.setState((current) => activityFiltersChanged(current, { area }));
+    store.update((current) => activityFiltersChanged(current, { area }));
   }, [store]);
 
   const setSearch = useCallback((search: string) => {
-    store.setState((current) => activityFiltersChanged(current, { search }));
+    store.update((current) => activityFiltersChanged(current, { search }));
   }, [store]);
 
   const setStatus = useCallback((status: ActivityLogStatus | 'all') => {
-    store.setState((current) => activityFiltersChanged(current, { status }));
+    store.update((current) => activityFiltersChanged(current, { status }));
   }, [store]);
 
   const record = useCallback((input: ActivityLogAppendInput) => {

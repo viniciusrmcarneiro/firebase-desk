@@ -1,17 +1,17 @@
-import { Store } from '@tanstack/react-store';
+import { type AppCoreStore, createAppCoreStore } from '../shared/store.ts';
 import { type ActivityState, createInitialActivityState } from './activityState.ts';
 
-export type ActivityStore = Store<ActivityState>;
+export type ActivityStore = AppCoreStore<ActivityState>;
 
 export function createActivityStore(
   initialState: ActivityState = createInitialActivityState(),
 ): ActivityStore {
-  return new Store(initialState);
+  return createAppCoreStore(initialState);
 }
 
 export function updateActivityStore(
   store: ActivityStore,
   transition: (state: ActivityState) => ActivityState,
 ): void {
-  store.setState(transition);
+  store.update(transition);
 }

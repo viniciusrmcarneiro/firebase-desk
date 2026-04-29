@@ -69,7 +69,7 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { useActivityController } from '../app-core/activity/index.ts';
+import { type ActivityStore, useActivityController } from '../app-core/activity/index.ts';
 import appIconUrl from '../assets/app-icon.png';
 import { AddProjectDialog } from './dialogs/AddProjectDialog.tsx';
 import { EditProjectDialog } from './dialogs/EditProjectDialog.tsx';
@@ -118,12 +118,17 @@ interface PendingCreateDocumentRequest extends FirestoreCreateDocumentRequest {
 const MAX_ACTIVITY_DEDUPE_KEYS = 500;
 
 export interface AppShellProps {
+  readonly activityStore?: ActivityStore | undefined;
   readonly dataMode?: 'live' | 'mock';
   readonly initialSidebarWidth?: number;
 }
 
 export function AppShell(
-  { dataMode = 'mock', initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH }: AppShellProps,
+  {
+    activityStore,
+    dataMode = 'mock',
+    initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH,
+  }: AppShellProps,
 ) {
   const [persistedWorkspace] = useState(() => {
     const persisted = loadPersistedWorkspaceState();
@@ -166,8 +171,10 @@ export function AppShell(
   const loggedScriptRuns = useRef<Set<string>>(new Set());
   const loggedAuthFailures = useRef<Set<string>>(new Set());
   const activity = useActivityController({
+    loadIssuePreviewOnMount: !activityStore,
     onStatus: setLastAction,
     repository: repositories.activity,
+    store: activityStore,
   });
   const recordActivity = activity.record;
   const firestoreTab = useFirestoreTabState({

@@ -106,17 +106,17 @@ Activity is the first extraction because it is self-contained and already expose
 
 ## Phase 2: Shared App-Core Store And React Adapter
 
-- [ ] Add a generic store helper:
-  - [ ] `get`
-  - [ ] `set`
-  - [ ] `update`
-  - [ ] `subscribe`
-  - [ ] batch/transaction support only if needed
-- [ ] Add React `useSyncExternalStore` adapter helper.
-- [ ] Add a command environment type for repositories, query client hooks, clock, and ID generation.
-- [ ] Add test helpers for rendering AppShell with explicit app-core state.
-- [ ] Document when to use `useActionState`, `useOptimistic`, `useTransition`, `useEffectEvent`, and `use`.
-- [ ] Remove duplicated store/subscription code from feature controllers.
+- [x] Add a generic store helper:
+  - [x] `get`
+  - [x] `set`
+  - [x] `update`
+  - [x] `subscribe`
+  - [x] batch/transaction support only if needed
+- [x] Add React `useSyncExternalStore` adapter helper.
+- [x] Add a command environment type for repositories, query client hooks, clock, and ID generation.
+- [x] Add test helpers for rendering AppShell with explicit app-core state.
+- [x] Document when to use `useActionState`, `useOptimistic`, `useTransition`, `useEffectEvent`, and `use`.
+- [x] Remove duplicated store/subscription code from feature controllers.
 
 ## Phase 3: Firestore Query Core
 

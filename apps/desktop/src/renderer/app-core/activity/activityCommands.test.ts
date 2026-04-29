@@ -28,7 +28,7 @@ describe('activity commands', () => {
 
   it('loads activity with the current filters', async () => {
     const store = createActivityStore();
-    store.setState((state) =>
+    store.update((state) =>
       activityFiltersChanged(activityOpened(state), {
         area: 'firestore',
         search: 'orders',
@@ -42,8 +42,8 @@ describe('activity commands', () => {
     expect(repository.listRequests).toEqual([
       { area: 'firestore', limit: 200, search: 'orders', status: 'success' },
     ]);
-    expect(store.state.entries).toMatchObject([{ id: '1' }]);
-    expect(store.state.isLoading).toBe(false);
+    expect(store.get().entries).toMatchObject([{ id: '1' }]);
+    expect(store.get().isLoading).toBe(false);
   });
 
   it('keeps load failures in state and reports status', async () => {
@@ -52,8 +52,8 @@ describe('activity commands', () => {
 
     await loadActivity(store, env(repository, statuses));
 
-    expect(store.state.isLoading).toBe(false);
-    expect(store.state.lastErrorMessage).toBe('disk failed');
+    expect(store.get().isLoading).toBe(false);
+    expect(store.get().lastErrorMessage).toBe('disk failed');
     expect(statuses).toEqual(['Activity load failed: disk failed']);
   });
 
@@ -64,8 +64,8 @@ describe('activity commands', () => {
     await loadLatestActivityIssue(store, env(repository, statuses));
 
     expect(repository.listRequests).toEqual([{ limit: 1 }]);
-    expect(store.state.entries).toEqual([]);
-    expect(store.state.unreadIssue?.id).toBe('2');
+    expect(store.get().entries).toEqual([]);
+    expect(store.get().unreadIssue?.id).toBe('2');
   });
 
   it('records appended entries through the repository', async () => {
@@ -80,7 +80,7 @@ describe('activity commands', () => {
     const recorded = await recordActivity(store, env(repository, statuses), input);
 
     expect(recorded?.id).toBe('activity-1');
-    expect(store.state.unreadIssue?.summary).toBe('Could not save');
+    expect(store.get().unreadIssue?.summary).toBe('Could not save');
   });
 
   it('clears activity and reports success', async () => {
@@ -95,25 +95,25 @@ describe('activity commands', () => {
     await clearActivity(store, env(repository, statuses));
 
     expect(repository.entries).toEqual([]);
-    expect(store.state.unreadIssue).toBeNull();
+    expect(store.get().unreadIssue).toBeNull();
     expect(statuses).toEqual(['Cleared activity']);
   });
 
   it('reports clear failures without mutating state', async () => {
     const store = createActivityStore();
     const failure = makeEntry('1', 'failure');
-    store.setState((state) => ({ ...state, entries: [failure], unreadIssue: failure }));
+    store.update((state) => ({ ...state, entries: [failure], unreadIssue: failure }));
     repository.clearError = new Error('cannot clear');
 
     await clearActivity(store, env(repository, statuses));
 
-    expect(store.state.entries).toEqual([failure]);
+    expect(store.get().entries).toEqual([failure]);
     expect(statuses).toEqual(['Activity clear failed: cannot clear']);
   });
 
   it('exports activity with current filters and reports the file path', async () => {
     const store = createActivityStore();
-    store.setState((state) => activityFiltersChanged(state, { search: 'auth' }));
+    store.update((state) => activityFiltersChanged(state, { search: 'auth' }));
     repository.exportResult = { canceled: false, filePath: '/tmp/activity.jsonl' };
 
     await exportActivity(store, env(repository, statuses));
@@ -130,7 +130,7 @@ describe('activity commands', () => {
 
     await exportActivity(store, env(repository, statuses));
 
-    expect(store.state.lastErrorMessage).toBe('no permission');
+    expect(store.get().lastErrorMessage).toBe('no permission');
     expect(statuses).toEqual(['Activity export failed: no permission']);
   });
 
