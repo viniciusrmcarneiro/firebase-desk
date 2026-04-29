@@ -66,21 +66,20 @@ describe('QueryBuilder', () => {
     expect(screen.queryByLabelText('Filter 1 field')).toBeNull();
   });
 
-  it('renders create document CTA for collection paths', () => {
+  it('does not render create document CTA in the query toolbar', () => {
     const onCreateDocument = vi.fn();
     render(
       <QueryBuilder
         draft={draft}
         isLoading={false}
-        onCreateDocument={onCreateDocument}
         onDraftChange={() => {}}
         onReset={() => {}}
         onRun={() => {}}
       />,
     );
 
-    fireEvent.click(screen.getByRole('button', { name: 'New document' }));
-    expect(onCreateDocument).toHaveBeenCalledWith('orders');
+    expect(screen.queryByRole('button', { name: 'New document' })).toBeNull();
+    expect(onCreateDocument).not.toHaveBeenCalled();
   });
 
   it('uses generic placeholders for filter fields and values', () => {

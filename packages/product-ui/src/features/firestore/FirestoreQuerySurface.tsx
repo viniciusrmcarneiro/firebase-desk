@@ -283,9 +283,6 @@ export function FirestoreQuerySurface(
             draft={draft}
             fieldSuggestions={fieldSuggestions}
             isLoading={isLoading}
-            onCreateDocument={onCreateDocument && onGenerateDocumentId
-              ? openCreateDocument
-              : undefined}
             onDraftChange={onDraftChange}
             onReset={onReset}
             onRun={onRun}

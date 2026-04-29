@@ -10,7 +10,6 @@ interface QueryBuilderProps {
   readonly draft: FirestoreQueryDraft;
   readonly fieldSuggestions?: ReadonlyArray<FirestoreFieldCatalogEntry>;
   readonly isLoading: boolean;
-  readonly onCreateDocument?: ((collectionPath: string) => void) | undefined;
   readonly onDraftChange: (draft: FirestoreQueryDraft) => void;
   readonly onReset: () => void;
   readonly onRun: () => void;
@@ -44,7 +43,6 @@ export function QueryBuilder(
     draft,
     fieldSuggestions = [],
     isLoading,
-    onCreateDocument,
     onDraftChange,
     onReset,
     onRun,
@@ -107,7 +105,7 @@ export function QueryBuilder(
         <PanelBody className='grid gap-2 overflow-visible'>
           <div
             className={supportsCollectionControls
-              ? 'grid grid-cols-[minmax(180px,1fr)_96px_auto_auto] items-center gap-2'
+              ? 'grid grid-cols-[minmax(180px,1fr)_96px_auto] items-center gap-2'
               : 'grid grid-cols-[minmax(180px,1fr)_auto] items-center gap-2'}
           >
             <Input
@@ -134,18 +132,6 @@ export function QueryBuilder(
                   onChange={(event) =>
                     onDraftChange({ ...draft, limit: Number(event.currentTarget.value) || 1 })}
                 />
-              )
-              : null}
-            {supportsCollectionControls && onCreateDocument
-              ? (
-                <Button
-                  disabled={isLoading}
-                  variant='secondary'
-                  onClick={() => onCreateDocument(draft.path)}
-                >
-                  <Plus size={14} aria-hidden='true' />
-                  New document
-                </Button>
               )
               : null}
             <Button disabled={isLoading} variant='primary' onClick={onRun}>

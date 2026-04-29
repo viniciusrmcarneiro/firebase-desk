@@ -9,6 +9,7 @@ import {
   formatFirestoreValue,
   isFirestoreTypedValue,
 } from './FirestoreValueCell.tsx';
+import { sortedObjectEntries } from './sortedJson.ts';
 
 export interface FieldCatalogItem {
   readonly count: number;
@@ -203,7 +204,7 @@ function appendDocumentTreeRows(
     openPath: row.path,
   });
   if (!expanded) return;
-  const fields = sortedEntries(row.data);
+  const fields = sortedObjectEntries(row.data);
   const fieldsId = `${nodeId}:fields`;
   const fieldsExpanded = expandedIds.has(fieldsId);
   flattened.push({
@@ -346,7 +347,7 @@ function appendValueTreeRows(
   }
   const entries = Array.isArray(value)
     ? value.map((entry, index) => [`[${index}]`, entry] as const)
-    : sortedEntries(value as Record<string, unknown>);
+    : sortedObjectEntries(value as Record<string, unknown>);
   const expanded = expandedIds.has(nodeId);
   flattened.push({
     id: nodeId,
@@ -404,40 +405,4 @@ function valueType(value: unknown): string {
 
 function formatValue(value: unknown): string {
   return formatFirestoreValue(value);
-}
-
-function sortedEntries(value: Record<string, unknown>): ReadonlyArray<readonly [string, unknown]> {
-  return mergeSortEntries(Object.entries(value));
-}
-
-function mergeSortEntries(
-  entries: ReadonlyArray<readonly [string, unknown]>,
-): ReadonlyArray<readonly [string, unknown]> {
-  if (entries.length < 2) return entries;
-  const midpoint = Math.floor(entries.length / 2);
-  return mergeEntries(
-    mergeSortEntries(entries.slice(0, midpoint)),
-    mergeSortEntries(entries.slice(midpoint)),
-  );
-}
-
-function mergeEntries(
-  left: ReadonlyArray<readonly [string, unknown]>,
-  right: ReadonlyArray<readonly [string, unknown]>,
-): ReadonlyArray<readonly [string, unknown]> {
-  const merged: Array<readonly [string, unknown]> = [];
-  let leftIndex = 0;
-  let rightIndex = 0;
-  while (leftIndex < left.length && rightIndex < right.length) {
-    const leftEntry = left[leftIndex]!;
-    const rightEntry = right[rightIndex]!;
-    if (leftEntry[0].localeCompare(rightEntry[0]) <= 0) {
-      merged.push(leftEntry);
-      leftIndex += 1;
-    } else {
-      merged.push(rightEntry);
-      rightIndex += 1;
-    }
-  }
-  return merged.concat(left.slice(leftIndex), right.slice(rightIndex));
 }
