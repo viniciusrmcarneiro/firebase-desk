@@ -7,6 +7,7 @@ import {
 } from '@firebase-desk/repo-contracts';
 import { Badge, Button, cn, DockedPanel, Input } from '@firebase-desk/ui';
 import { Download, ExternalLink, Maximize2, Minimize2, Trash2, X } from 'lucide-react';
+import { useState } from 'react';
 
 export interface ActivityDrawerProps {
   readonly area: ActivityLogArea | 'all';
@@ -118,50 +119,72 @@ export function ActivityDrawer(
             : entries.length === 0
             ? <div className='p-4 text-sm text-text-secondary'>No activity</div>
             : entries.map((entry) => (
-              <details key={entry.id} className='border-b border-border-subtle'>
-                <summary className='grid cursor-pointer grid-cols-[112px_92px_86px_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 text-xs hover:bg-action-ghost-hover'>
-                  <span className='font-mono text-text-muted'>{timeLabel(entry.timestamp)}</span>
-                  <Badge variant={badgeVariant(entry.status)}>{entry.status}</Badge>
-                  <span className='font-mono text-text-secondary'>{entry.area}</span>
-                  <span className='min-w-0 truncate text-sm text-text-primary'>
-                    {entry.action}
-                    <span className='text-text-muted'>· {entry.summary}</span>
-                  </span>
-                  <span className='flex items-center gap-2'>
-                    {entry.durationMs !== undefined
-                      ? <span className='font-mono text-text-muted'>{entry.durationMs}ms</span>
-                      : null}
-                    {onOpenTarget && entry.target
-                      ? (
-                        <Button
-                          size='xs'
-                          variant='ghost'
-                          onClick={(event) => {
-                            event.preventDefault();
-                            onOpenTarget(entry);
-                          }}
-                        >
-                          <ExternalLink size={13} aria-hidden='true' /> Open
-                        </Button>
-                      )
-                      : null}
-                  </span>
-                </summary>
-                <div className='grid gap-2 bg-bg-subtle px-3 py-2 text-xs'>
-                  {entry.target
-                    ? <ActivityDetail label='Target' value={targetLabel(entry)} />
-                    : null}
-                  {entry.error
-                    ? <ActivityDetail label='Error' value={entry.error.message} />
-                    : null}
-                  <JsonBlock label='Metadata' value={entry.metadata ?? {}} />
-                  {entry.payload ? <JsonBlock label='Payload' value={entry.payload} /> : null}
-                </div>
-              </details>
+              <ActivityEntryRow key={entry.id} entry={entry} onOpenTarget={onOpenTarget} />
             ))}
         </div>
       </div>
     </DockedPanel>
+  );
+}
+
+function ActivityEntryRow(
+  {
+    entry,
+    onOpenTarget,
+  }: {
+    readonly entry: ActivityLogEntry;
+    readonly onOpenTarget?: ((entry: ActivityLogEntry) => void) | undefined;
+  },
+) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details
+      className='border-b border-border-subtle'
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary className='grid cursor-pointer grid-cols-[112px_92px_86px_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 text-xs hover:bg-action-ghost-hover'>
+        <span className='font-mono text-text-muted'>{timeLabel(entry.timestamp)}</span>
+        <Badge variant={badgeVariant(entry.status)}>{entry.status}</Badge>
+        <span className='font-mono text-text-secondary'>{entry.area}</span>
+        <span className='min-w-0 truncate text-sm text-text-primary'>
+          {entry.action}
+          <span className='text-text-muted'>· {entry.summary}</span>
+        </span>
+        <span className='flex items-center gap-2'>
+          {entry.durationMs !== undefined
+            ? <span className='font-mono text-text-muted'>{entry.durationMs}ms</span>
+            : null}
+          {onOpenTarget && entry.target
+            ? (
+              <Button
+                size='xs'
+                variant='ghost'
+                onClick={(event) => {
+                  event.preventDefault();
+                  onOpenTarget(entry);
+                }}
+              >
+                <ExternalLink size={13} aria-hidden='true' /> Open
+              </Button>
+            )
+            : null}
+        </span>
+      </summary>
+      {open
+        ? (
+          <div className='grid gap-2 bg-bg-subtle px-3 py-2 text-xs'>
+            {entry.target
+              ? <ActivityDetail label='Target' value={targetLabel(entry)} />
+              : null}
+            {entry.error
+              ? <ActivityDetail label='Error' value={entry.error.message} />
+              : null}
+            <JsonBlock label='Metadata' value={entry.metadata ?? {}} />
+            {entry.payload ? <JsonBlock label='Payload' value={entry.payload} /> : null}
+          </div>
+        )
+        : null}
+    </details>
   );
 }
 

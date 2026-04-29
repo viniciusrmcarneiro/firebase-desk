@@ -113,6 +113,8 @@ interface DestructiveAction {
   readonly title: string;
 }
 
+const MAX_ACTIVITY_DEDUPE_KEYS = 500;
+
 interface PendingCreateDocumentRequest extends FirestoreCreateDocumentRequest {
   readonly tabId: string;
 }
@@ -299,8 +301,7 @@ export function AppShell(
     if (!runId || !path || firestoreTab.isLoading) return;
 
     const key = `${activeTab.id}:${runId}`;
-    if (loggedFirestoreRuns.current.has(key)) return;
-    loggedFirestoreRuns.current.add(key);
+    if (!rememberActivityKey(loggedFirestoreRuns.current, key)) return;
 
     const isDocument = firestoreTab.activeQueryIsDocument;
     const errorMessage = firestoreTab.errorMessage;
@@ -342,8 +343,7 @@ export function AppShell(
   useEffect(() => {
     if (!activeTab || activeTab.kind !== 'auth-users' || !authTab.errorMessage) return;
     const key = `${activeTab.id}:${authTab.authFilter}:${authTab.errorMessage}`;
-    if (loggedAuthFailures.current.has(key)) return;
-    loggedAuthFailures.current.add(key);
+    if (!rememberActivityKey(loggedAuthFailures.current, key)) return;
     recordActivity({
       action: authTab.authFilter.trim() ? 'Search users' : 'Load users',
       area: 'auth',
@@ -359,8 +359,7 @@ export function AppShell(
     if (!activeTab || activeTab.kind !== 'js-query' || !jsTab.scriptRunId || !jsTab.scriptResult) {
       return;
     }
-    if (loggedScriptRuns.current.has(jsTab.scriptRunId)) return;
-    loggedScriptRuns.current.add(jsTab.scriptRunId);
+    if (!rememberActivityKey(loggedScriptRuns.current, jsTab.scriptRunId)) return;
     const result = jsTab.scriptResult;
     const status: ActivityLogStatus = result.cancelled
       ? 'cancelled'
@@ -2088,6 +2087,17 @@ function activityIssueBadgeVariant(status: ActivityLogStatus): 'danger' | 'neutr
   if (status === 'failure') return 'danger';
   if (status === 'conflict') return 'warning';
   return 'neutral';
+}
+
+function rememberActivityKey(keys: Set<string>, key: string): boolean {
+  if (keys.has(key)) return false;
+  keys.add(key);
+  while (keys.size > MAX_ACTIVITY_DEDUPE_KEYS) {
+    const oldestKey = keys.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    keys.delete(oldestKey);
+  }
+  return true;
 }
 
 function elapsedMs(startedAt: number): number {

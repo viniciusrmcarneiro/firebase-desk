@@ -25,8 +25,12 @@ describe('ActivityDrawer', () => {
 
     expect(screen.getByRole('region', { name: 'Activity' })).toBeTruthy();
     expect(screen.getByText('Save document')).toBeTruthy();
+    expect(screen.queryByText(/fieldCount/)).toBeNull();
 
+    const details = screen.getByText('Save document').closest('details');
+    expect(details).toBeTruthy();
     fireEvent.click(screen.getByText('Save document'));
+    fireEvent(details!, new Event('toggle', { bubbles: true }));
 
     expect(screen.getByText(/fieldCount/)).toBeTruthy();
 

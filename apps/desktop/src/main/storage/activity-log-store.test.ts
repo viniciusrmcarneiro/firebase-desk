@@ -25,6 +25,24 @@ describe('ActivityLogStore', () => {
     ]);
   });
 
+  it('serializes concurrent appends without losing entries', async () => {
+    const dir = await makeTempDir();
+    const store = new ActivityLogStore(dir);
+
+    await Promise.all(
+      Array.from(
+        { length: 25 },
+        (_, index) =>
+          store.append(
+            entry(`entry-${index}`, `2026-04-29T00:00:${String(index).padStart(2, '0')}.000Z`),
+            1024 * 1024,
+          ),
+      ),
+    );
+
+    await expect(store.list()).resolves.toHaveLength(25);
+  });
+
   it('prunes oldest entries by byte budget', async () => {
     const dir = await makeTempDir();
     const store = new ActivityLogStore(dir);

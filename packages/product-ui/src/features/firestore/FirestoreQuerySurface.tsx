@@ -163,6 +163,8 @@ export function FirestoreQuerySurface(
     rows,
     settings,
   });
+  // Field-level actions require patch writes; falling back to full saves would overwrite documents.
+  const fieldActionsEnabled = Boolean(onUpdateDocumentFields);
 
   useEffect(() => {
     if (!createDocumentRequest || createDocumentRequest.requestId === handledCreateRequestId) {
@@ -429,9 +431,9 @@ export function FirestoreQuerySurface(
         selectedDocumentPath={selectedDocumentPath}
         settings={settings}
         onDeleteDocument={onDeleteDocument ? setDeleteDocumentTarget : undefined}
-        onDeleteField={onUpdateDocumentFields ? setDeleteFieldTarget : undefined}
+        onDeleteField={fieldActionsEnabled ? setDeleteFieldTarget : undefined}
         onEditDocument={setEditorDocument}
-        onEditField={onUpdateDocumentFields
+        onEditField={fieldActionsEnabled
           ? (target) => {
             const document = documentForTarget(target, rows, selectedDocument);
             setFieldEditor({
@@ -451,8 +453,8 @@ export function FirestoreQuerySurface(
           ? openCreateDocument
           : undefined}
         onSelectDocument={onSelectDocument}
-        onSetFieldValue={onUpdateDocumentFields ? setFieldValue : undefined}
-        onSetFieldNull={onUpdateDocumentFields ? setFieldNull : undefined}
+        onSetFieldValue={fieldActionsEnabled ? setFieldValue : undefined}
+        onSetFieldNull={fieldActionsEnabled ? setFieldNull : undefined}
       />
       <DocumentEditorModal
         document={editorDocument}
