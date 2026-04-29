@@ -39,7 +39,14 @@ const selectClassName =
   'h-[var(--density-compact-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary disabled:cursor-not-allowed disabled:opacity-60';
 
 export function QueryBuilder(
-  { draft, fieldSuggestions = [], isLoading, onDraftChange, onReset, onRun }: QueryBuilderProps,
+  {
+    draft,
+    fieldSuggestions = [],
+    isLoading,
+    onDraftChange,
+    onReset,
+    onRun,
+  }: QueryBuilderProps,
 ) {
   const supportsCollectionControls = isCollectionPath(draft.path);
   const filters = filtersForDraft(draft);

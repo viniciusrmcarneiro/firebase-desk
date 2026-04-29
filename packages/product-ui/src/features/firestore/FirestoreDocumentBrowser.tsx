@@ -6,7 +6,9 @@ import type {
 import { cn, ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@firebase-desk/ui';
 import { type ReactNode, useMemo, useState } from 'react';
 import { useMediaQuery } from '../../hooks/useMediaQuery.ts';
+import { type FieldEditTarget } from './fieldEditModel.ts';
 import {
+  findDocumentByPath,
   mergeLoadedSubcollections,
   messageFromError,
   type SubcollectionLoadState,
@@ -22,8 +24,12 @@ export interface FirestoreDocumentBrowserProps {
   readonly header?: ReactNode;
   readonly isFetchingMore?: boolean;
   readonly isLoading?: boolean;
-  readonly onDeleteDocument?: ((documentPath: string) => Promise<void> | void) | undefined;
+  readonly actionErrorMessage?: string | null;
+  readonly onCreateDocument?: ((collectionPath: string) => void) | undefined;
+  readonly onDeleteDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
+  readonly onDeleteField?: ((target: FieldEditTarget) => void) | undefined;
   readonly onEditDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
+  readonly onEditField?: ((target: FieldEditTarget, jsonMode: boolean) => void) | undefined;
   readonly onLoadMore: () => void;
   readonly onLoadSubcollections?:
     | (
@@ -32,9 +38,13 @@ export interface FirestoreDocumentBrowserProps {
     | undefined;
   readonly onOpenDocumentInNewTab?: ((documentPath: string) => void) | undefined;
   readonly onResultViewChange: (view: FirestoreResultView) => void;
+  readonly onRefreshResults?: (() => void) | undefined;
   readonly onSelectDocument?: ((documentPath: string) => void) | undefined;
+  readonly onSetFieldValue?: ((target: FieldEditTarget, value: unknown) => void) | undefined;
+  readonly onSetFieldNull?: ((target: FieldEditTarget) => void) | undefined;
   readonly queryPath: string;
   readonly resultView: FirestoreResultView;
+  readonly resultsStale?: boolean;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocument?: FirestoreDocumentResult | null;
   readonly selectedDocumentPath?: string | null;
@@ -47,17 +57,25 @@ export function FirestoreDocumentBrowser(
     errorMessage = null,
     hasMore,
     header,
+    actionErrorMessage = null,
     isFetchingMore = false,
     isLoading = false,
+    onCreateDocument,
     onDeleteDocument,
+    onDeleteField,
     onEditDocument,
+    onEditField,
     onLoadMore,
     onLoadSubcollections,
     onOpenDocumentInNewTab,
     onResultViewChange,
+    onRefreshResults,
     onSelectDocument,
+    onSetFieldValue,
+    onSetFieldNull,
     queryPath,
     resultView,
+    resultsStale = false,
     rows,
     selectedDocument = null,
     selectedDocumentPath = null,
@@ -73,15 +91,15 @@ export function FirestoreDocumentBrowser(
     () => rows.map((row) => mergeLoadedSubcollections(row, subcollectionStates[row.path])),
     [rows, subcollectionStates],
   );
-  const selectedDocumentWithSubcollections = useMemo(
-    () =>
-      rowsWithSubcollections.find((row) => row.path === selectedDocumentPath)
-        ?? mergeLoadedSubcollections(
-          selectedDocument,
-          selectedDocument ? subcollectionStates[selectedDocument.path] : undefined,
-        ),
-    [rowsWithSubcollections, selectedDocument, selectedDocumentPath, subcollectionStates],
-  );
+  const selectedDocumentWithSubcollections = useMemo(() => {
+    const fallback = mergeLoadedSubcollections(
+      selectedDocument,
+      selectedDocument ? subcollectionStates[selectedDocument.path] : undefined,
+    );
+    return selectedDocumentPath
+      ? findDocumentByPath(rowsWithSubcollections, selectedDocumentPath) ?? fallback
+      : fallback;
+  }, [rowsWithSubcollections, selectedDocument, selectedDocumentPath, subcollectionStates]);
 
   async function loadSubcollections(documentPath: string) {
     if (!onLoadSubcollections) return;
@@ -118,18 +136,26 @@ export function FirestoreDocumentBrowser(
         errorMessage={errorMessage}
         isFetchingMore={isFetchingMore}
         isLoading={isLoading}
+        actionErrorMessage={actionErrorMessage}
         queryPath={queryPath}
         resultView={resultView}
+        resultsStale={resultsStale}
         rows={rowsWithSubcollections}
         selectedDocumentPath={selectedDocumentPath}
         settings={settings}
         subcollectionStates={subcollectionStates}
+        onCreateDocument={onCreateDocument}
+        onDeleteDocument={onDeleteDocument}
+        onDeleteField={onDeleteField}
         onEditDocument={onEditDocument}
+        onEditField={onEditField}
         onLoadMore={onLoadMore}
         onLoadSubcollections={onLoadSubcollections ? loadSubcollections : undefined}
         onOpenDocumentInNewTab={onOpenDocumentInNewTab}
         onResultViewChange={onResultViewChange}
+        onRefreshResults={onRefreshResults}
         onSelectDocument={onSelectDocument}
+        onSetFieldNull={onSetFieldNull}
       />
     </div>
   );
@@ -143,8 +169,12 @@ export function FirestoreDocumentBrowser(
         selectedDocument={selectedDocumentWithSubcollections}
         onCollapse={() => setOverviewCollapsed(true)}
         onDeleteDocument={onDeleteDocument}
+        onDeleteField={onDeleteField}
         onEditDocument={onEditDocument}
+        onEditField={onEditField}
         onOpenDocumentInNewTab={onOpenDocumentInNewTab}
+        onSetFieldValue={onSetFieldValue}
+        onSetFieldNull={onSetFieldNull}
       />
     );
 

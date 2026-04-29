@@ -63,9 +63,74 @@ describe('repo-mocks contract conformance', () => {
     const document = await repo.getDocument('p', 'orders/ord_1024');
     expect(document?.path).toBe('orders/ord_1024');
 
-    const saved = await repo.saveDocument('p', 'orders/ord_saved', { status: 'draft' });
-    expect(saved.path).toBe('orders/ord_saved');
-    expect(await repo.getDocument('p', 'orders/ord_saved')).not.toBeNull();
+    const savedResult = await repo.saveDocument('p', 'orders/ord_saved', { status: 'draft' });
+    expect(savedResult.status).toBe('saved');
+    const saved = await repo.getDocument('p', 'orders/ord_saved');
+    expect(saved?.path).toBe('orders/ord_saved');
+    expect(saved?.updateTime).toBeDefined();
+
+    await expect(repo.generateDocumentId('p', 'orders')).resolves.toEqual({
+      documentId: 'mock_1',
+    });
+    await expect(repo.generateDocumentId('p', '/orders')).rejects.toThrow(
+      'Invalid collection path',
+    );
+    const created = await repo.createDocument('p', 'orders', 'ord_created', { status: 'new' });
+    expect(created.path).toBe('orders/ord_created');
+    await expect(repo.createDocument('p', 'orders', 'ord_created', { status: 'again' }))
+      .rejects.toThrow('already exists');
+    await expect(repo.createDocument('p', 'orders/', 'ord_invalid', {})).rejects.toThrow(
+      'Invalid collection path',
+    );
+
+    await repo.saveDocument('p', 'orders/ord_fields', {
+      id: 'data-id',
+      path: 'data-path',
+      subcollections: 'data-subcollections',
+      'a.b': true,
+    });
+    await expect(repo.getDocument('p', 'orders/ord_fields')).resolves.toMatchObject({
+      data: {
+        id: 'data-id',
+        path: 'data-path',
+        subcollections: 'data-subcollections',
+        'a.b': true,
+      },
+    });
+
+    await repo.saveDocument('p', 'orders/ord_encoded', {
+      customerRef: { __type__: 'reference', path: 'customers/cus_ada' },
+      deliveredAt: { __type__: 'timestamp', value: '2026-04-29T10:30:00.000Z' },
+      payload: { __type__: 'bytes', base64: 'aGVsbG8=' },
+      place: { __type__: 'geoPoint', latitude: -36.8485, longitude: 174.7633 },
+    });
+    await expect(repo.getDocument('p', 'orders/ord_encoded')).resolves.toMatchObject({
+      data: {
+        customerRef: { __type__: 'reference', path: 'customers/cus_ada' },
+        deliveredAt: { __type__: 'timestamp', value: '2026-04-29T10:30:00.000Z' },
+        payload: { __type__: 'bytes', base64: 'aGVsbG8=' },
+        place: { __type__: 'geoPoint', latitude: -36.8485, longitude: 174.7633 },
+      },
+    });
+    await expect(repo.saveDocument('p', '/orders/ord_invalid', {})).rejects.toThrow(
+      'Invalid document path',
+    );
+
+    const conflictBase = await repo.getDocument('p', 'orders/ord_encoded');
+    expect(conflictBase?.updateTime).toBeDefined();
+    await repo.saveDocument('p', 'orders/ord_encoded', { status: 'remote' });
+    await expect(repo.saveDocument(
+      'p',
+      'orders/ord_encoded',
+      { status: 'local' },
+      { lastUpdateTime: conflictBase!.updateTime! },
+    )).resolves.toMatchObject({
+      status: 'conflict',
+      remoteDocument: { data: { status: 'remote' } },
+    });
+    await expect(repo.getDocument('p', 'orders/ord_encoded')).resolves.toMatchObject({
+      data: { status: 'remote' },
+    });
 
     await repo.saveDocument('p', 'objects/a', { value: { score: 2, toJSON: 'not callable' } });
     await repo.saveDocument('p', 'objects/b', { value: { score: 1 } });
@@ -77,6 +142,22 @@ describe('repo-mocks contract conformance', () => {
 
     await repo.deleteDocument('p', 'orders/ord_saved');
     expect(await repo.getDocument('p', 'orders/ord_saved')).toBeNull();
+
+    await repo.saveDocument('p', 'orders/ord_nested', { status: 'draft' });
+    await repo.saveDocument('p', 'orders/ord_nested/events/evt_1', { type: 'deleted' });
+    await repo.saveDocument('p', 'orders/ord_nested/audit/aud_1', { type: 'kept' });
+    await expect(repo.deleteDocument('p', 'orders/ord_nested', {
+      deleteSubcollectionPaths: ['orders/ord_nested/events/'],
+    })).rejects.toThrow('Invalid collection path');
+    await repo.deleteDocument('p', 'orders/ord_nested', {
+      deleteSubcollectionPaths: ['orders/ord_nested/events'],
+    });
+    expect(await repo.getDocument('p', 'orders/ord_nested')).toBeNull();
+    expect(await repo.getDocument('p', 'orders/ord_nested/events/evt_1')).toBeNull();
+    expect(await repo.getDocument('p', 'orders/ord_nested/audit/aud_1')).not.toBeNull();
+    await expect(repo.listSubcollections('p', 'orders/ord_nested')).resolves.toEqual([
+      expect.objectContaining({ path: 'orders/ord_nested/audit' }),
+    ]);
 
     await expect(repo.listRootCollections(MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID)).rejects
       .toBeInstanceOf(MockFirebaseError);

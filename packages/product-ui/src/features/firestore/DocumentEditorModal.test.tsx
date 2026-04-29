@@ -26,7 +26,7 @@ const document: FirestoreDocumentResult = {
 };
 
 describe('DocumentEditorModal', () => {
-  it('adds parsed fields and saves document JSON', async () => {
+  it('saves document JSON', async () => {
     const onOpenChange = vi.fn();
     const onSaveDocument = vi.fn();
     render(
@@ -38,9 +38,9 @@ describe('DocumentEditorModal', () => {
       />,
     );
 
-    fireEvent.change(screen.getByLabelText('New field name'), { target: { value: 'count' } });
-    fireEvent.change(screen.getByLabelText('New field value'), { target: { value: '2' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Add field' }));
+    fireEvent.change(screen.getByLabelText('Document JSON'), {
+      target: { value: '{ "status": "paid", "count": 2 }' },
+    });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() =>

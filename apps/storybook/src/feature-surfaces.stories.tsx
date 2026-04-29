@@ -258,20 +258,31 @@ export const FirestoreQueryDefault: Story = {
 
 function FirestoreQueryStorySurface() {
   const [draft, setDraft] = useState<FirestoreQueryDraft>(initialFirestoreDraft);
+  const [rows, setRows] = useState(documents);
+  const [selectedPath, setSelectedPath] = useState(selectedDocument.path);
+  const selected = rows.find((row) => row.path === selectedPath) ?? rows[0] ?? null;
   return (
     <FirestoreQuerySurface
       draft={draft}
       hasMore
-      rows={documents}
-      selectedDocument={selectedDocument}
-      selectedDocumentPath='orders/ord_1024'
+      rows={rows}
+      selectedDocument={selected}
+      selectedDocumentPath={selected?.path ?? null}
       settings={settings}
       onDraftChange={setDraft}
       onLoadMore={() => {}}
       onOpenDocumentInNewTab={() => {}}
       onReset={() => setDraft(initialFirestoreDraft)}
       onRun={() => {}}
-      onSelectDocument={() => {}}
+      onDeleteDocument={(path, options) => {
+        const deletedPaths = new Set([path, ...options.deleteDescendantDocumentPaths]);
+        setRows((current) => current.filter((row) => !deletedPaths.has(row.path)));
+        if (selectedPath === path) setSelectedPath('');
+      }}
+      onSaveDocument={(path, data) => {
+        setRows((current) => current.map((row) => row.path === path ? { ...row, data } : row));
+      }}
+      onSelectDocument={setSelectedPath}
     />
   );
 }

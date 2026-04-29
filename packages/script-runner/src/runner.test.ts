@@ -153,6 +153,7 @@ describe('runUserScript', () => {
     );
 
     expect(result.stream?.[0]).toMatchObject({
+      label: 'yield DocumentSnapshot',
       view: 'table',
       value: [{
         id: 'ord_1',

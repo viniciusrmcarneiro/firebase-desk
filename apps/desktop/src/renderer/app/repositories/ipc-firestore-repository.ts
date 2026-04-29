@@ -1,10 +1,14 @@
 import type { IpcRequest, IpcResponse } from '@firebase-desk/ipc-schemas';
 import type {
   FirestoreCollectionNode,
+  FirestoreDeleteDocumentOptions,
   FirestoreDocumentNode,
   FirestoreDocumentResult,
+  FirestoreGeneratedDocumentId,
   FirestoreQuery,
   FirestoreRepository,
+  FirestoreSaveDocumentOptions,
+  FirestoreSaveDocumentResult,
   Page,
   PageRequest,
 } from '@firebase-desk/repo-contracts';
@@ -71,12 +75,62 @@ export class IpcFirestoreRepository implements FirestoreRepository {
     return document ? toDocumentResult(document) : null;
   }
 
-  async saveDocument(): Promise<FirestoreDocumentResult> {
-    throw new Error('Firestore writes are not available until Phase 8.');
+  async saveDocument(
+    connectionId: string,
+    documentPath: string,
+    data: Record<string, unknown>,
+    options?: FirestoreSaveDocumentOptions,
+  ): Promise<FirestoreSaveDocumentResult> {
+    const result = await window.firebaseDesk.firestore.saveDocument({
+      connectionId,
+      data,
+      documentPath,
+      ...(options ? { options: toIpcSaveOptions(options) } : {}),
+    });
+    return result.status === 'conflict'
+      ? {
+        status: 'conflict',
+        remoteDocument: result.remoteDocument ? toDocumentResult(result.remoteDocument) : null,
+      }
+      : { status: 'saved', document: toDocumentResult(result.document) };
   }
 
-  async deleteDocument(): Promise<void> {
-    throw new Error('Firestore deletes are not available until Phase 8.');
+  async generateDocumentId(
+    connectionId: string,
+    collectionPath: string,
+  ): Promise<FirestoreGeneratedDocumentId> {
+    return await window.firebaseDesk.firestore.generateDocumentId({
+      collectionPath,
+      connectionId,
+    });
+  }
+
+  async createDocument(
+    connectionId: string,
+    collectionPath: string,
+    documentId: string,
+    data: Record<string, unknown>,
+  ): Promise<FirestoreDocumentResult> {
+    return toDocumentResult(
+      await window.firebaseDesk.firestore.createDocument({
+        collectionPath,
+        connectionId,
+        data,
+        documentId,
+      }),
+    );
+  }
+
+  async deleteDocument(
+    connectionId: string,
+    documentPath: string,
+    options?: FirestoreDeleteDocumentOptions,
+  ): Promise<void> {
+    await window.firebaseDesk.firestore.deleteDocument({
+      connectionId,
+      documentPath,
+      ...(options ? { options: toIpcDeleteOptions(options) } : {}),
+    });
   }
 }
 
@@ -96,6 +150,20 @@ function toIpcQuery(query: FirestoreQuery): IpcRequest<'firestore.runQuery'>['qu
       : {}),
     ...(query.sorts !== undefined ? { sorts: query.sorts.map((sort) => ({ ...sort })) } : {}),
   };
+}
+
+function toIpcDeleteOptions(
+  options: FirestoreDeleteDocumentOptions,
+): NonNullable<IpcRequest<'firestore.deleteDocument'>['options']> {
+  return {
+    deleteSubcollectionPaths: [...options.deleteSubcollectionPaths],
+  };
+}
+
+function toIpcSaveOptions(
+  options: FirestoreSaveDocumentOptions,
+): NonNullable<IpcRequest<'firestore.saveDocument'>['options']> {
+  return options.lastUpdateTime ? { lastUpdateTime: options.lastUpdateTime } : {};
 }
 
 function toCollectionNode(
@@ -119,5 +187,6 @@ function toDocumentResult(
     ...(document.subcollections
       ? { subcollections: document.subcollections.map(toCollectionNode) }
       : {}),
+    ...(document.updateTime ? { updateTime: document.updateTime } : {}),
   };
 }

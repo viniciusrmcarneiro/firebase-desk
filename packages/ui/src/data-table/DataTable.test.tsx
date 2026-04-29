@@ -1,5 +1,6 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { ContextMenuContent, ContextMenuItem } from '../context-menu/index.ts';
 import { DataTable, type DataTableColumn, sanitizeDataTableColumnLayout } from './DataTable.tsx';
 
 vi.mock('@tanstack/react-virtual', () => ({
@@ -56,6 +57,27 @@ describe('DataTable', () => {
     );
 
     expect(container.querySelector('.match-row')?.textContent).toContain('Ada');
+  });
+
+  it('supports cell context menus', async () => {
+    render(
+      <div className='h-60'>
+        <DataTable
+          columns={columns}
+          data={[{ id: '1', name: 'Ada' }]}
+          getRowId={(row) => row.id}
+          cellContextMenu={(row, columnId) => (
+            <ContextMenuContent>
+              <ContextMenuItem>{columnId}:{row.name}</ContextMenuItem>
+            </ContextMenuContent>
+          )}
+        />
+      </div>,
+    );
+
+    fireEvent.contextMenu(screen.getByText('Ada'));
+
+    expect(await screen.findByText('name:Ada')).toBeTruthy();
   });
 
   it('updates rendered columns when column definitions change', () => {

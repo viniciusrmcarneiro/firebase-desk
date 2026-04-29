@@ -61,6 +61,74 @@ describe('preload script runner api', () => {
 
     expect(listener).not.toHaveBeenCalled();
   });
+
+  it('exposes Firestore write methods', async () => {
+    const api = exposedApi();
+    electronMocks.invoke
+      .mockResolvedValueOnce({ documentId: 'generated_id' })
+      .mockResolvedValueOnce({
+        id: 'ord_1',
+        path: 'orders/ord_1',
+        data: { status: 'paid' },
+        hasSubcollections: false,
+        updateTime: '2026-04-29T00:00:00.000Z',
+      })
+      .mockResolvedValueOnce({
+        status: 'saved',
+        document: {
+          id: 'ord_1',
+          path: 'orders/ord_1',
+          data: { status: 'paid' },
+          hasSubcollections: false,
+          updateTime: '2026-04-29T00:00:00.000Z',
+        },
+      })
+      .mockResolvedValueOnce(undefined);
+
+    await expect(api.firestore.generateDocumentId({
+      connectionId: 'emu',
+      collectionPath: 'orders',
+    })).resolves.toEqual({ documentId: 'generated_id' });
+    await expect(api.firestore.createDocument({
+      connectionId: 'emu',
+      collectionPath: 'orders',
+      documentId: 'ord_1',
+      data: { status: 'paid' },
+    })).resolves.toMatchObject({ id: 'ord_1' });
+    await expect(api.firestore.saveDocument({
+      connectionId: 'emu',
+      documentPath: 'orders/ord_1',
+      data: { status: 'paid' },
+      options: { lastUpdateTime: '2026-04-29T00:00:00.000Z' },
+    })).resolves.toMatchObject({ status: 'saved', document: { id: 'ord_1' } });
+    await expect(api.firestore.deleteDocument({
+      connectionId: 'emu',
+      documentPath: 'orders/ord_1',
+      options: { deleteSubcollectionPaths: ['orders/ord_1/events'] },
+    })).resolves.toBeUndefined();
+
+    expect(electronMocks.invoke).toHaveBeenCalledWith('firestore.generateDocumentId', {
+      connectionId: 'emu',
+      collectionPath: 'orders',
+    });
+    expect(electronMocks.invoke).toHaveBeenCalledWith('firestore.createDocument', {
+      connectionId: 'emu',
+      collectionPath: 'orders',
+      documentId: 'ord_1',
+      data: { status: 'paid' },
+    });
+    expect(electronMocks.invoke).toHaveBeenCalledWith('firestore.saveDocument', {
+      connectionId: 'emu',
+      documentPath: 'orders/ord_1',
+      data: { status: 'paid' },
+      options: { lastUpdateTime: '2026-04-29T00:00:00.000Z' },
+    });
+    expect(electronMocks.invoke).toHaveBeenCalledWith('firestore.deleteDocument', {
+      connectionId: 'emu',
+      documentPath: 'orders/ord_1',
+      options: { deleteSubcollectionPaths: ['orders/ord_1/events'] },
+    });
+  });
 });
 
 function exposedApi(): DesktopApi {

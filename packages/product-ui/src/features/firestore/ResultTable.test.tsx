@@ -13,8 +13,17 @@ vi.mock('@firebase-desk/ui', async (importOriginal) => {
   };
   return {
     ...actual,
+    ContextMenuContent: ({ children }: { readonly children: ReactNode; }) => <div>{children}</div>,
+    ContextMenuItem: (
+      { children, onSelect }: {
+        readonly children: ReactNode;
+        readonly onSelect?: () => void;
+      },
+    ) => <button type='button' onClick={() => onSelect?.()}>{children}</button>,
+    ContextMenuSeparator: () => <hr />,
     DataTable: (
       {
+        cellContextMenu,
         columns,
         columnLayout,
         data,
@@ -24,6 +33,7 @@ vi.mock('@firebase-desk/ui', async (importOriginal) => {
         onRowClick,
         onRowDoubleClick,
       }: {
+        readonly cellContextMenu?: (row: unknown, columnId: string) => ReactNode | null;
         readonly columns: ReadonlyArray<Column>;
         readonly columnLayout?: {
           readonly columnOrder: ReadonlyArray<string>;
@@ -72,7 +82,10 @@ vi.mock('@firebase-desk/ui', async (importOriginal) => {
                 onDoubleClick={() => onRowDoubleClick?.(row)}
               >
                 {columns.map((column) => (
-                  <span key={column.id}>{column.cell?.({ row: { original: row } })}</span>
+                  <span key={column.id}>
+                    {column.cell?.({ row: { original: row } })}
+                    {cellContextMenu?.(row, column.id)}
+                  </span>
                 ))}
               </div>
             ))}
@@ -181,6 +194,60 @@ describe('ResultTable', () => {
     ).map((item) => item.getAttribute('data-column-id'));
     expect(headerIds).not.toContain('actions');
     expect(headerIds.at(-1)).toBe('subcollections');
+  });
+
+  it('adds delete document to the row context menu', () => {
+    const onDeleteDocument = vi.fn();
+    const document = {
+      id: 'ord_1',
+      path: 'orders/ord_1',
+      data: { total: 10 },
+      hasSubcollections: false,
+    };
+
+    render(
+      <ResultTable
+        hasMore={false}
+        isFetchingMore={false}
+        queryPath='orders'
+        rows={[document]}
+        selectedDocumentPath={null}
+        subcollectionStates={{}}
+        onDeleteDocument={onDeleteDocument}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getAllByRole('button', { name: /Delete document/ })[0]!);
+
+    expect(onDeleteDocument).toHaveBeenCalledWith(document);
+  });
+
+  it('shows field and document sections for field cells', () => {
+    render(
+      <ResultTable
+        hasMore={false}
+        isFetchingMore={false}
+        queryPath='orders'
+        rows={[{
+          id: 'ord_1',
+          path: 'orders/ord_1',
+          data: { total: 10 },
+          hasSubcollections: false,
+        }]}
+        selectedDocumentPath={null}
+        subcollectionStates={{}}
+        onDeleteDocument={() => {}}
+        onDeleteField={() => {}}
+        onLoadMore={() => {}}
+        onOpenDocumentInNewTab={() => {}}
+      />,
+    );
+
+    expect(screen.getAllByText('Field').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Document').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Delete field').length).toBeGreaterThan(0);
+    expect(screen.getAllByText('Delete document').length).toBeGreaterThan(0);
   });
 
   it('renders object values as compact content previews', () => {

@@ -4,6 +4,8 @@ import {
   AccountTree,
   AuthUsersSurface,
   CommandPalette,
+  type DeleteDocumentOptions,
+  type FirestoreCreateDocumentRequest,
   type FirestoreQueryDraft,
   FirestoreQuerySurface,
   JsQuerySurface,
@@ -20,6 +22,8 @@ import type {
   AuthUser,
   FirestoreCollectionNode,
   FirestoreDocumentResult,
+  FirestoreSaveDocumentOptions,
+  FirestoreSaveDocumentResult,
   ProjectAddInput,
   ProjectSummary,
   ProjectUpdatePatch,
@@ -56,7 +60,7 @@ import {
   Sun,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import appIconUrl from '../assets/app-icon.png';
 import { AddProjectDialog } from './dialogs/AddProjectDialog.tsx';
 import { EditProjectDialog } from './dialogs/EditProjectDialog.tsx';
@@ -65,6 +69,7 @@ import { useFirestoreTabState } from './hooks/useFirestoreTabState.ts';
 import { useJsTabState } from './hooks/useJsTabState.ts';
 import { useProjects } from './hooks/useRepositoriesData.ts';
 import { useWorkspaceTree } from './hooks/useWorkspaceTree.ts';
+import { RenderErrorBoundary } from './RenderErrorBoundary.tsx';
 import { type RepositorySet, useRepositories } from './RepositoryProvider.tsx';
 import { selectionActions, selectionStore } from './stores/selectionStore.ts';
 import {
@@ -76,6 +81,7 @@ import {
 } from './stores/tabsStore.ts';
 import {
   clampSidebarWidth,
+  DEFAULT_FIRESTORE_DRAFT,
   DEFAULT_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
@@ -94,6 +100,10 @@ interface DestructiveAction {
   readonly description: string;
   readonly onConfirm: () => void;
   readonly title: string;
+}
+
+interface PendingCreateDocumentRequest extends FirestoreCreateDocumentRequest {
+  readonly tabId: string;
 }
 
 export interface AppShellProps {
@@ -124,7 +134,7 @@ export function AppShell(
   const activeTab = tabsState.tabs.find((tab) => tab.id === tabsState.activeTabId)
     ?? tabsState.tabs[0];
   const activeProject = activeTab ? resolveProject(projects, activeTab.connectionId) : null;
-  const runtimeProjectId = activeProject?.projectId ?? null;
+  const authConnectionId = activeProject?.id ?? null;
 
   const [density, setDensity] = useState<DensityName>('compact');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -132,12 +142,15 @@ export function AppShell(
   const [addProjectOpen, setAddProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [credentialWarning, setCredentialWarning] = useState<string | null>(null);
-  const [firestoreActionError, setFirestoreActionError] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState('Ready');
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pendingDestructiveAction, setPendingDestructiveAction] = useState<
     DestructiveAction | null
   >(null);
+  const [pendingCreateDocumentRequest, setPendingCreateDocumentRequest] = useState<
+    PendingCreateDocumentRequest | null
+  >(null);
+  const nextCreateDocumentRequestId = useRef(1);
   const firestoreTab = useFirestoreTabState({
     activeProject,
     activeTab,
@@ -147,7 +160,7 @@ export function AppShell(
   const authTab = useAuthTabState({
     activeTab,
     initialAuthFilter: persistedWorkspace?.authFilter,
-    runtimeProjectId,
+    runtimeProjectId: authConnectionId,
     selectedUserId: selection.authUserId,
   });
   const jsTab = useJsTabState({
@@ -419,6 +432,40 @@ export function AppShell(
     setEditingProjectId(parsed.connectionId);
   }
 
+  function handleCreateDocumentFromTree(id: string) {
+    const parsed = parseTreeId(id);
+    if (parsed.kind !== 'collection' || !parsed.connectionId || !parsed.path) return;
+    const tabId = openFirestoreTab(parsed.connectionId, parsed.path);
+    setPendingCreateDocumentRequest({
+      collectionPath: parsed.path,
+      requestId: nextCreateDocumentRequestId.current++,
+      tabId,
+    });
+    tabActions.recordInteraction({
+      activeTabId: tabId,
+      path: parsed.path,
+      selectedTreeItemId: id,
+    });
+    setLastAction(`Creating document in ${parsed.path}`);
+  }
+
+  function handleCreateCollectionFromTree(id: string) {
+    const parsed = parseTreeId(id);
+    if (parsed.kind !== 'firestore' || !parsed.connectionId) return;
+    const tabId = openFirestoreTab(parsed.connectionId, DEFAULT_FIRESTORE_DRAFT.path);
+    setPendingCreateDocumentRequest({
+      collectionPath: '',
+      collectionPathEditable: true,
+      requestId: nextCreateDocumentRequestId.current++,
+      tabId,
+    });
+    tabActions.recordInteraction({
+      activeTabId: tabId,
+      selectedTreeItemId: id,
+    });
+    setLastAction('Creating collection');
+  }
+
   async function handleAddProject(input: ProjectAddInput): Promise<ProjectSummary> {
     const project = await repositories.projects.add(input);
     await queryClient.invalidateQueries({ queryKey: ['projects'] });
@@ -437,7 +484,6 @@ export function AppShell(
   }
 
   function handleRunQuery() {
-    setFirestoreActionError(null);
     const path = firestoreTab.runQuery();
     if (path) setLastAction(`Ran query ${path}`);
   }
@@ -495,7 +541,7 @@ export function AppShell(
         authErrorMessage={authTab.errorMessage}
         authFilter={authTab.authFilter}
         draft={firestoreTab.activeDraft}
-        firestoreErrorMessage={firestoreTab.errorMessage ?? firestoreActionError}
+        firestoreErrorMessage={firestoreTab.errorMessage}
         hasMore={firestoreTab.hasMore}
         isFetchingMore={firestoreTab.isFetchingMore}
         isLoading={firestoreTab.isLoading}
@@ -514,10 +560,21 @@ export function AppShell(
         usersHasMore={authTab.usersHasMore}
         usersIsFetchingMore={authTab.usersIsFetchingMore}
         usersIsLoading={authTab.usersIsLoading}
+        createDocumentRequest={activeTab.kind === 'firestore-query'
+            && pendingCreateDocumentRequest?.tabId === activeTab.id
+          ? pendingCreateDocumentRequest
+          : null}
         onAuthFilterChange={authTab.setAuthFilter}
         onCancelScript={handleCancelScript}
-        onDeleteDocument={(path) => handleDeleteDocument(path)}
+        onCreateDocument={handleCreateDocument}
+        onCreateDocumentRequestHandled={(requestId) => {
+          setPendingCreateDocumentRequest((current) =>
+            current?.requestId === requestId ? null : current
+          );
+        }}
+        onDeleteDocument={(path, options) => handleDeleteDocument(path, options)}
         onDraftChange={firestoreTab.setDraft}
+        onGenerateDocumentId={handleGenerateDocumentId}
         onLoadMore={firestoreTab.loadMore}
         onLoadMoreUsers={authTab.loadMore}
         onLoadSubcollections={handleLoadSubcollections}
@@ -531,9 +588,10 @@ export function AppShell(
           setLastAction(`Opened ${path} in new tab`);
         }}
         onReset={firestoreTab.resetDraft}
+        onRefreshResults={firestoreTab.refreshQuery}
         onRunQuery={handleRunQuery}
         onRunScript={handleRunScript}
-        onSaveDocument={(path, data) => handleSaveDocument(path, data)}
+        onSaveDocument={(path, data, options) => handleSaveDocument(path, data, options)}
         onSaveUserCustomClaims={authTab.saveCustomClaims}
         onScriptChange={jsTab.setScriptSource}
         onSelectDocument={(path) => firestoreTab.selectDocument(activeTab.id, path)}
@@ -543,7 +601,6 @@ export function AppShell(
     : null;
 
   function handleSelectTab(tabId: string) {
-    setFirestoreActionError(null);
     tabActions.selectTab(tabId);
     const tab = tabsStore.state.tabs.find((item) => item.id === tabId);
     const selectedTreeItemId = tab ? treeItemIdForTab(tab) : selection.treeItemId;
@@ -559,7 +616,6 @@ export function AppShell(
   function handleActiveProjectChange(connectionId: string) {
     if (!activeTab) return;
     if (activeTab.connectionId === connectionId) return;
-    setFirestoreActionError(null);
     tabActions.updateConnection(activeTab.id, connectionId);
     clearConnectionScopedTabState(activeTab);
     const nextTreeItemId = treeItemIdForTab({ ...activeTab, connectionId });
@@ -642,35 +698,81 @@ export function AppShell(
     setLastAction(`Refreshed ${activeTab.title}`);
   }
 
-  async function handleSaveDocument(documentPath: string, data: Record<string, unknown>) {
+  async function handleGenerateDocumentId(collectionPath: string): Promise<string> {
+    if (!activeProject) throw new Error('Choose a project before creating a document.');
+    const generated = await repositories.firestore.generateDocumentId(
+      activeProject.id,
+      collectionPath,
+    );
+    return generated.documentId;
+  }
+
+  async function handleCreateDocument(
+    collectionPath: string,
+    documentId: string,
+    data: Record<string, unknown>,
+  ) {
     if (!activeProject) return;
-    setFirestoreActionError(null);
     try {
-      await repositories.firestore.saveDocument(activeProject.id, documentPath, data);
-      await queryClient.invalidateQueries({ queryKey: ['firestore'] });
-      setLastAction(`Saved ${documentPath}`);
+      const document = await repositories.firestore.createDocument(
+        activeProject.id,
+        collectionPath,
+        documentId,
+        data,
+      );
+      if (dataMode !== 'mock') await queryClient.invalidateQueries({ queryKey: ['firestore'] });
+      setLastAction(`Created ${document.path}`);
+    } catch (error) {
+      const message = messageFromError(error, 'Could not create document.');
+      setLastAction(`Create failed: ${message}`);
+      throw error instanceof Error ? error : new Error(message);
+    }
+  }
+
+  async function handleSaveDocument(
+    documentPath: string,
+    data: Record<string, unknown>,
+    options?: FirestoreSaveDocumentOptions,
+  ): Promise<FirestoreSaveDocumentResult | void> {
+    if (!activeProject) return;
+    try {
+      const result = await repositories.firestore.saveDocument(
+        activeProject.id,
+        documentPath,
+        data,
+        options,
+      );
+      if (result.status === 'conflict') {
+        setLastAction(`Save conflict: ${documentPath}`);
+        return result;
+      }
+      if (dataMode !== 'mock') await queryClient.invalidateQueries({ queryKey: ['firestore'] });
+      setLastAction(`Saved ${result.document.path}`);
+      return result;
     } catch (error) {
       const message = messageFromError(error, 'Could not save document.');
-      setFirestoreActionError(message);
       setLastAction(`Save failed: ${message}`);
       throw error instanceof Error ? error : new Error(message);
     }
   }
 
-  function handleDeleteDocument(documentPath: string) {
+  async function handleDeleteDocument(
+    documentPath: string,
+    options: DeleteDocumentOptions,
+  ) {
     if (!activeProject || !activeTab) return;
-    setFirestoreActionError(null);
-    void repositories.firestore.deleteDocument(activeProject.id, documentPath)
-      .then(() => queryClient.invalidateQueries({ queryKey: ['firestore'] }))
-      .then(() => {
-        firestoreTab.selectDocument(activeTab.id, null);
-        setLastAction(`Deleted ${documentPath}`);
-      })
-      .catch((error: unknown) => {
-        const message = messageFromError(error, 'Could not delete document.');
-        setFirestoreActionError(message);
-        setLastAction(`Delete failed: ${message}`);
+    try {
+      await repositories.firestore.deleteDocument(activeProject.id, documentPath, {
+        deleteSubcollectionPaths: options.deleteSubcollectionPaths,
       });
+      if (dataMode !== 'mock') await queryClient.invalidateQueries({ queryKey: ['firestore'] });
+      firestoreTab.selectDocument(activeTab.id, null);
+      setLastAction(`Deleted ${documentPath}`);
+    } catch (error) {
+      const message = messageFromError(error, 'Could not delete document.');
+      setLastAction(`Delete failed: ${message}`);
+      throw error instanceof Error ? error : new Error(message);
+    }
   }
 
   async function handleLoadSubcollections(
@@ -733,6 +835,8 @@ export function AppShell(
                   filterValue={workspaceTree.treeFilter}
                   items={workspaceTree.treeItems}
                   onAddProject={() => setAddProjectOpen(true)}
+                  onCreateCollection={handleCreateCollectionFromTree}
+                  onCreateDocument={handleCreateDocumentFromTree}
                   onEditItem={handleEditTreeItem}
                   onFilterChange={workspaceTree.setTreeFilter}
                   onOpenItem={workspaceTree.handleOpenItem}
@@ -801,7 +905,13 @@ export function AppShell(
                 </Toolbar>
               }
             >
-              {activeView}
+              <RenderErrorBoundary
+                label={activeTab?.title ?? 'Workspace'}
+                resetKey={activeTab?.id ?? 'empty'}
+                onError={(message) => setLastAction(`View failed: ${message}`)}
+              >
+                {activeView}
+              </RenderErrorBoundary>
             </WorkspaceShell>
             <StatusBar
               left={
@@ -1068,6 +1178,7 @@ interface TabViewProps {
   readonly activeTab: WorkspaceTab;
   readonly authErrorMessage: string | null;
   readonly authFilter: string;
+  readonly createDocumentRequest: FirestoreCreateDocumentRequest | null;
   readonly draft: FirestoreQueryDraft;
   readonly firestoreErrorMessage: string | null;
   readonly hasMore: boolean;
@@ -1075,8 +1186,18 @@ interface TabViewProps {
   readonly isLoading: boolean;
   readonly onAuthFilterChange: (value: string) => void;
   readonly onCancelScript: () => void;
-  readonly onDeleteDocument: (documentPath: string) => void;
+  readonly onCreateDocument: (
+    collectionPath: string,
+    documentId: string,
+    data: Record<string, unknown>,
+  ) => Promise<void> | void;
+  readonly onCreateDocumentRequestHandled: (requestId: number) => void;
+  readonly onDeleteDocument: (
+    documentPath: string,
+    options: DeleteDocumentOptions,
+  ) => void;
   readonly onDraftChange: (draft: FirestoreQueryDraft) => void;
+  readonly onGenerateDocumentId: (collectionPath: string) => Promise<string> | string;
   readonly onLoadMore: () => void;
   readonly onLoadMoreUsers: () => void;
   readonly onLoadSubcollections: (
@@ -1084,12 +1205,14 @@ interface TabViewProps {
   ) => Promise<ReadonlyArray<FirestoreCollectionNode>>;
   readonly onOpenDocumentInNewTab: (documentPath: string) => void;
   readonly onReset: () => void;
+  readonly onRefreshResults: () => void;
   readonly onRunQuery: () => void;
   readonly onRunScript: () => void;
   readonly onSaveDocument: (
     documentPath: string,
     data: Record<string, unknown>,
-  ) => Promise<void> | void;
+    options?: FirestoreSaveDocumentOptions,
+  ) => Promise<FirestoreSaveDocumentResult | void> | FirestoreSaveDocumentResult | void;
   readonly onSaveUserCustomClaims: (
     uid: string,
     claims: Record<string, unknown>,
@@ -1150,6 +1273,7 @@ function TabView(props: TabViewProps) {
   }
   return (
     <FirestoreQuerySurface
+      createDocumentRequest={props.createDocumentRequest}
       draft={props.draft}
       errorMessage={props.firestoreErrorMessage}
       hasMore={props.hasMore}
@@ -1159,12 +1283,16 @@ function TabView(props: TabViewProps) {
       selectedDocument={props.selectedDocument}
       selectedDocumentPath={props.selectedDocumentPath}
       settings={props.repositories.settings}
+      onCreateDocument={props.onCreateDocument}
+      onCreateDocumentRequestHandled={props.onCreateDocumentRequestHandled}
       onDraftChange={props.onDraftChange}
       onDeleteDocument={props.onDeleteDocument}
+      onGenerateDocumentId={props.onGenerateDocumentId}
       onLoadMore={props.onLoadMore}
       onLoadSubcollections={props.onLoadSubcollections}
       onOpenDocumentInNewTab={props.onOpenDocumentInNewTab}
       onReset={props.onReset}
+      onRefreshResults={props.onRefreshResults}
       onRun={props.onRunQuery}
       onSaveDocument={props.onSaveDocument}
       onSelectDocument={props.onSelectDocument}

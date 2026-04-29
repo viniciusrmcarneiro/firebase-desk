@@ -162,6 +162,7 @@ describe('workspaceModel', () => {
 
     const prod = items.find((item) => item.id === 'project:prod');
     const emu = items.find((item) => item.id === 'project:emu');
+    const firestore = items.find((item) => item.id === 'firestore:emu');
     const collection = items.find((item) => item.id === 'collection:emu:orders');
 
     expect(prod?.label).toBe('acme-prod');
@@ -170,8 +171,30 @@ describe('workspaceModel', () => {
     expect(emu?.label).toBe('Local Emulator (demo-local)');
     expect(emu?.projectTarget).toBe('emulator');
     expect('secondary' in (emu ?? {})).toBe(false);
+    expect(firestore?.canCreateCollection).toBe(true);
     expect(collection?.label).toBe('orders');
     expect('secondary' in (collection ?? {})).toBe(false);
+  });
+
+  it('only allows sidebar new collection after root collections load', () => {
+    const items = buildTreeItems(
+      [{
+        id: 'emu',
+        name: 'Local Emulator',
+        projectId: 'demo-local',
+        target: 'emulator',
+        emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
+        hasCredential: false,
+        credentialEncrypted: null,
+        createdAt: '2026-04-27T00:00:00.000Z',
+      }],
+      new Set([projectNodeId('emu')]),
+      { tools: { emu: { status: 'success', items: ['tools'] } }, roots: {} },
+      null,
+      '',
+    );
+
+    expect(items.find((item) => item.id === 'firestore:emu')?.canCreateCollection).toBe(false);
   });
 
   it('shows an empty root collections state with the Firebase project id', () => {

@@ -6,6 +6,7 @@ import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'r
 import splashLogoUrl from '../assets/splash-logo.png';
 import { AppShell } from './AppShell.tsx';
 import { createAppQueryClient } from './queryClient.ts';
+import { RenderErrorBoundary } from './RenderErrorBoundary.tsx';
 import { createRepositories, RepositoryProvider } from './RepositoryProvider.tsx';
 
 function SplashScreen() {
@@ -86,7 +87,12 @@ export function App() {
                 height: '100vh',
               } as CSSProperties}
             >
-              <AppShell dataMode={dataMode ?? 'mock'} initialSidebarWidth={snapshot.sidebarWidth} />
+              <RenderErrorBoundary label='Firebase Desk' resetKey={dataMode ?? 'mock'}>
+                <AppShell
+                  dataMode={dataMode ?? 'mock'}
+                  initialSidebarWidth={snapshot.sidebarWidth}
+                />
+              </RenderErrorBoundary>
             </div>
           </AppearanceProvider>
         </HotkeysProvider>

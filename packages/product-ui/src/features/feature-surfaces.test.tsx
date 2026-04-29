@@ -402,6 +402,97 @@ describe('feature surfaces', () => {
     expect(onToggleItem).toHaveBeenCalledWith('firestore:emu');
   });
 
+  it('AccountTree exposes new document action on collection context menu', async () => {
+    const onCreateDocument = vi.fn();
+    render(
+      <AccountTree
+        filterValue=''
+        items={[{
+          id: 'collection:emu:orders',
+          kind: 'collection',
+          label: 'orders',
+          depth: 0,
+          hasChildren: false,
+          expanded: false,
+        }]}
+        onAddProject={() => {}}
+        onCreateDocument={onCreateDocument}
+        onFilterChange={() => {}}
+        onOpenItem={() => {}}
+        onRefreshItem={() => {}}
+        onRemoveItem={() => {}}
+        onSelectItem={() => {}}
+        onToggleItem={() => {}}
+      />,
+    );
+
+    fireEvent.contextMenu(screen.getByText('orders'));
+    fireEvent.click(await screen.findByText('New document'));
+
+    expect(onCreateDocument).toHaveBeenCalledWith('collection:emu:orders');
+  });
+
+  it('AccountTree exposes new collection action on Firestore rows', async () => {
+    const onCreateCollection = vi.fn();
+    render(
+      <AccountTree
+        filterValue=''
+        items={[{
+          id: 'firestore:emu',
+          kind: 'firestore',
+          label: 'Firestore',
+          depth: 0,
+          hasChildren: true,
+          expanded: false,
+          canCreateCollection: true,
+        }]}
+        onAddProject={() => {}}
+        onCreateCollection={onCreateCollection}
+        onFilterChange={() => {}}
+        onOpenItem={() => {}}
+        onRefreshItem={() => {}}
+        onRemoveItem={() => {}}
+        onSelectItem={() => {}}
+        onToggleItem={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText('New collection')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'New collection in Firestore' }));
+    expect(onCreateCollection).toHaveBeenCalledWith('firestore:emu');
+
+    fireEvent.contextMenu(screen.getByText('Firestore'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'New collection' }));
+
+    expect(onCreateCollection).toHaveBeenCalledTimes(2);
+  });
+
+  it('AccountTree hides new collection action until Firestore roots load', () => {
+    render(
+      <AccountTree
+        filterValue=''
+        items={[{
+          id: 'firestore:emu',
+          kind: 'firestore',
+          label: 'Firestore',
+          depth: 0,
+          hasChildren: true,
+          expanded: false,
+        }]}
+        onAddProject={() => {}}
+        onCreateCollection={() => {}}
+        onFilterChange={() => {}}
+        onOpenItem={() => {}}
+        onRefreshItem={() => {}}
+        onRemoveItem={() => {}}
+        onSelectItem={() => {}}
+        onToggleItem={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'New collection in Firestore' })).toBeNull();
+  });
+
   it('WorkspaceTabStrip switches and closes tabs', () => {
     const onSelectTab = vi.fn();
     const onCloseTab = vi.fn();
@@ -645,8 +736,8 @@ describe('feature surfaces', () => {
     const treeTab = screen.getByRole('tab', { name: /Tree/ });
     fireEvent.mouseDown(treeTab, { button: 0, ctrlKey: false });
     expect(screen.queryByText('evt_created')).toBeNull();
-    fireEvent.click(screen.getByText('Subcollections'));
-    fireEvent.click(screen.getByText('events'));
+    fireEvent.click(screen.getAllByText('Subcollections')[0]!);
+    fireEvent.click(screen.getAllByText('events')[0]!);
     expect(await screen.findByText('evt_created')).toBeTruthy();
 
     const tableTab = screen.getByRole('tab', { name: /Table/ });
@@ -656,11 +747,12 @@ describe('feature surfaces', () => {
 
     fireEvent.mouseDown(tableTab, { button: 0, ctrlKey: false });
     fireEvent.doubleClick(screen.getAllByText('ord_1024')[0]!);
-    expect(await screen.findByRole('dialog', { name: 'Document editor' })).toBeTruthy();
+    expect(await screen.findByRole('dialog', { name: 'Edit document JSON' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(onSaveDocument).toHaveBeenCalledWith(
       'orders/ord_1024',
       expect.objectContaining({ status: 'paid' }),
+      undefined,
     );
   });
 

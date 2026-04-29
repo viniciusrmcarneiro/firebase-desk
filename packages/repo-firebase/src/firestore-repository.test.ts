@@ -1,10 +1,203 @@
 import type { ProjectSummary } from '@firebase-desk/repo-contracts';
-import type { Firestore } from 'firebase-admin/firestore';
-import { describe, expect, it } from 'vitest';
+import { DocumentReference, type Firestore, GeoPoint, Timestamp } from 'firebase-admin/firestore';
+import { describe, expect, it, vi } from 'vitest';
 import type { AdminFirestoreProvider } from './admin-firestore-provider.ts';
 import { FirebaseFirestoreRepository } from './firestore-repository.ts';
 
 describe('FirebaseFirestoreRepository', () => {
+  it('saves decoded Firestore values and returns an encoded document', async () => {
+    let savedData: Record<string, unknown> | null = null;
+    const targetRef = fakeDocumentReference('orders/ord_1', {
+      getData: () => savedData ?? {},
+      onSet: (data) => {
+        savedData = data;
+      },
+    });
+    const customerRef = fakeDocumentReference('customers/cust_1');
+    const db = {
+      doc: vi.fn((path: string) => path === 'orders/ord_1' ? targetRef : customerRef),
+    } as unknown as Firestore;
+    const repository = new FirebaseFirestoreRepository(providerFor(db));
+
+    const result = await repository.saveDocument('test', 'orders/ord_1', {
+      createdAt: { __type__: 'timestamp', value: '2026-04-29T00:00:00.000Z' },
+      location: { __type__: 'geoPoint', latitude: -37.8136, longitude: 144.9631 },
+      receipt: { __type__: 'bytes', base64: 'dGVzdA==' },
+      customer: { __type__: 'reference', path: 'customers/cust_1' },
+    });
+    expect(result.status).toBe('saved');
+    const saved = result.status === 'saved' ? result.document : null;
+
+    expect(savedData?.['createdAt']).toBeInstanceOf(Timestamp);
+    expect(savedData?.['location']).toBeInstanceOf(GeoPoint);
+    expect(Buffer.isBuffer(savedData?.['receipt'])).toBe(true);
+    expect(savedData?.['customer']).toBe(customerRef);
+    expect(saved?.updateTime).toBe('2026-04-29T00:00:00.000Z');
+    expect(saved?.data).toMatchObject({
+      createdAt: { __type__: 'timestamp', value: '2026-04-29T00:00:00.000Z' },
+      location: { __type__: 'geoPoint', latitude: -37.8136, longitude: 144.9631 },
+      receipt: { __type__: 'bytes', base64: 'dGVzdA==' },
+      customer: { __type__: 'reference', path: 'customers/cust_1' },
+    });
+  });
+
+  it('generates and creates documents with decoded data', async () => {
+    let createdData: Record<string, unknown> | null = null;
+    const targetRef = fakeDocumentReference('orders/generated_id', {
+      getData: () => createdData ?? {},
+      onCreate: (data) => {
+        createdData = data;
+      },
+    });
+    const db = {
+      collection: vi.fn(() => ({
+        doc: vi.fn((documentId?: string) => documentId ? targetRef : { id: 'generated_id' }),
+      })),
+    } as unknown as Firestore;
+    const repository = new FirebaseFirestoreRepository(providerFor(db));
+
+    await expect(repository.generateDocumentId('test', 'orders')).resolves.toEqual({
+      documentId: 'generated_id',
+    });
+    const created = await repository.createDocument('test', 'orders', 'generated_id', {
+      status: 'draft',
+    });
+
+    expect(createdData).toEqual({ status: 'draft' });
+    expect(created.path).toBe('orders/generated_id');
+  });
+
+  it('returns conflict and does not save when update time changed', async () => {
+    const onSet = vi.fn();
+    const ref = fakeDocumentReference('orders/ord_1', {
+      getData: () => ({ status: 'remote' }),
+      getUpdateTime: () => Timestamp.fromDate(new Date('2026-04-29T01:00:00.000Z')),
+      onSet,
+    });
+    const transaction = {
+      get: vi.fn(async () => await ref.get()),
+      set: vi.fn(),
+    };
+    const db = {
+      doc: vi.fn(() => ref),
+      runTransaction: vi.fn(async (callback: (tx: typeof transaction) => Promise<unknown>) =>
+        await callback(transaction)
+      ),
+    } as unknown as Firestore;
+    const repository = new FirebaseFirestoreRepository(providerFor(db));
+
+    const result = await repository.saveDocument(
+      'test',
+      'orders/ord_1',
+      { status: 'local' },
+      { lastUpdateTime: '2026-04-29T00:00:00.000Z' },
+    );
+
+    expect(result).toMatchObject({
+      status: 'conflict',
+      remoteDocument: { data: { status: 'remote' }, updateTime: '2026-04-29T01:00:00.000Z' },
+    });
+    expect(transaction.set).not.toHaveBeenCalled();
+    expect(onSet).not.toHaveBeenCalled();
+  });
+
+  it('saves inside a transaction when update time matches', async () => {
+    let savedData: Record<string, unknown> | null = null;
+    const ref = fakeDocumentReference('orders/ord_1', {
+      getData: () => savedData ?? { status: 'remote' },
+      getUpdateTime: () => Timestamp.fromDate(new Date('2026-04-29T00:00:00.000Z')),
+      onSet: (data) => {
+        savedData = data;
+      },
+    });
+    const transaction = {
+      get: vi.fn(async () => await ref.get()),
+      set: vi.fn((_ref: DocumentReference, data: Record<string, unknown>) => {
+        savedData = data;
+      }),
+    };
+    const db = {
+      doc: vi.fn(() => ref),
+      runTransaction: vi.fn(async (callback: (tx: typeof transaction) => Promise<unknown>) =>
+        await callback(transaction)
+      ),
+    } as unknown as Firestore;
+    const repository = new FirebaseFirestoreRepository(providerFor(db));
+
+    const result = await repository.saveDocument(
+      'test',
+      'orders/ord_1',
+      { status: 'local' },
+      { lastUpdateTime: '2026-04-29T00:00:00.000Z' },
+    );
+
+    expect(result.status).toBe('saved');
+    expect(transaction.set).toHaveBeenCalledWith(ref, { status: 'local' });
+    expect(savedData).toEqual({ status: 'local' });
+  });
+
+  it('recursively deletes selected subcollections before deleting the parent document', async () => {
+    const parentDelete = vi.fn();
+    const parentRef = fakeDocumentReference('orders/ord_1', { onDelete: parentDelete });
+    const recursiveDelete = vi.fn();
+    const db = {
+      collection: vi.fn((path: string) => ({ path })),
+      doc: vi.fn(() => parentRef),
+      recursiveDelete,
+    } as unknown as Firestore;
+    const repository = new FirebaseFirestoreRepository(providerFor(db));
+
+    await repository.deleteDocument('test', 'orders/ord_1', {
+      deleteSubcollectionPaths: ['orders/ord_1/events'],
+    });
+
+    expect(recursiveDelete).toHaveBeenCalledWith({ path: 'orders/ord_1/events' });
+    expect(parentDelete).toHaveBeenCalledTimes(1);
+    expect(recursiveDelete.mock.invocationCallOrder[0]).toBeLessThan(
+      parentDelete.mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it('does not delete the parent document when recursive subcollection delete fails', async () => {
+    const parentDelete = vi.fn();
+    const parentRef = fakeDocumentReference('orders/ord_1', { onDelete: parentDelete });
+    const recursiveDelete = vi.fn(async () => {
+      throw new Error('recursive delete failed');
+    });
+    const db = {
+      collection: vi.fn((path: string) => ({ path })),
+      doc: vi.fn(() => parentRef),
+      recursiveDelete,
+    } as unknown as Firestore;
+    const repository = new FirebaseFirestoreRepository(providerFor(db));
+
+    await expect(repository.deleteDocument('test', 'orders/ord_1', {
+      deleteSubcollectionPaths: ['orders/ord_1/events'],
+    })).rejects.toThrow('recursive delete failed');
+
+    expect(parentDelete).not.toHaveBeenCalled();
+  });
+
+  it('rejects invalid write and delete paths', async () => {
+    const repository = new FirebaseFirestoreRepository(providerFor({} as Firestore));
+
+    await expect(repository.saveDocument('test', 'orders', {})).rejects.toThrow(
+      'Invalid Firestore document path',
+    );
+    await expect(repository.saveDocument('test', '/orders/ord_1', {})).rejects.toThrow(
+      'Invalid Firestore document path',
+    );
+    await expect(repository.generateDocumentId('test', 'orders/')).rejects.toThrow(
+      'Invalid Firestore collection path',
+    );
+    await expect(repository.deleteDocument('test', 'orders/ord_1', {
+      deleteSubcollectionPaths: ['orders/ord_2/events'],
+    })).rejects.toThrow('Invalid Firestore subcollection path');
+    await expect(repository.deleteDocument('test', 'orders/ord_1', {
+      deleteSubcollectionPaths: ['orders/ord_1/events/'],
+    })).rejects.toThrow('Invalid Firestore collection path');
+  });
+
   it('surfaces emulator connection failures as actionable errors', async () => {
     const repository = new FirebaseFirestoreRepository({
       getFirestoreConnection: async () => ({
@@ -24,6 +217,60 @@ describe('FirebaseFirestoreRepository', () => {
     );
   });
 });
+
+function providerFor(db: Firestore): AdminFirestoreProvider {
+  return {
+    getFirestoreConnection: async () => ({
+      config: { project: emulatorProject(), credentialJson: null },
+      db,
+    }),
+  } as unknown as AdminFirestoreProvider;
+}
+
+function fakeDocumentReference(
+  path: string,
+  options: {
+    readonly getData?: (() => Record<string, unknown>) | undefined;
+    readonly getUpdateTime?: (() => Timestamp | undefined) | undefined;
+    readonly onCreate?: ((data: Record<string, unknown>) => void | Promise<void>) | undefined;
+    readonly onDelete?: (() => void | Promise<void>) | undefined;
+    readonly onSet?: ((data: Record<string, unknown>) => void | Promise<void>) | undefined;
+  } = {},
+): DocumentReference {
+  const id = path.split('/').at(-1) ?? path;
+  const ref = Object.create(DocumentReference.prototype) as DocumentReference;
+  Object.defineProperties(ref, {
+    create: {
+      value: async (data: Record<string, unknown>) => {
+        await options.onCreate?.(data);
+      },
+    },
+    delete: {
+      value: async () => {
+        await options.onDelete?.();
+      },
+    },
+    get: {
+      value: async () => ({
+        data: () => options.getData?.() ?? {},
+        exists: true,
+        id,
+        ref: fakeDocumentReference(path),
+        updateTime: options.getUpdateTime?.()
+          ?? Timestamp.fromDate(new Date('2026-04-29T00:00:00.000Z')),
+      }),
+    },
+    id: { value: id },
+    listCollections: { value: async () => [] },
+    path: { value: path },
+    set: {
+      value: async (data: Record<string, unknown>) => {
+        await options.onSet?.(data);
+      },
+    },
+  });
+  return ref;
+}
 
 function emulatorProject(): ProjectSummary {
   return {

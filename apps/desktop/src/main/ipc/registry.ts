@@ -11,6 +11,8 @@ import type {
   FirestoreDocumentNode,
   FirestoreDocumentResult,
   FirestoreQuery,
+  FirestoreSaveDocumentOptions,
+  FirestoreSaveDocumentResult,
   Page,
   PageRequest,
   ScriptRunEvent,
@@ -136,6 +138,24 @@ export function registerIpcHandlers(): void {
       firestoreRepository.getDocument(connectionId, documentPath).then((document) =>
         document ? toIpcDocumentResult(document) : null
       ),
+    'firestore.generateDocumentId': ({ collectionPath, connectionId }) =>
+      firestoreRepository.generateDocumentId(connectionId, collectionPath),
+    'firestore.createDocument': async ({ collectionPath, connectionId, data, documentId }) =>
+      toIpcDocumentResult(
+        await firestoreRepository.createDocument(connectionId, collectionPath, documentId, data),
+      ),
+    'firestore.saveDocument': async ({ connectionId, data, documentPath, options }) =>
+      toIpcSaveDocumentResult(
+        await firestoreRepository.saveDocument(
+          connectionId,
+          documentPath,
+          data,
+          toSaveDocumentOptions(options),
+        ),
+      ),
+    'firestore.deleteDocument': async ({ connectionId, documentPath, options }) => {
+      await firestoreRepository.deleteDocument(connectionId, documentPath, options);
+    },
     'scriptRunner.run': async (request) =>
       toIpcScriptRunResult(await scriptRunnerRepository.run(request)),
     'scriptRunner.cancel': async ({ runId }) => {
@@ -264,6 +284,12 @@ function toIpcDocumentPage(
   };
 }
 
+function toSaveDocumentOptions(
+  options?: { readonly lastUpdateTime?: string | undefined; },
+): FirestoreSaveDocumentOptions | undefined {
+  return options?.lastUpdateTime ? { lastUpdateTime: options.lastUpdateTime } : undefined;
+}
+
 function toIpcResultPage(
   page: Page<FirestoreDocumentResult>,
 ): IpcResponse<'firestore.runQuery'> {
@@ -284,7 +310,20 @@ function toIpcDocumentResult(
     ...(document.subcollections
       ? { subcollections: document.subcollections.map(toIpcCollectionNode) }
       : {}),
+    ...(document.updateTime ? { updateTime: document.updateTime } : {}),
   };
+}
+
+function toIpcSaveDocumentResult(
+  result: FirestoreSaveDocumentResult,
+): IpcResponse<'firestore.saveDocument'> {
+  if (result.status === 'conflict') {
+    return {
+      status: 'conflict',
+      remoteDocument: result.remoteDocument ? toIpcDocumentResult(result.remoteDocument) : null,
+    };
+  }
+  return { status: 'saved', document: toIpcDocumentResult(result.document) };
 }
 
 function toIpcScriptRunResult(result: ScriptRunResult): IpcResponse<'scriptRunner.run'> {

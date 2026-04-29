@@ -9,6 +9,7 @@ import {
   formatFirestoreValue,
   isFirestoreTypedValue,
 } from './FirestoreValueCell.tsx';
+import { sortedObjectEntries } from './sortedJson.ts';
 
 export interface FieldCatalogItem {
   readonly count: number;
@@ -29,6 +30,8 @@ export type ResultTreeNodeKind = 'branch' | 'leaf' | 'load-more' | 'load-subcoll
 export interface ResultTreeRowModel extends ExplorerTreeRowModel {
   readonly documentPath?: string;
   readonly errorMessage?: string;
+  readonly fieldPath?: ReadonlyArray<string>;
+  readonly fieldValue?: unknown;
   readonly kind: ResultTreeNodeKind;
   readonly openPath?: string;
   readonly subcollectionStatus?: SubcollectionLoadState['status'] | 'idle';
@@ -134,6 +137,20 @@ export function documentsForCollectionNode(
   return withDocuments.documents ?? [];
 }
 
+export function findDocumentByPath(
+  documents: ReadonlyArray<FirestoreDocumentResult>,
+  path: string,
+): FirestoreDocumentResult | null {
+  for (const document of documents) {
+    if (document.path === path) return document;
+    for (const collection of document.subcollections ?? []) {
+      const nested = findDocumentByPath(documentsForCollectionNode(collection), path);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
 export function subcollectionLoadLabel(
   status?: SubcollectionLoadState['status'] | 'idle',
 ): string {
@@ -176,6 +193,7 @@ function appendDocumentTreeRows(
   const expanded = expandedIds.has(nodeId);
   flattened.push({
     id: nodeId,
+    documentPath: row.path,
     icon: <FileText size={14} aria-hidden='true' />,
     kind: 'branch',
     label: row.id,
@@ -186,11 +204,12 @@ function appendDocumentTreeRows(
     openPath: row.path,
   });
   if (!expanded) return;
-  const fields = sortedEntries(row.data);
+  const fields = sortedObjectEntries(row.data);
   const fieldsId = `${nodeId}:fields`;
   const fieldsExpanded = expandedIds.has(fieldsId);
   flattened.push({
     id: fieldsId,
+    documentPath: row.path,
     icon: <Folder size={14} aria-hidden='true' />,
     kind: 'branch',
     label: 'Fields',
@@ -202,7 +221,17 @@ function appendDocumentTreeRows(
   });
   if (fieldsExpanded) {
     for (const [key, value] of fields) {
-      appendValueTreeRows(flattened, key, value, level + 2, `${fieldsId}:field`, expandedIds);
+      appendValueTreeRows(
+        flattened,
+        key,
+        value,
+        level + 2,
+        `${fieldsId}:field`,
+        expandedIds,
+        row.path,
+        [],
+        true,
+      );
     }
   }
   appendSubcollectionTreeRows(
@@ -236,7 +265,7 @@ function appendSubcollectionTreeRows(
       level,
       meta: row.hasSubcollections ? subcollectionLoadMeta(state) : 'empty',
       value: row.hasSubcollections ? subcollectionLoadValue(state) : 'none',
-      ...(canLoadSubcollections && row.hasSubcollections ? { documentPath: row.path } : {}),
+      documentPath: row.path,
       ...(state?.errorMessage ? { errorMessage: state.errorMessage } : {}),
       subcollectionStatus: state?.status ?? 'idle',
     });
@@ -246,6 +275,7 @@ function appendSubcollectionTreeRows(
   const groupExpanded = expandedIds.has(groupId);
   flattened.push({
     id: groupId,
+    documentPath: row.path,
     icon: <Folder size={14} aria-hidden='true' />,
     kind: 'branch',
     label: 'Subcollections',
@@ -262,6 +292,7 @@ function appendSubcollectionTreeRows(
     const documents = documentsForCollectionNode(collection);
     flattened.push({
       id: collectionId,
+      documentPath: row.path,
       icon: <Folder size={14} aria-hidden='true' />,
       kind: documents.length > 0 ? 'branch' : 'leaf',
       label: collection.id,
@@ -293,11 +324,18 @@ function appendValueTreeRows(
   level: number,
   parentId: string,
   expandedIds: ReadonlySet<string>,
+  documentPath: string,
+  parentFieldPath: ReadonlyArray<string>,
+  canEditFieldPath: boolean,
 ) {
   const nodeId = `${parentId}:${key}`;
+  const fieldPath = canEditFieldPath && !key.startsWith('[') ? [...parentFieldPath, key] : null;
+  const childCanEditFieldPath = canEditFieldPath && !key.startsWith('[');
   if (!isExpandableValue(value)) {
     flattened.push({
       id: nodeId,
+      documentPath,
+      ...(fieldPath ? { fieldPath, fieldValue: value } : {}),
       icon: <FileJson size={14} aria-hidden='true' />,
       kind: 'leaf',
       label: key,
@@ -309,10 +347,12 @@ function appendValueTreeRows(
   }
   const entries = Array.isArray(value)
     ? value.map((entry, index) => [`[${index}]`, entry] as const)
-    : sortedEntries(value as Record<string, unknown>);
+    : sortedObjectEntries(value as Record<string, unknown>);
   const expanded = expandedIds.has(nodeId);
   flattened.push({
     id: nodeId,
+    documentPath,
+    ...(fieldPath ? { fieldPath, fieldValue: value } : {}),
     icon: <Folder size={14} aria-hidden='true' />,
     kind: 'branch',
     label: key,
@@ -324,7 +364,17 @@ function appendValueTreeRows(
   });
   if (!expanded) return;
   for (const [childKey, childValue] of entries) {
-    appendValueTreeRows(flattened, childKey, childValue, level + 1, nodeId, expandedIds);
+    appendValueTreeRows(
+      flattened,
+      childKey,
+      childValue,
+      level + 1,
+      nodeId,
+      expandedIds,
+      documentPath,
+      fieldPath ?? parentFieldPath,
+      childCanEditFieldPath,
+    );
   }
 }
 
@@ -355,40 +405,4 @@ function valueType(value: unknown): string {
 
 function formatValue(value: unknown): string {
   return formatFirestoreValue(value);
-}
-
-function sortedEntries(value: Record<string, unknown>): ReadonlyArray<readonly [string, unknown]> {
-  return mergeSortEntries(Object.entries(value));
-}
-
-function mergeSortEntries(
-  entries: ReadonlyArray<readonly [string, unknown]>,
-): ReadonlyArray<readonly [string, unknown]> {
-  if (entries.length < 2) return entries;
-  const midpoint = Math.floor(entries.length / 2);
-  return mergeEntries(
-    mergeSortEntries(entries.slice(0, midpoint)),
-    mergeSortEntries(entries.slice(midpoint)),
-  );
-}
-
-function mergeEntries(
-  left: ReadonlyArray<readonly [string, unknown]>,
-  right: ReadonlyArray<readonly [string, unknown]>,
-): ReadonlyArray<readonly [string, unknown]> {
-  const merged: Array<readonly [string, unknown]> = [];
-  let leftIndex = 0;
-  let rightIndex = 0;
-  while (leftIndex < left.length && rightIndex < right.length) {
-    const leftEntry = left[leftIndex]!;
-    const rightEntry = right[rightIndex]!;
-    if (leftEntry[0].localeCompare(rightEntry[0]) <= 0) {
-      merged.push(leftEntry);
-      leftIndex += 1;
-    } else {
-      merged.push(rightEntry);
-      rightIndex += 1;
-    }
-  }
-  return merged.concat(left.slice(leftIndex), right.slice(rightIndex));
 }

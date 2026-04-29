@@ -167,15 +167,65 @@ describe('useFirestoreTabState', () => {
     expect(result.current.selectedDocument).toBeNull();
     expect(result.current.selectedDocumentPath).toBeNull();
   });
+
+  it('refreshes from page one, reloads loaded page count, and preserves selection', () => {
+    const fetchNextPage = vi.fn();
+    let queryResult = runQueryResult({
+      pages: [{ items: rows }, { items: rows }],
+      hasNextPage: true,
+    });
+    vi.mocked(useRunQuery).mockImplementation(() => queryResult);
+    tabActions.restore({
+      activeTabId: tab.id,
+      interactionHistory: [],
+      interactionHistoryIndex: 0,
+      tabs: [tab],
+    });
+    const { rerender, result } = renderHook(() =>
+      useFirestoreTabState({
+        activeProject: project,
+        activeTab: tab,
+        selectedTreeItemId: 'collection:emu:orders',
+      })
+    );
+    act(() => result.current.selectDocument(tab.id, 'orders/ord_1024'));
+
+    act(() => {
+      expect(result.current.refreshQuery()).toBe('orders');
+      queryResult = runQueryResult({
+        fetchNextPage,
+        hasNextPage: true,
+        pages: [{ items: rows }],
+      });
+    });
+    rerender();
+
+    expect(result.current.selectedDocumentPath).toBe('orders/ord_1024');
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
+  });
 });
 
-function runQueryResult(page: { readonly items: ReadonlyArray<FirestoreDocumentResult>; }) {
+function runQueryResult(
+  {
+    fetchNextPage = vi.fn(),
+    hasNextPage = false,
+    isFetchingNextPage = false,
+    items,
+    pages,
+  }: {
+    readonly fetchNextPage?: () => void;
+    readonly hasNextPage?: boolean;
+    readonly isFetchingNextPage?: boolean;
+    readonly items?: ReadonlyArray<FirestoreDocumentResult>;
+    readonly pages?: ReadonlyArray<{ readonly items: ReadonlyArray<FirestoreDocumentResult>; }>;
+  },
+) {
   return {
-    data: { pages: [page] },
-    fetchNextPage: vi.fn(),
-    hasNextPage: false,
+    data: { pages: pages ?? [{ items: items ?? [] }] },
+    fetchNextPage,
+    hasNextPage,
     isFetching: false,
-    isFetchingNextPage: false,
+    isFetchingNextPage,
     isLoading: false,
   } as unknown as ReturnType<typeof useRunQuery>;
 }

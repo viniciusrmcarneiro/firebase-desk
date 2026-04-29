@@ -1,11 +1,14 @@
-import { encode } from '@firebase-desk/data-format';
+import { decode, encode } from '@firebase-desk/data-format';
 import type {
   FirestoreCollectionNode,
+  FirestoreDeleteDocumentOptions,
   FirestoreDocumentNode,
   FirestoreDocumentResult,
   FirestoreFilter,
   FirestoreQuery,
   FirestoreRepository,
+  FirestoreSaveDocumentOptions,
+  FirestoreSaveDocumentResult,
   FirestoreSort,
   Page,
   PageRequest,
@@ -14,8 +17,10 @@ import { COLLECTIONS, MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID } from './fixtures/i
 
 type FixtureDoc = (typeof COLLECTIONS)[number]['docs'][number];
 type FixtureCollection = (typeof COLLECTIONS)[number];
+type UpdateTimeLookup = (documentPath: string) => string;
 
 const DEFAULT_LIMIT = 25;
+const MOCK_UPDATE_TIME_EPOCH = Date.UTC(2026, 0, 1);
 
 export class MockFirebaseError extends Error {
   readonly code: string;
@@ -29,6 +34,14 @@ export class MockFirebaseError extends Error {
 
 export class MockFirestoreRepository implements FirestoreRepository {
   private readonly collections: FixtureCollection[] = cloneCollections(COLLECTIONS);
+  private readonly documentIdGenerator: () => string;
+  private readonly updateTimes = new Map<string, string>();
+  private generatedIdCounter = 0;
+  private updateTimeCounter = 0;
+
+  constructor(documentIdGenerator?: () => string) {
+    this.documentIdGenerator = documentIdGenerator ?? (() => `mock_${++this.generatedIdCounter}`);
+  }
 
   async listRootCollections(connectionId: string): Promise<ReadonlyArray<FirestoreCollectionNode>> {
     assertConnectionAvailable(connectionId);
@@ -53,7 +66,7 @@ export class MockFirestoreRepository implements FirestoreRepository {
     documentPath: string,
   ): Promise<ReadonlyArray<FirestoreCollectionNode>> {
     assertConnectionAvailable(connectionId);
-    return subcollectionsFor(this.collections, documentPath);
+    return subcollectionsFor(this.collections, documentPath, (path) => this.updateTimeFor(path));
   }
 
   async runQuery(
@@ -63,7 +76,13 @@ export class MockFirestoreRepository implements FirestoreRepository {
     assertConnectionAvailable(query.connectionId);
     const collection = this.collections.find((c) => c.path === query.path);
     const docs = sortDocs(filterDocs(collection?.docs ?? [], query.filters), query.sorts);
-    return pageResults(this.collections, query.path, docs, request);
+    return pageResults(
+      this.collections,
+      query.path,
+      docs,
+      request,
+      (path) => this.updateTimeFor(path),
+    );
   }
 
   async getDocument(
@@ -77,23 +96,72 @@ export class MockFirestoreRepository implements FirestoreRepository {
     const collection = this.collections.find((c) => c.path === collectionPath);
     const doc = collection?.docs.find((d) => d.id === docId);
     if (!doc) return null;
-    const subcollections = subcollectionsFor(this.collections, documentPath);
+    const subcollections = subcollectionsFor(
+      this.collections,
+      documentPath,
+      (path) => this.updateTimeFor(path),
+    );
     return {
       id: doc.id,
       path: documentPath,
       data: encode(doc.data as never) as Record<string, unknown>,
       hasSubcollections: subcollections.length > 0,
       subcollections,
+      updateTime: this.updateTimeFor(documentPath),
     };
+  }
+
+  async generateDocumentId(
+    connectionId: string,
+    collectionPath: string,
+  ): Promise<{ readonly documentId: string; }> {
+    assertConnectionAvailable(connectionId);
+    assertCollectionPath(collectionPath);
+    return { documentId: this.documentIdGenerator() };
+  }
+
+  async createDocument(
+    connectionId: string,
+    collectionPath: string,
+    documentId: string,
+    data: Record<string, unknown>,
+  ): Promise<FirestoreDocumentResult> {
+    assertConnectionAvailable(connectionId);
+    assertCollectionPath(collectionPath);
+    assertDocumentId(documentId);
+    const documentPath = `${collectionPath}/${documentId}`;
+    if (await this.getDocument(connectionId, documentPath)) {
+      throw new MockFirebaseError('already-exists', `Document ${documentPath} already exists`);
+    }
+    this.writeDocument(collectionPath, documentId, data);
+    const saved = await this.getDocument(connectionId, documentPath);
+    if (!saved) throw new MockFirebaseError('not-found', `Document ${documentPath} not found`);
+    return saved;
   }
 
   async saveDocument(
     connectionId: string,
     documentPath: string,
     data: Record<string, unknown>,
-  ): Promise<FirestoreDocumentResult> {
+    options?: FirestoreSaveDocumentOptions,
+  ): Promise<FirestoreSaveDocumentResult> {
     assertConnectionAvailable(connectionId);
     const { collectionPath, docId } = splitDocumentPath(documentPath);
+    const current = await this.getDocument(connectionId, documentPath);
+    if (options?.lastUpdateTime && current?.updateTime !== options.lastUpdateTime) {
+      return { status: 'conflict', remoteDocument: current };
+    }
+    this.writeDocument(collectionPath, docId, data);
+    const saved = await this.getDocument(connectionId, documentPath);
+    if (!saved) throw new MockFirebaseError('not-found', `Document ${documentPath} not found`);
+    return { status: 'saved', document: saved };
+  }
+
+  private writeDocument(
+    collectionPath: string,
+    docId: string,
+    data: Record<string, unknown>,
+  ): void {
     let collection = this.collections.find((item) => item.path === collectionPath);
     if (!collection) {
       collection = { path: collectionPath, docs: [] };
@@ -101,30 +169,31 @@ export class MockFirestoreRepository implements FirestoreRepository {
     }
     const docs = [...collection.docs];
     const existingIndex = docs.findIndex((doc) => doc.id === docId);
-    const nextDoc = { id: docId, data: { ...data } };
+    const nextDoc = { id: docId, data: decodeDocumentData(data) };
     if (existingIndex >= 0) docs.splice(existingIndex, 1, nextDoc);
     else docs.push(nextDoc);
     this.replaceCollection(collectionPath, docs);
-    const saved = await this.getDocument(connectionId, documentPath);
-    if (!saved) throw new MockFirebaseError('not-found', `Document ${documentPath} not found`);
-    return saved;
+    this.touchUpdateTime(`${collectionPath}/${docId}`);
   }
 
-  async deleteDocument(connectionId: string, documentPath: string): Promise<void> {
+  async deleteDocument(
+    connectionId: string,
+    documentPath: string,
+    options?: FirestoreDeleteDocumentOptions,
+  ): Promise<void> {
     assertConnectionAvailable(connectionId);
     const { collectionPath, docId } = splitDocumentPath(documentPath);
+    for (const subcollectionPath of options?.deleteSubcollectionPaths ?? []) {
+      assertDirectSubcollectionPath(documentPath, subcollectionPath);
+      this.deleteCollectionTree(subcollectionPath);
+    }
     const collection = this.collections.find((item) => item.path === collectionPath);
     if (!collection) return;
     this.replaceCollection(
       collectionPath,
       collection.docs.filter((doc) => doc.id !== docId),
     );
-    const subcollectionPrefix = `${documentPath}/`;
-    for (let index = this.collections.length - 1; index >= 0; index -= 1) {
-      if (this.collections[index]?.path.startsWith(subcollectionPrefix)) {
-        this.collections.splice(index, 1);
-      }
-    }
+    this.updateTimes.delete(documentPath);
   }
 
   private replaceCollection(path: string, docs: ReadonlyArray<FixtureDoc>) {
@@ -133,11 +202,35 @@ export class MockFirestoreRepository implements FirestoreRepository {
     if (index >= 0) this.collections.splice(index, 1, next);
     else this.collections.push(next);
   }
+
+  private deleteCollectionTree(path: string) {
+    for (let index = this.collections.length - 1; index >= 0; index -= 1) {
+      const collection = this.collections[index]!;
+      if (collection.path === path || collection.path.startsWith(`${path}/`)) {
+        for (const doc of collection.docs) this.updateTimes.delete(`${collection.path}/${doc.id}`);
+        this.collections.splice(index, 1);
+      }
+    }
+  }
+
+  private updateTimeFor(documentPath: string): string {
+    const current = this.updateTimes.get(documentPath);
+    if (current) return current;
+    return this.touchUpdateTime(documentPath);
+  }
+
+  private touchUpdateTime(documentPath: string): string {
+    this.updateTimeCounter += 1;
+    const updateTime = new Date(MOCK_UPDATE_TIME_EPOCH + this.updateTimeCounter).toISOString();
+    this.updateTimes.set(documentPath, updateTime);
+    return updateTime;
+  }
 }
 
 function collectionNode(
   collections: ReadonlyArray<FixtureCollection>,
   path: string,
+  updateTimeFor?: UpdateTimeLookup,
   options: { readonly includeDocuments?: boolean; } = {},
 ): FirestoreCollectionNode {
   const collection = collections.find((item) => item.path === path);
@@ -147,7 +240,8 @@ function collectionNode(
   if (!options.includeDocuments) return base;
   return {
     ...base,
-    documents: pageResults(collections, collection.path, collection.docs).items,
+    documents: pageResults(collections, collection.path, collection.docs, undefined, updateTimeFor)
+      .items,
   } as FirestoreCollectionNode;
 }
 
@@ -172,18 +266,20 @@ function pageResults(
   collectionPath: string,
   docs: ReadonlyArray<FixtureDoc>,
   request?: PageRequest,
+  updateTimeFor: UpdateTimeLookup = () => new Date(MOCK_UPDATE_TIME_EPOCH).toISOString(),
 ): Page<FirestoreDocumentResult> {
   const page = pageSlice(docs, request);
   return {
     items: page.items.map((doc) => {
       const path = `${collectionPath}/${doc.id}`;
-      const subcollections = subcollectionsFor(collections, path);
+      const subcollections = subcollectionsFor(collections, path, updateTimeFor);
       return {
         id: doc.id,
         path,
         data: encode(doc.data as never) as Record<string, unknown>,
         hasSubcollections: subcollections.length > 0,
         subcollections,
+        updateTime: updateTimeFor(path),
       };
     }),
     nextCursor: page.nextCursor,
@@ -210,13 +306,16 @@ function hasSubcollections(
 function subcollectionsFor(
   collections: ReadonlyArray<FixtureCollection>,
   documentPath: string,
+  updateTimeFor: UpdateTimeLookup = () => new Date(MOCK_UPDATE_TIME_EPOCH).toISOString(),
 ): ReadonlyArray<FirestoreCollectionNode> {
   const prefix = `${documentPath}/`;
   return collections
     .filter((collection) => collection.path.startsWith(prefix))
     .map((collection) => collection.path.slice(prefix.length))
     .filter((path) => path.length > 0 && !path.includes('/'))
-    .map((id) => collectionNode(collections, `${prefix}${id}`, { includeDocuments: true }));
+    .map((id) =>
+      collectionNode(collections, `${prefix}${id}`, updateTimeFor, { includeDocuments: true })
+    );
 }
 
 function filterDocs(
@@ -309,7 +408,7 @@ function assertConnectionAvailable(connectionId: string) {
 }
 
 function splitDocumentPath(documentPath: string) {
-  const parts = documentPath.split('/').filter(Boolean);
+  const parts = pathParts(documentPath);
   if (parts.length === 0 || parts.length % 2 !== 0) {
     throw new MockFirebaseError('invalid-argument', `Invalid document path: ${documentPath}`);
   }
@@ -317,6 +416,53 @@ function splitDocumentPath(documentPath: string) {
     collectionPath: parts.slice(0, -1).join('/'),
     docId: parts.at(-1)!,
   };
+}
+
+function assertCollectionPath(collectionPath: string) {
+  const parts = pathParts(collectionPath);
+  if (parts.length === 0 || parts.length % 2 === 0) {
+    throw new MockFirebaseError('invalid-argument', `Invalid collection path: ${collectionPath}`);
+  }
+}
+
+function assertDocumentId(documentId: string) {
+  if (!documentId.trim() || documentId.includes('/')) {
+    throw new MockFirebaseError('invalid-argument', `Invalid document ID: ${documentId}`);
+  }
+}
+
+function assertDirectSubcollectionPath(documentPath: string, collectionPath: string) {
+  const documentParts = pathParts(documentPath);
+  const collectionParts = pathParts(collectionPath);
+  if (collectionParts.length === 0 || collectionParts.length % 2 === 0) {
+    throw new MockFirebaseError('invalid-argument', `Invalid collection path: ${collectionPath}`);
+  }
+  if (
+    collectionParts.length !== documentParts.length + 1
+    || collectionParts.slice(0, documentParts.length).join('/') !== documentParts.join('/')
+  ) {
+    throw new MockFirebaseError(
+      'invalid-argument',
+      `Invalid subcollection path ${collectionPath} for document ${documentPath}`,
+    );
+  }
+}
+
+function pathParts(path: string): ReadonlyArray<string> {
+  const parts = path.split('/');
+  return parts.some((part) => part.length === 0) ? [] : parts;
+}
+
+function decodeDocumentData(data: Record<string, unknown>): Record<string, unknown> {
+  const decoded = decode(data as never);
+  if (!isPlainObject(decoded)) {
+    throw new MockFirebaseError('invalid-argument', 'Firestore document data must be an object.');
+  }
+  return decoded;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function cloneCollections(

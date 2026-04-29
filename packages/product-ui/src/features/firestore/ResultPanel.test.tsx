@@ -14,10 +14,12 @@ vi.mock('./ResultTreeView.tsx', () => ({
   ResultTreeView: (
     {
       expandedIds,
+      onSelectDocument,
       onToggleNode,
       rows,
     }: {
       readonly expandedIds: ReadonlySet<string>;
+      readonly onSelectDocument?: (documentPath: string) => void;
       readonly onToggleNode: (id: string) => void;
       readonly rows: ReadonlyArray<FirestoreDocumentResult>;
       readonly subcollectionStates: Readonly<Record<string, SubcollectionLoadState>>;
@@ -25,8 +27,22 @@ vi.mock('./ResultTreeView.tsx', () => ({
   ) => (
     <div>
       <div data-testid='expanded'>{Array.from(expandedIds).join('|')}</div>
-      <button type='button' onClick={() => onToggleNode(`doc:${rows[0]?.path ?? ''}`)}>
+      <button
+        type='button'
+        onClick={() => {
+          if (rows[0]) onSelectDocument?.(rows[0].path);
+          onToggleNode(`doc:${rows[0]?.path ?? ''}`);
+        }}
+      >
         tree
+      </button>
+      <button
+        type='button'
+        onClick={() => {
+          if (rows[0]) onSelectDocument?.(rows[0].path);
+        }}
+      >
+        field
       </button>
     </div>
   ),
@@ -54,8 +70,53 @@ describe('ResultPanel', () => {
     expect(screen.getByTestId('table').textContent).toBe('0 rows');
   });
 
+  it('renders create document CTA in result header for collection paths', () => {
+    const onCreateDocument = vi.fn();
+    render(
+      <ResultPanel
+        errorMessage={null}
+        hasMore={false}
+        isFetchingMore={false}
+        isLoading={false}
+        queryPath='orders'
+        resultView='table'
+        rows={[]}
+        selectedDocumentPath={null}
+        subcollectionStates={{}}
+        onCreateDocument={onCreateDocument}
+        onLoadMore={() => {}}
+        onResultViewChange={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'New document' }));
+    expect(onCreateDocument).toHaveBeenCalledWith('orders');
+  });
+
+  it('hides create document CTA in result header for document paths', () => {
+    render(
+      <ResultPanel
+        errorMessage={null}
+        hasMore={false}
+        isFetchingMore={false}
+        isLoading={false}
+        queryPath='orders/ord_1'
+        resultView='table'
+        rows={[]}
+        selectedDocumentPath={null}
+        subcollectionStates={{}}
+        onCreateDocument={() => {}}
+        onLoadMore={() => {}}
+        onResultViewChange={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'New document' })).toBeNull();
+  });
+
   it('loads subcollections when expanding tree document', () => {
     const onLoadSubcollections = vi.fn();
+    const onSelectDocument = vi.fn();
 
     render(
       <ResultPanel
@@ -76,6 +137,7 @@ describe('ResultPanel', () => {
         onLoadMore={() => {}}
         onLoadSubcollections={onLoadSubcollections}
         onResultViewChange={() => {}}
+        onSelectDocument={onSelectDocument}
       />,
     );
 
@@ -86,6 +148,37 @@ describe('ResultPanel', () => {
     fireEvent.click(screen.getByRole('button', { name: 'tree' }));
 
     expect(onLoadSubcollections).toHaveBeenCalledWith('orders/ord_1');
+    expect(onSelectDocument).toHaveBeenCalledWith('orders/ord_1');
+  });
+
+  it('selects the document when tree field nodes are selected', () => {
+    const onSelectDocument = vi.fn();
+
+    render(
+      <ResultPanel
+        errorMessage={null}
+        hasMore={false}
+        isFetchingMore={false}
+        isLoading={false}
+        queryPath='orders'
+        resultView='tree'
+        rows={[{
+          id: 'ord_1',
+          path: 'orders/ord_1',
+          data: { total: 10 },
+          hasSubcollections: false,
+        }]}
+        selectedDocumentPath={null}
+        subcollectionStates={{}}
+        onLoadMore={() => {}}
+        onResultViewChange={() => {}}
+        onSelectDocument={onSelectDocument}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'field' }));
+
+    expect(onSelectDocument).toHaveBeenCalledWith('orders/ord_1');
   });
 
   it('renders json results in a full-size tab pane', async () => {

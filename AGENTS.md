@@ -44,6 +44,7 @@
 - Keep layouts responsive and keyboard accessible.
 - Avoid overlapping text, clipped popovers, and fixed-height hacks.
 - Verify meaningful frontend changes in Storybook or the app when practical.
+- Prefer the real app for integrated workflow testing when a dev app is already running, usually `http://localhost:5173/`; use Storybook for isolated component states.
 
 ## Checks
 

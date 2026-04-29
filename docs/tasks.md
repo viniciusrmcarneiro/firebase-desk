@@ -238,12 +238,48 @@ Move this ahead of real Firebase integration so packaging, artifacts, and instal
 
 ## Phase 8: Firestore Editing
 
-- [ ] Load full document data.
-- [ ] Save full JSON document.
-- [ ] Save individual field edits.
-- [ ] Delete document.
-- [ ] Confirm destructive actions.
-- [ ] Preserve unsaved editor state on failed save.
+- [x] Review editing UX from a greenfield user-flow perspective.
+- [x] Define field edit CTAs for table cells, tree nodes, and selection preview.
+- [x] Keep column headers scoped to query/layout actions only.
+- [x] Add field-aware context menus: edit scalar, edit JSON, set null, delete field, copy path, copy value.
+- [x] Treat timestamp, reference, bytes, and geoPoint encoded values as scalar field edits.
+- [x] Add field edit modal with locked field path, type selector, typed controls, cancel, and save.
+- [x] Add full document JSON modal for document fields.
+- [x] Add delete document confirmation modal.
+- [x] Show selectable subcollections in delete document confirmation.
+- [x] Add delete CTAs on result rows and tree document nodes.
+- [x] Integrate tree view selection with the selection preview.
+- [x] Make any node inside a document select that document for preview.
+- [x] Add app-level error boundary so unexpected UI errors do not blank the app.
+- [x] Validate field names using Firestore field constraints.
+- [x] Validate raw JSON before save.
+- [x] Validate encoded Firestore values and reference paths.
+- [x] Validate full document JSON is an object.
+- [x] Keep literal field names such as `id`, `path`, `subcollections`, and `a.b` as document data.
+- [x] Implement mock in-memory field writes through full document saves.
+- [x] Implement mock field delete and set-null behavior.
+- [x] Add collection/query `Results changed` banner after writes.
+- [x] Refresh paginated results from page 1 and reload the same loaded page count.
+- [x] Preserve selection after refresh when the document still appears.
+- [x] Add shared `FirestoreDeleteDocumentOptions` contract.
+- [x] Add `firestore.saveDocument` and `firestore.deleteDocument` IPC schemas/channels.
+- [x] Wire save/delete through preload, renderer repository, and main IPC registry.
+- [x] Implement live `saveDocument` for emulator and production targets.
+- [x] Decode encoded Firestore values before live save.
+- [x] Return fresh encoded document data after live save.
+- [x] Implement live `deleteDocument` for emulator and production targets.
+- [x] Delete selected subcollections recursively before deleting the parent document.
+- [x] Keep parent document when selected subcollection deletion fails.
+- [x] Update mock repository to support selected subcollection deletes.
+- [x] Call repository delete once from the app with selected subcollection paths.
+- [x] Add unit tests close to field helpers, UI flows, IPC, mock repo, live repo, preload, and AppShell.
+- [x] Add emulator-backed smoke test for typed writes and selected subcollection deletes.
+- [x] Validate smoke writes by directly querying Firestore emulator state.
+- [x] Add create document CTA for collection queries, results, and sidebar collection nodes.
+- [x] Add generated-ID create flow with editable ID and JSON object validation.
+- [x] Add optimistic save conflict detection with document `updateTime`.
+- [x] Add editable conflict merge modal using Monaco diff editor.
+- [x] Add emulator-backed smoke tests for create and conflict merge with direct REST verification.
 
 ## Phase 9: JavaScript Query
 
