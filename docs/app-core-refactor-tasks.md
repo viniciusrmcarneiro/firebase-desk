@@ -67,42 +67,42 @@ Initial app-core folder naming:
 
 Activity is the first extraction because it is self-contained and already exposed brittle behavior.
 
-- [ ] Create `apps/desktop/src/renderer/app-core/activity/`.
-- [ ] Add `ActivityState`, `ActivityFilters`, and initial-state helper.
-- [ ] Add pure transitions:
-  - [ ] `activityOpened`
-  - [ ] `activityClosed`
-  - [ ] `activityExpandedChanged`
-  - [ ] `activityFiltersChanged`
-  - [ ] `activityLoadStarted`
-  - [ ] `activityLoadSucceeded`
-  - [ ] `activityLoadFailed`
-  - [ ] `activityRecorded`
-  - [ ] `activityCleared`
-  - [ ] `activityExportFailed`
-- [ ] Add selectors:
-  - [ ] drawer props model
-  - [ ] unread issue
-  - [ ] filtered list request
-  - [ ] button variant/status model
-- [ ] Add commands:
-  - [ ] load activity
-  - [ ] record activity
-  - [ ] clear activity
-  - [ ] export activity
-  - [ ] open activity target intent
-- [ ] Add a tiny store or reuse a shared app-core store helper.
-- [ ] Add React adapter hook for Activity.
-- [ ] Move Activity state and handlers out of `AppShell`.
-- [ ] Keep Activity drawer UI in `packages/product-ui`.
-- [ ] Keep current status-bar behavior:
-  - [ ] failure/conflict shows unread issue badge
-  - [ ] newer success does not clear unread issue
-  - [ ] opening Activity clears unread issue
-  - [ ] issue recorded while Activity is open does not create unread badge
-- [ ] Add pure tests for all Activity transitions and selectors.
-- [ ] Add command tests with mocked `ActivityLogRepository`.
-- [ ] Keep or simplify AppShell tests to verify wiring only.
+- [x] Create `apps/desktop/src/renderer/app-core/activity/`.
+- [x] Add `ActivityState`, `ActivityFilters`, and initial-state helper.
+- [x] Add pure transitions:
+  - [x] `activityOpened`
+  - [x] `activityClosed`
+  - [x] `activityExpandedChanged`
+  - [x] `activityFiltersChanged`
+  - [x] `activityLoadStarted`
+  - [x] `activityLoadSucceeded`
+  - [x] `activityLoadFailed`
+  - [x] `activityRecorded`
+  - [x] `activityCleared`
+  - [x] `activityExportFailed`
+- [x] Add selectors:
+  - [x] drawer props model
+  - [x] unread issue
+  - [x] filtered list request
+  - [x] button variant/status model
+- [x] Add commands:
+  - [x] load activity
+  - [x] record activity
+  - [x] clear activity
+  - [x] export activity
+  - [x] open activity target intent
+- [x] Add a tiny store or reuse a shared app-core store helper.
+- [x] Add React adapter hook for Activity.
+- [x] Move Activity state and handlers out of `AppShell`.
+- [x] Keep Activity drawer UI in `packages/product-ui`.
+- [x] Keep current status-bar behavior:
+  - [x] failure/conflict shows unread issue badge
+  - [x] newer success does not clear unread issue
+  - [x] opening Activity clears unread issue
+  - [x] issue recorded while Activity is open does not create unread badge
+- [x] Add pure tests for all Activity transitions and selectors.
+- [x] Add command tests with mocked `ActivityLogRepository`.
+- [x] Keep or simplify AppShell tests to verify wiring only.
 
 ## Phase 2: Shared App-Core Store And React Adapter
 

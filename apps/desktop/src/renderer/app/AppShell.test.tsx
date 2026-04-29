@@ -107,6 +107,10 @@ function renderShell(
   );
 }
 
+async function waitForLocalEmulatorProject() {
+  await screen.findByText('demo-local');
+}
+
 describe('desktop AppShell', () => {
   it('flips html data-theme from the theme toggle', async () => {
     renderShell();
@@ -166,6 +170,7 @@ describe('desktop AppShell', () => {
     const appendActivity = vi.spyOn(repositories.activity, 'append');
     renderShell({ initialTab: { kind: 'firestore-query', connectionId: 'emu' }, repositories });
 
+    await waitForLocalEmulatorProject();
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
 
     await waitFor(() =>
@@ -221,6 +226,7 @@ describe('desktop AppShell', () => {
     fireEvent.change(await screen.findByRole('textbox', { name: 'Query path' }), {
       target: { value: 'orders/ord_1024' },
     });
+    await waitForLocalEmulatorProject();
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
     await waitFor(() => expect(getDocument).toHaveBeenCalledWith('emu', 'orders/ord_1024'));
@@ -293,6 +299,7 @@ describe('desktop AppShell', () => {
       initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
+    await waitForLocalEmulatorProject();
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
     await waitFor(() => expect(runQuery).toHaveBeenCalledTimes(1));
 
@@ -362,6 +369,7 @@ describe('desktop AppShell', () => {
       initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
+    await waitForLocalEmulatorProject();
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
     await waitFor(() =>
       expect(runQuery).toHaveBeenCalledWith(
@@ -396,6 +404,7 @@ describe('desktop AppShell', () => {
       initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
+    await waitForLocalEmulatorProject();
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
     await waitFor(() => expect(runQuery).toHaveBeenCalledTimes(1));
 
@@ -420,6 +429,7 @@ describe('desktop AppShell', () => {
       initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
+    await waitForLocalEmulatorProject();
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
     await waitFor(() => expect(runQuery).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.getAllByText('25 docs').length).toBeGreaterThan(0));
@@ -489,6 +499,7 @@ describe('desktop AppShell', () => {
     expect(screen.getAllByText('0 docs').length).toBeGreaterThan(0);
     expect(runQuery).not.toHaveBeenCalled();
 
+    await waitForLocalEmulatorProject();
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
     await waitFor(() =>
       expect(runQuery).toHaveBeenCalledWith(
@@ -506,6 +517,7 @@ describe('desktop AppShell', () => {
       initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
+    await waitForLocalEmulatorProject();
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
     await waitFor(() => expect(runQuery).toHaveBeenCalledTimes(1));
 

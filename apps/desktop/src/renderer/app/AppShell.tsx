@@ -20,10 +20,7 @@ import {
   WorkspaceTabStrip,
 } from '@firebase-desk/product-ui';
 import type {
-  ActivityLogAppendInput,
-  ActivityLogArea,
   ActivityLogEntry,
-  ActivityLogListRequest,
   ActivityLogStatus,
   AuthUser,
   FirestoreCollectionNode,
@@ -71,7 +68,8 @@ import {
   Sun,
   X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useActivityController } from '../app-core/activity/index.ts';
 import appIconUrl from '../assets/app-icon.png';
 import { AddProjectDialog } from './dialogs/AddProjectDialog.tsx';
 import { EditProjectDialog } from './dialogs/EditProjectDialog.tsx';
@@ -113,11 +111,11 @@ interface DestructiveAction {
   readonly title: string;
 }
 
-const MAX_ACTIVITY_DEDUPE_KEYS = 500;
-
 interface PendingCreateDocumentRequest extends FirestoreCreateDocumentRequest {
   readonly tabId: string;
 }
+
+const MAX_ACTIVITY_DEDUPE_KEYS = 500;
 
 export interface AppShellProps {
   readonly dataMode?: 'live' | 'mock';
@@ -156,14 +154,6 @@ export function AppShell(
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [credentialWarning, setCredentialWarning] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState('Ready');
-  const [activityOpen, setActivityOpen] = useState(false);
-  const [activityExpanded, setActivityExpanded] = useState(false);
-  const [activityEntries, setActivityEntries] = useState<ReadonlyArray<ActivityLogEntry>>([]);
-  const [activitySearch, setActivitySearch] = useState('');
-  const [activityArea, setActivityArea] = useState<ActivityLogArea | 'all'>('all');
-  const [activityStatus, setActivityStatus] = useState<ActivityLogStatus | 'all'>('all');
-  const [activityIsLoading, setActivityIsLoading] = useState(false);
-  const [latestActivityIssue, setLatestActivityIssue] = useState<ActivityLogEntry | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pendingDestructiveAction, setPendingDestructiveAction] = useState<
     DestructiveAction | null
@@ -175,8 +165,11 @@ export function AppShell(
   const loggedFirestoreRuns = useRef<Set<string>>(new Set());
   const loggedScriptRuns = useRef<Set<string>>(new Set());
   const loggedAuthFailures = useRef<Set<string>>(new Set());
-  const activityOpenRef = useRef(false);
-  const activityListRequestRef = useRef<ActivityLogListRequest>({ limit: 200 });
+  const activity = useActivityController({
+    onStatus: setLastAction,
+    repository: repositories.activity,
+  });
+  const recordActivity = activity.record;
   const firestoreTab = useFirestoreTabState({
     activeProject,
     activeTab,
@@ -208,61 +201,10 @@ export function AppShell(
     ? projects.find((project) => project.id === editingProjectId) ?? null
     : null;
   const sidebarDefaultWidth = clampSidebarWidth(initialSidebarWidth);
-  const activityListRequest = useMemo<ActivityLogListRequest>(() => ({
-    area: activityArea,
-    limit: 200,
-    search: activitySearch.trim() || undefined,
-    status: activityStatus,
-  }), [activityArea, activitySearch, activityStatus]);
-
-  const loadActivity = useCallback(async () => {
-    setActivityIsLoading(true);
-    try {
-      const entries = await repositories.activity.list(activityListRequest);
-      setActivityEntries(entries);
-    } catch (error) {
-      setLastAction(`Activity load failed: ${messageFromError(error, 'Could not load activity.')}`);
-    } finally {
-      setActivityIsLoading(false);
-    }
-  }, [activityListRequest, repositories.activity]);
-
-  const recordActivity = useCallback((input: ActivityLogAppendInput) => {
-    void repositories.activity.append(input)
-      .then((entry) => {
-        if (isActivityIssue(entry) && !activityOpenRef.current) setLatestActivityIssue(entry);
-        setActivityEntries((current) =>
-          activityOpenRef.current
-            && activityEntryMatchesRequest(entry, activityListRequestRef.current)
-            ? [entry, ...current].slice(0, 200)
-            : current
-        );
-      })
-      .catch(() => {});
-  }, [repositories.activity]);
 
   useEffect(() => {
     document.documentElement.dataset.density = density;
   }, [density]);
-
-  useEffect(() => {
-    activityOpenRef.current = activityOpen;
-    if (activityOpen) setLatestActivityIssue(null);
-  }, [activityOpen]);
-
-  useEffect(() => {
-    activityListRequestRef.current = activityListRequest;
-  }, [activityListRequest]);
-
-  useEffect(() => {
-    void repositories.activity.list({ limit: 1 })
-      .then((entries) => setLatestActivityIssue(activityIssueFromLatestEntry(entries)))
-      .catch(() => {});
-  }, [repositories.activity]);
-
-  useEffect(() => {
-    if (activityOpen) void loadActivity();
-  }, [activityOpen, loadActivity]);
 
   useEffect(() => {
     savePersistedWorkspaceState({
@@ -1424,58 +1366,36 @@ export function AppShell(
       confirmLabel: 'Clear',
       description: 'Clear local Activity entries?',
       onConfirm: () => {
-        void repositories.activity.clear()
-          .then(() => {
-            setActivityEntries([]);
-            setLatestActivityIssue(null);
-            setLastAction('Cleared activity');
-          })
-          .catch((error) => {
-            setLastAction(
-              `Activity clear failed: ${messageFromError(error, 'Could not clear activity.')}`,
-            );
-          });
+        activity.clear();
       },
       title: 'Clear activity',
     });
   }
 
   function handleExportActivity() {
-    void repositories.activity.export(activityListRequest)
-      .then((result) => {
-        if (!result.canceled) setLastAction(`Exported activity ${result.filePath ?? ''}`.trim());
-      })
-      .catch((error) => {
-        setLastAction(
-          `Activity export failed: ${messageFromError(error, 'Could not export activity.')}`,
-        );
-      });
+    activity.exportEntries();
   }
 
   function handleOpenActivityTarget(entry: ActivityLogEntry) {
-    const target = entry.target;
-    if (!target?.connectionId) return;
-    if (target.type === 'firestore-document' || target.type === 'firestore-query') {
-      const path = target.path ?? '';
-      if (!path) return;
-      const tabId = openFirestoreTab(target.connectionId, path);
+    const intent = activity.openTargetIntent(entry);
+    if (!intent) return;
+    if (intent.type === 'firestore') {
+      const tabId = openFirestoreTab(intent.connectionId, intent.path);
       tabActions.recordInteraction({
         activeTabId: tabId,
-        path,
+        path: intent.path,
         selectedTreeItemId: selection.treeItemId,
       });
-      setLastAction(`Opened ${path}`);
+      setLastAction(`Opened ${intent.path}`);
       return;
     }
-    if (target.type === 'auth-user') {
-      const tabId = openToolTab('auth-users', target.connectionId);
-      selectionActions.selectAuthUser(target.uid ?? null);
-      tabActions.recordInteraction({
-        activeTabId: tabId,
-        selectedTreeItemId: selection.treeItemId,
-      });
-      setLastAction(target.uid ? `Opened ${target.uid}` : 'Opened Authentication');
-    }
+    const tabId = openToolTab('auth-users', intent.connectionId);
+    selectionActions.selectAuthUser(intent.uid);
+    tabActions.recordInteraction({
+      activeTabId: tabId,
+      selectedTreeItemId: selection.treeItemId,
+    });
+    setLastAction(intent.uid ? `Opened ${intent.uid}` : 'Opened Authentication');
   }
 
   const desktopAppApi = getDesktopAppApi();
@@ -1603,21 +1523,21 @@ export function AppShell(
               </RenderErrorBoundary>
             </WorkspaceShell>
             <ActivityDrawer
-              area={activityArea}
-              entries={activityEntries}
-              expanded={activityExpanded}
-              isLoading={activityIsLoading}
-              open={activityOpen}
-              search={activitySearch}
-              status={activityStatus}
-              onAreaChange={setActivityArea}
+              area={activity.drawer.area}
+              entries={activity.drawer.entries}
+              expanded={activity.drawer.expanded}
+              isLoading={activity.drawer.isLoading}
+              open={activity.drawer.open}
+              search={activity.drawer.search}
+              status={activity.drawer.status}
+              onAreaChange={activity.setArea}
               onClear={handleClearActivity}
-              onClose={() => setActivityOpen(false)}
+              onClose={activity.close}
               onExport={handleExportActivity}
-              onExpandedChange={setActivityExpanded}
+              onExpandedChange={activity.setExpanded}
               onOpenTarget={handleOpenActivityTarget}
-              onSearchChange={setActivitySearch}
-              onStatusChange={setActivityStatus}
+              onSearchChange={activity.setSearch}
+              onStatusChange={activity.setStatus}
             />
             <StatusBar
               left={
@@ -1632,17 +1552,17 @@ export function AppShell(
               right={
                 <>
                   <Button
-                    aria-pressed={activityOpen}
+                    aria-pressed={activity.drawer.open}
                     size='xs'
-                    variant={activityButtonVariant(latestActivityIssue)}
-                    onClick={() => setActivityOpen((current) => !current)}
+                    variant={activity.button.variant}
+                    onClick={activity.toggle}
                   >
                     <ListChecks size={13} aria-hidden='true' />
                     Activity
-                    {latestActivityIssue
+                    {activity.button.badge
                       ? (
-                        <Badge variant={activityIssueBadgeVariant(latestActivityIssue.status)}>
-                          {latestActivityIssue.status}
+                        <Badge variant={activity.button.badge.variant}>
+                          {activity.button.badge.label}
                         </Badge>
                       )
                       : null}
@@ -2049,51 +1969,6 @@ function persistSidebarWidth(repositories: RepositorySet, size: number) {
 function messageFromError(error: unknown, fallback: string): string {
   if (error instanceof Error) return error.message;
   return fallback;
-}
-
-function isActivityIssue(entry: ActivityLogEntry): boolean {
-  return entry.status === 'failure' || entry.status === 'conflict';
-}
-
-function activityIssueFromLatestEntry(
-  entries: ReadonlyArray<ActivityLogEntry>,
-): ActivityLogEntry | null {
-  const latest = entries[0];
-  return latest && isActivityIssue(latest) ? latest : null;
-}
-
-function activityEntryMatchesRequest(
-  entry: ActivityLogEntry,
-  request: ActivityLogListRequest,
-): boolean {
-  if (request.area && request.area !== 'all' && entry.area !== request.area) return false;
-  if (request.status && request.status !== 'all' && entry.status !== request.status) return false;
-  const search = request.search?.trim().toLowerCase();
-  if (!search) return true;
-  return [
-    entry.action,
-    entry.area,
-    entry.status,
-    entry.summary,
-    entry.target?.label,
-    entry.target?.path,
-    entry.target?.uid,
-    entry.error?.message,
-  ].some((value) => value?.toLowerCase().includes(search));
-}
-
-function activityButtonVariant(
-  entry: ActivityLogEntry | null,
-): 'danger' | 'secondary' | 'warning' {
-  if (entry?.status === 'failure') return 'danger';
-  if (entry?.status === 'conflict') return 'warning';
-  return 'secondary';
-}
-
-function activityIssueBadgeVariant(status: ActivityLogStatus): 'danger' | 'neutral' | 'warning' {
-  if (status === 'failure') return 'danger';
-  if (status === 'conflict') return 'warning';
-  return 'neutral';
 }
 
 function rememberActivityKey(keys: Set<string>, key: string): boolean {
