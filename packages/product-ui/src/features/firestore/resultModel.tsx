@@ -29,6 +29,8 @@ export type ResultTreeNodeKind = 'branch' | 'leaf' | 'load-more' | 'load-subcoll
 export interface ResultTreeRowModel extends ExplorerTreeRowModel {
   readonly documentPath?: string;
   readonly errorMessage?: string;
+  readonly fieldPath?: ReadonlyArray<string>;
+  readonly fieldValue?: unknown;
   readonly kind: ResultTreeNodeKind;
   readonly openPath?: string;
   readonly subcollectionStatus?: SubcollectionLoadState['status'] | 'idle';
@@ -134,6 +136,20 @@ export function documentsForCollectionNode(
   return withDocuments.documents ?? [];
 }
 
+export function findDocumentByPath(
+  documents: ReadonlyArray<FirestoreDocumentResult>,
+  path: string,
+): FirestoreDocumentResult | null {
+  for (const document of documents) {
+    if (document.path === path) return document;
+    for (const collection of document.subcollections ?? []) {
+      const nested = findDocumentByPath(documentsForCollectionNode(collection), path);
+      if (nested) return nested;
+    }
+  }
+  return null;
+}
+
 export function subcollectionLoadLabel(
   status?: SubcollectionLoadState['status'] | 'idle',
 ): string {
@@ -176,6 +192,7 @@ function appendDocumentTreeRows(
   const expanded = expandedIds.has(nodeId);
   flattened.push({
     id: nodeId,
+    documentPath: row.path,
     icon: <FileText size={14} aria-hidden='true' />,
     kind: 'branch',
     label: row.id,
@@ -191,6 +208,7 @@ function appendDocumentTreeRows(
   const fieldsExpanded = expandedIds.has(fieldsId);
   flattened.push({
     id: fieldsId,
+    documentPath: row.path,
     icon: <Folder size={14} aria-hidden='true' />,
     kind: 'branch',
     label: 'Fields',
@@ -202,7 +220,17 @@ function appendDocumentTreeRows(
   });
   if (fieldsExpanded) {
     for (const [key, value] of fields) {
-      appendValueTreeRows(flattened, key, value, level + 2, `${fieldsId}:field`, expandedIds);
+      appendValueTreeRows(
+        flattened,
+        key,
+        value,
+        level + 2,
+        `${fieldsId}:field`,
+        expandedIds,
+        row.path,
+        [],
+        true,
+      );
     }
   }
   appendSubcollectionTreeRows(
@@ -236,7 +264,7 @@ function appendSubcollectionTreeRows(
       level,
       meta: row.hasSubcollections ? subcollectionLoadMeta(state) : 'empty',
       value: row.hasSubcollections ? subcollectionLoadValue(state) : 'none',
-      ...(canLoadSubcollections && row.hasSubcollections ? { documentPath: row.path } : {}),
+      documentPath: row.path,
       ...(state?.errorMessage ? { errorMessage: state.errorMessage } : {}),
       subcollectionStatus: state?.status ?? 'idle',
     });
@@ -246,6 +274,7 @@ function appendSubcollectionTreeRows(
   const groupExpanded = expandedIds.has(groupId);
   flattened.push({
     id: groupId,
+    documentPath: row.path,
     icon: <Folder size={14} aria-hidden='true' />,
     kind: 'branch',
     label: 'Subcollections',
@@ -262,6 +291,7 @@ function appendSubcollectionTreeRows(
     const documents = documentsForCollectionNode(collection);
     flattened.push({
       id: collectionId,
+      documentPath: row.path,
       icon: <Folder size={14} aria-hidden='true' />,
       kind: documents.length > 0 ? 'branch' : 'leaf',
       label: collection.id,
@@ -293,11 +323,18 @@ function appendValueTreeRows(
   level: number,
   parentId: string,
   expandedIds: ReadonlySet<string>,
+  documentPath: string,
+  parentFieldPath: ReadonlyArray<string>,
+  canEditFieldPath: boolean,
 ) {
   const nodeId = `${parentId}:${key}`;
+  const fieldPath = canEditFieldPath && !key.startsWith('[') ? [...parentFieldPath, key] : null;
+  const childCanEditFieldPath = canEditFieldPath && !key.startsWith('[');
   if (!isExpandableValue(value)) {
     flattened.push({
       id: nodeId,
+      documentPath,
+      ...(fieldPath ? { fieldPath, fieldValue: value } : {}),
       icon: <FileJson size={14} aria-hidden='true' />,
       kind: 'leaf',
       label: key,
@@ -313,6 +350,8 @@ function appendValueTreeRows(
   const expanded = expandedIds.has(nodeId);
   flattened.push({
     id: nodeId,
+    documentPath,
+    ...(fieldPath ? { fieldPath, fieldValue: value } : {}),
     icon: <Folder size={14} aria-hidden='true' />,
     kind: 'branch',
     label: key,
@@ -324,7 +363,17 @@ function appendValueTreeRows(
   });
   if (!expanded) return;
   for (const [childKey, childValue] of entries) {
-    appendValueTreeRows(flattened, childKey, childValue, level + 1, nodeId, expandedIds);
+    appendValueTreeRows(
+      flattened,
+      childKey,
+      childValue,
+      level + 1,
+      nodeId,
+      expandedIds,
+      documentPath,
+      fieldPath ?? parentFieldPath,
+      childCanEditFieldPath,
+    );
   }
 }
 

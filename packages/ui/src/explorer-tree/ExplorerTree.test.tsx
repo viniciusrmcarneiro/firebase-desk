@@ -32,6 +32,7 @@ describe('ExplorerTree', () => {
   it('toggles, opens, and renders actions', () => {
     const onToggle = vi.fn();
     const onOpen = vi.fn();
+    const onSelect = vi.fn();
     const onAction = vi.fn();
     render(
       <ExplorerTree
@@ -40,6 +41,7 @@ describe('ExplorerTree', () => {
           <button type='button' onClick={() => onAction(node.id)}>Action</button>
         )}
         onOpen={onOpen}
+        onSelect={onSelect}
         onToggle={onToggle}
       />,
     );
@@ -51,12 +53,37 @@ describe('ExplorerTree', () => {
     expect(onToggle).toHaveBeenCalledWith('doc:one');
     expect(onToggle).toHaveBeenCalledTimes(1);
     expect(onOpen).toHaveBeenCalledWith('doc:one');
+    expect(onSelect).toHaveBeenCalledWith('doc:one');
     expect(onAction).toHaveBeenCalledWith('doc:one');
+  });
+
+  it('selects leaf rows without toggling them', () => {
+    const onSelect = vi.fn();
+    const onToggle = vi.fn();
+
+    render(
+      <ExplorerTree
+        rows={[{
+          id: 'doc:one:fields:field:total',
+          label: 'total',
+          level: 1,
+          hasChildren: false,
+        }]}
+        onSelect={onSelect}
+        onToggle={onToggle}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('treeitem', { name: /total/ }));
+
+    expect(onSelect).toHaveBeenCalledWith('doc:one:fields:field:total');
+    expect(onToggle).not.toHaveBeenCalled();
   });
 
   it('supports keyboard navigation and toggling from the full row', () => {
     const onToggle = vi.fn();
     const onOpen = vi.fn();
+    const onSelect = vi.fn();
     render(
       <ExplorerTree
         rows={[
@@ -69,6 +96,7 @@ describe('ExplorerTree', () => {
           },
         ]}
         onOpen={onOpen}
+        onSelect={onSelect}
         onToggle={onToggle}
       />,
     );
@@ -82,6 +110,8 @@ describe('ExplorerTree', () => {
 
     expect(onToggle).toHaveBeenCalledWith('doc:one');
     expect(onOpen).toHaveBeenCalledWith('doc:two');
+    expect(onSelect).toHaveBeenCalledWith('doc:one');
+    expect(onSelect).toHaveBeenCalledWith('doc:two');
   });
 
   it('keeps a tabbable row when rows shrink', () => {

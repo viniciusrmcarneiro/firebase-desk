@@ -1,6 +1,7 @@
 import type { FirestoreDocumentResult, SettingsRepository } from '@firebase-desk/repo-contracts';
 import {
   Badge,
+  Button,
   EmptyState,
   InlineAlert,
   Panel,
@@ -14,7 +15,13 @@ import {
 import { Braces, GitBranch, Table2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { JsonPreview } from '../../json-preview/index.ts';
-import { isCollectionPath, type SubcollectionLoadState, toggleSet } from './resultModel.tsx';
+import { type FieldEditTarget } from './fieldEditModel.ts';
+import {
+  documentsForCollectionNode,
+  isCollectionPath,
+  type SubcollectionLoadState,
+  toggleSet,
+} from './resultModel.tsx';
 import { ResultTable } from './ResultTable.tsx';
 import { ResultTreeView } from './ResultTreeView.tsx';
 import type { FirestoreResultView } from './types.ts';
@@ -24,12 +31,19 @@ export interface ResultPanelProps {
   readonly hasMore: boolean;
   readonly isFetchingMore: boolean;
   readonly isLoading: boolean;
+  readonly actionErrorMessage?: string | null;
+  readonly resultsStale?: boolean;
+  readonly onDeleteDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
+  readonly onDeleteField?: ((target: FieldEditTarget) => void) | undefined;
   readonly onEditDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
+  readonly onEditField?: ((target: FieldEditTarget, jsonMode: boolean) => void) | undefined;
   readonly onLoadMore: () => void;
   readonly onLoadSubcollections?: ((documentPath: string) => Promise<void> | void) | undefined;
   readonly onOpenDocumentInNewTab?: ((documentPath: string) => void) | undefined;
   readonly onResultViewChange: (view: FirestoreResultView) => void;
   readonly onSelectDocument?: ((documentPath: string) => void) | undefined;
+  readonly onRefreshResults?: (() => void) | undefined;
+  readonly onSetFieldNull?: ((target: FieldEditTarget) => void) | undefined;
   readonly queryPath: string;
   readonly resultView: FirestoreResultView;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
@@ -41,15 +55,22 @@ export interface ResultPanelProps {
 export function ResultPanel(
   {
     hasMore,
+    actionErrorMessage = null,
     errorMessage,
     isFetchingMore,
     isLoading,
+    resultsStale = false,
+    onDeleteDocument,
+    onDeleteField,
     onEditDocument,
+    onEditField,
     onLoadMore,
     onLoadSubcollections,
     onOpenDocumentInNewTab,
     onResultViewChange,
+    onRefreshResults,
     onSelectDocument,
+    onSetFieldNull,
     queryPath,
     resultView,
     rows,
@@ -74,24 +95,23 @@ export function ResultPanel(
   }, [defaultExpandedTreeIds]);
 
   function toggleTreeNode(id: string) {
+    const document = findDocumentByTreeNodeId(rows, id);
     const willExpand = !expandedTreeIds.has(id);
     setExpandedTreeIds((current) => {
       const next = new Set(toggleSet(current, id));
-      if (willExpand && id.startsWith('doc:')) {
+      if (willExpand && document) {
         next.add(`${id}:fields`);
         next.add(`${id}:subcollections`);
       }
       return next;
     });
-    if (!willExpand || !onLoadSubcollections || !id.startsWith('doc:')) return;
-    const documentPath = id.slice('doc:'.length);
-    const row = rows.find((item) => item.path === documentPath);
-    const state = subcollectionStates[documentPath];
+    if (!willExpand || !onLoadSubcollections || !document) return;
+    const state = subcollectionStates[document.path];
     if (
-      !row || row.hasSubcollections === false || row.subcollections !== undefined
+      document.hasSubcollections === false || document.subcollections !== undefined
       || state?.status === 'loading'
     ) return;
-    void onLoadSubcollections(documentPath);
+    void onLoadSubcollections(document.path);
   }
 
   return (
@@ -132,6 +152,28 @@ export function ResultPanel(
               </div>
             )
             : null}
+          {actionErrorMessage
+            ? (
+              <div className='border-b border-border-subtle p-2'>
+                <InlineAlert variant='danger'>{actionErrorMessage}</InlineAlert>
+              </div>
+            )
+            : null}
+          {resultsStale
+            ? (
+              <div className='border-b border-border-subtle p-2'>
+                <InlineAlert
+                  className='flex items-center justify-between gap-3'
+                  variant='warning'
+                >
+                  <span>Results changed.</span>
+                  <Button size='xs' variant='secondary' onClick={onRefreshResults}>
+                    Refresh
+                  </Button>
+                </InlineAlert>
+              </div>
+            )
+            : null}
           <div className='grid min-h-0 flex-1 overflow-hidden'>
             <TabsContent
               className='col-start-1 row-start-1 m-0 h-full min-h-0 overflow-hidden data-[state=inactive]:hidden'
@@ -145,11 +187,15 @@ export function ResultPanel(
                 selectedDocumentPath={selectedDocumentPath}
                 settings={settings}
                 subcollectionStates={subcollectionStates}
+                onDeleteField={onDeleteField}
+                onDeleteDocument={onDeleteDocument}
                 onEditDocument={onEditDocument}
+                onEditField={onEditField}
                 onLoadMore={onLoadMore}
                 onLoadSubcollections={onLoadSubcollections}
                 onOpenDocumentInNewTab={onOpenDocumentInNewTab}
                 onSelectDocument={onSelectDocument}
+                onSetFieldNull={onSetFieldNull}
               />
             </TabsContent>
             <TabsContent
@@ -165,9 +211,14 @@ export function ResultPanel(
                     isFetchingMore={isFetchingMore}
                     rows={rows}
                     subcollectionStates={subcollectionStates}
+                    onDeleteField={onDeleteField}
+                    onDeleteDocument={onDeleteDocument}
+                    onEditField={onEditField}
                     onLoadMore={onLoadMore}
                     onLoadSubcollections={onLoadSubcollections}
                     onOpenDocumentInNewTab={onOpenDocumentInNewTab}
+                    onSelectDocument={onSelectDocument}
+                    onSetFieldNull={onSetFieldNull}
                     onToggleNode={toggleTreeNode}
                   />
                 )
@@ -204,4 +255,18 @@ function defaultResultTreeExpansion(
   if (!firstDocument) return new Set([rootId]);
   const documentId = `doc:${firstDocument.path}`;
   return new Set([rootId, documentId, `${documentId}:fields`]);
+}
+
+function findDocumentByTreeNodeId(
+  rows: ReadonlyArray<FirestoreDocumentResult>,
+  id: string,
+): FirestoreDocumentResult | null {
+  for (const row of rows) {
+    if (`doc:${row.path}` === id) return row;
+    for (const collection of row.subcollections ?? []) {
+      const nested = findDocumentByTreeNodeId(documentsForCollectionNode(collection), id);
+      if (nested) return nested;
+    }
+  }
+  return null;
 }

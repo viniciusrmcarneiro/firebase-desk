@@ -14,14 +14,13 @@ import {
   Edit3,
   FileJson,
   FileText,
-  GitBranch,
   PanelRightClose,
   PanelRightOpen,
   Table2,
   Trash2,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
-import { ConfirmDialog } from './ConfirmDialog.tsx';
+import { useMemo } from 'react';
+import { type FieldEditTarget } from './fieldEditModel.ts';
 import { NestedValueTree } from './NestedValueTree.tsx';
 import {
   fieldCatalogForRows,
@@ -32,10 +31,14 @@ import { SubcollectionChipList } from './SubcollectionControls.tsx';
 import type { FirestoreResultView } from './types.ts';
 
 export interface ResultContextPanelProps {
-  readonly onDeleteDocument?: ((documentPath: string) => Promise<void> | void) | undefined;
+  readonly onDeleteDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
+  readonly onDeleteField?: ((target: FieldEditTarget) => void) | undefined;
   readonly onCollapse: () => void;
   readonly onEditDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
+  readonly onEditField?: ((target: FieldEditTarget, jsonMode: boolean) => void) | undefined;
   readonly onOpenDocumentInNewTab?: ((documentPath: string) => void) | undefined;
+  readonly onSetFieldValue?: ((target: FieldEditTarget, value: unknown) => void) | undefined;
+  readonly onSetFieldNull?: ((target: FieldEditTarget) => void) | undefined;
   readonly resultView: FirestoreResultView;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocument: FirestoreDocumentResult | null;
@@ -45,93 +48,86 @@ export function ResultContextPanel(
   {
     onCollapse,
     onDeleteDocument,
+    onDeleteField,
     onEditDocument,
+    onEditField,
     onOpenDocumentInNewTab,
+    onSetFieldValue,
+    onSetFieldNull,
     resultView,
     rows,
     selectedDocument,
   }: ResultContextPanelProps,
 ) {
-  const [confirmOpen, setConfirmOpen] = useState(false);
   const fieldCatalog = useMemo(() => fieldCatalogForRows(rows), [rows]);
-  const showSelectionPreview = resultView === 'table';
+  const showSelectionPreview = resultView === 'table' || resultView === 'tree';
 
   return (
-    <>
-      <Panel className='grid min-h-0 grid-rows-[auto_minmax(0,1fr)]'>
-        <PanelHeader
-          actions={
-            <span className='flex items-center gap-1'>
-              <Badge>{rows.length} docs</Badge>
-              <IconButton
-                icon={<PanelRightClose size={14} aria-hidden='true' />}
-                label='Collapse result overview'
-                size='xs'
-                variant='ghost'
-                onClick={onCollapse}
-              />
-            </span>
-          }
-        >
-          <span className='flex min-w-0 items-center gap-2'>
-            <Table2 size={15} aria-hidden='true' />
-            <span className='truncate'>Result overview</span>
+    <Panel className='grid min-h-0 grid-rows-[auto_minmax(0,1fr)]'>
+      <PanelHeader
+        actions={
+          <span className='flex items-center gap-1'>
+            <Badge>{rows.length} docs</Badge>
+            <IconButton
+              icon={<PanelRightClose size={14} aria-hidden='true' />}
+              label='Collapse result overview'
+              size='xs'
+              variant='ghost'
+              onClick={onCollapse}
+            />
           </span>
-        </PanelHeader>
-        <PanelBody className='min-h-0 p-0'>
-          <InspectorSection
-            defaultOpen
-            icon={<Table2 size={14} aria-hidden='true' />}
-            meta={`${fieldCatalog.length} fields`}
-            title='Fields in results'
-          >
-            <FieldCatalogTable fields={fieldCatalog} rowCount={rows.length} />
-          </InspectorSection>
-          {showSelectionPreview
-            ? (
-              <InspectorSection
-                defaultOpen
-                icon={<FileText size={14} aria-hidden='true' />}
-                meta={selectedDocument?.id ?? 'none'}
-                title='Selection preview'
-              >
-                <SelectionPreview
-                  document={selectedDocument}
-                  onDelete={onDeleteDocument ? () => setConfirmOpen(true) : undefined}
-                  onEdit={onEditDocument && selectedDocument
-                    ? () => onEditDocument(selectedDocument)
-                    : undefined}
-                  onOpenDocumentInNewTab={onOpenDocumentInNewTab}
-                />
-              </InspectorSection>
-            )
-            : (
-              <InspectorSection
-                defaultOpen
-                icon={resultView === 'tree'
-                  ? <GitBranch size={14} aria-hidden='true' />
-                  : <FileJson size={14} aria-hidden='true' />}
-                meta={resultView}
-                title={resultView === 'tree' ? 'Tree context' : 'JSON context'}
-              >
-                <ResultViewFacts resultView={resultView} rows={rows} />
-              </InspectorSection>
-            )}
-        </PanelBody>
-      </Panel>
-      <ConfirmDialog
-        confirmLabel='Delete'
-        description={selectedDocument
-          ? `Delete ${selectedDocument.path}?`
-          : 'Delete the selected document?'}
-        open={confirmOpen}
-        title='Delete document'
-        onConfirm={() => {
-          if (selectedDocument) onDeleteDocument?.(selectedDocument.path);
-        }}
-        onOpenChange={setConfirmOpen}
-      />
-    </>
+        }
+      >
+        <span className='flex min-w-0 items-center gap-2'>
+          <Table2 size={15} aria-hidden='true' />
+          <span className='truncate'>Result overview</span>
+        </span>
+      </PanelHeader>
+      <PanelBody className='min-h-0 p-0'>
+        <InspectorSection
+          defaultOpen
+          icon={<Table2 size={14} aria-hidden='true' />}
+          meta={`${fieldCatalog.length} fields`}
+          title='Fields in results'
+        >
+          <FieldCatalogTable fields={fieldCatalog} rowCount={rows.length} />
+        </InspectorSection>
+        {showSelectionPreview
+          ? (
+            <InspectorSection
+              defaultOpen
+              icon={<FileText size={14} aria-hidden='true' />}
+              meta={selectedDocument?.id ?? 'none'}
+              title='Selection preview'
+            >
+              <SelectionPreview
+                document={selectedDocument}
+                onDelete={onDeleteDocument && selectedDocument
+                  ? () => onDeleteDocument(selectedDocument)
+                  : undefined}
+                onEdit={onEditDocument && selectedDocument
+                  ? () => onEditDocument(selectedDocument)
+                  : undefined}
+                onDeleteField={onDeleteField}
+                onEditField={onEditField}
+                onOpenDocumentInNewTab={onOpenDocumentInNewTab}
+                onSetFieldValue={onSetFieldValue}
+                onSetFieldNull={onSetFieldNull}
+              />
+            </InspectorSection>
+          )
+          : (
+            <InspectorSection
+              defaultOpen
+              icon={<FileJson size={14} aria-hidden='true' />}
+              meta={resultView}
+              title='JSON context'
+            >
+              <ResultViewFacts resultView={resultView} rows={rows} />
+            </InspectorSection>
+          )}
+      </PanelBody>
+    </Panel>
   );
 }
 
@@ -188,12 +184,25 @@ function FieldCatalogTable(
 interface SelectionPreviewProps {
   readonly document: FirestoreDocumentResult | null;
   readonly onDelete?: (() => void) | undefined;
+  readonly onDeleteField?: ((target: FieldEditTarget) => void) | undefined;
   readonly onEdit?: (() => void) | undefined;
+  readonly onEditField?: ((target: FieldEditTarget, jsonMode: boolean) => void) | undefined;
   readonly onOpenDocumentInNewTab?: ((documentPath: string) => void) | undefined;
+  readonly onSetFieldValue?: ((target: FieldEditTarget, value: unknown) => void) | undefined;
+  readonly onSetFieldNull?: ((target: FieldEditTarget) => void) | undefined;
 }
 
 function SelectionPreview(
-  { document, onDelete, onEdit, onOpenDocumentInNewTab }: SelectionPreviewProps,
+  {
+    document,
+    onDelete,
+    onDeleteField,
+    onEdit,
+    onEditField,
+    onOpenDocumentInNewTab,
+    onSetFieldValue,
+    onSetFieldNull,
+  }: SelectionPreviewProps,
 ) {
   if (!document) {
     return (
@@ -231,7 +240,14 @@ function SelectionPreview(
             : null}
         </div>
       </div>
-      <NestedValueTree value={document.data} />
+      <NestedValueTree
+        document={document}
+        value={document.data}
+        onDeleteField={onDeleteField}
+        onEditField={onEditField}
+        onSetFieldValue={onSetFieldValue}
+        onSetFieldNull={onSetFieldNull}
+      />
       {document.subcollections?.length
         ? (
           <div className='grid gap-2 rounded-md border border-border-subtle p-2'>

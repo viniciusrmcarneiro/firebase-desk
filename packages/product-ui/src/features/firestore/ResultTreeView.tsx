@@ -1,14 +1,11 @@
 import type { FirestoreDocumentResult } from '@firebase-desk/repo-contracts';
-import {
-  Button,
-  ContextMenuContent,
-  ContextMenuItem,
-  ExplorerTree,
-  IconButton,
-} from '@firebase-desk/ui';
-import { ExternalLink, Folder, Loader2 } from 'lucide-react';
+import { Button, ExplorerTree, IconButton } from '@firebase-desk/ui';
+import { Folder, Loader2, Trash2 } from 'lucide-react';
 import { useCallback, useMemo } from 'react';
+import { DocumentContextMenuContent, FieldContextMenuContent } from './FieldContextMenu.tsx';
+import { type FieldEditTarget } from './fieldEditModel.ts';
 import {
+  documentsForCollectionNode,
   flattenResultTree,
   type ResultTreeRowModel,
   subcollectionLoadLabel,
@@ -23,6 +20,11 @@ export function ResultTreeView(
     onLoadMore,
     onLoadSubcollections,
     onOpenDocumentInNewTab,
+    onDeleteDocument,
+    onDeleteField,
+    onEditField,
+    onSelectDocument,
+    onSetFieldNull,
     onToggleNode,
     queryPath,
     rows,
@@ -31,9 +33,14 @@ export function ResultTreeView(
     readonly expandedIds: ReadonlySet<string>;
     readonly hasMore: boolean;
     readonly isFetchingMore: boolean;
+    readonly onDeleteDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
+    readonly onDeleteField?: ((target: FieldEditTarget) => void) | undefined;
+    readonly onEditField?: ((target: FieldEditTarget, jsonMode: boolean) => void) | undefined;
     readonly onLoadMore: () => void;
     readonly onLoadSubcollections?: ((documentPath: string) => Promise<void> | void) | undefined;
     readonly onOpenDocumentInNewTab?: ((documentPath: string) => void) | undefined;
+    readonly onSelectDocument?: ((documentPath: string) => void) | undefined;
+    readonly onSetFieldNull?: ((target: FieldEditTarget) => void) | undefined;
     readonly onToggleNode: (id: string) => void;
     readonly queryPath: string;
     readonly rows: ReadonlyArray<FirestoreDocumentResult>;
@@ -41,6 +48,7 @@ export function ResultTreeView(
   },
 ) {
   const canLoadSubcollections = Boolean(onLoadSubcollections);
+  const documentsByPath = useMemo(() => documentsByPathMap(rows), [rows]);
   const treeRows = useMemo(
     () =>
       flattenResultTree(
@@ -60,23 +68,47 @@ export function ResultTreeView(
     },
     [onOpenDocumentInNewTab, treeRows],
   );
+  const selectNode = useCallback(
+    (id: string) => {
+      const node = treeRows.find((item) => item.id === id);
+      if (node?.documentPath) onSelectDocument?.(node.documentPath);
+    },
+    [onSelectDocument, treeRows],
+  );
 
   return (
     <ExplorerTree
       rows={treeRows}
       onOpen={openNode}
+      onSelect={selectNode}
       onToggle={onToggleNode}
       contextMenu={(node) =>
-        node.openPath && onOpenDocumentInNewTab
+        node.fieldPath && node.documentPath && node.fieldValue !== undefined
           ? (
-            <ContextMenuContent>
-              <ContextMenuItem
-                className='gap-2'
-                onSelect={() => onOpenDocumentInNewTab(node.openPath ?? '')}
-              >
-                <ExternalLink size={13} aria-hidden='true' /> Open in new tab
-              </ContextMenuItem>
-            </ContextMenuContent>
+            <FieldContextMenuContent
+              document={documentsByPath.get(node.documentPath) ?? {
+                id: node.documentPath.split('/').at(-1) ?? node.documentPath,
+                path: node.documentPath,
+                data: {},
+                hasSubcollections: false,
+              }}
+              fieldPath={node.fieldPath}
+              value={node.fieldValue}
+              onDeleteDocument={onDeleteDocument}
+              onDeleteField={onDeleteField}
+              onEditField={onEditField}
+              onOpenDocumentInNewTab={onOpenDocumentInNewTab}
+              onSetFieldNull={onSetFieldNull}
+            />
+          )
+          : node.documentPath && documentsByPath.has(node.documentPath)
+              && (onOpenDocumentInNewTab || onDeleteDocument)
+          ? (
+            <DocumentContextMenuContent
+              document={documentsByPath.get(node.documentPath)!}
+              onDeleteDocument={onDeleteDocument}
+              onOpenDocumentInNewTab={onOpenDocumentInNewTab}
+            />
           )
           : null}
       renderAction={(node) => (
@@ -86,6 +118,8 @@ export function ResultTreeView(
           onLoadMore={onLoadMore}
           onLoadSubcollections={onLoadSubcollections}
           onOpenDocumentInNewTab={onOpenDocumentInNewTab}
+          onDeleteDocument={onDeleteDocument}
+          documentsByPath={documentsByPath}
         />
       )}
     />
@@ -99,12 +133,16 @@ function TreeRowAction(
     onLoadMore,
     onLoadSubcollections,
     onOpenDocumentInNewTab,
+    onDeleteDocument,
+    documentsByPath,
   }: {
     readonly isFetchingMore: boolean;
     readonly node: ResultTreeRowModel;
     readonly onLoadMore: () => void;
     readonly onLoadSubcollections?: ((documentPath: string) => Promise<void> | void) | undefined;
     readonly onOpenDocumentInNewTab?: ((documentPath: string) => void) | undefined;
+    readonly onDeleteDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
+    readonly documentsByPath: ReadonlyMap<string, FirestoreDocumentResult>;
   },
 ) {
   if (node.kind === 'load-more') {
@@ -140,6 +178,41 @@ function TreeRowAction(
       </Button>
     );
   }
+  if (node.documentPath && documentsByPath.has(node.documentPath)) {
+    return (
+      <span className='flex items-center gap-1'>
+        {onOpenDocumentInNewTab
+          ? (
+            <IconButton
+              icon={<Folder size={13} aria-hidden='true' />}
+              label={`Open ${node.label}`}
+              size='xs'
+              variant='ghost'
+              onClick={(event) => {
+                event.stopPropagation();
+                onOpenDocumentInNewTab(node.documentPath ?? '');
+              }}
+            />
+          )
+          : null}
+        {onDeleteDocument
+          ? (
+            <IconButton
+              icon={<Trash2 size={13} aria-hidden='true' />}
+              label={`Delete ${node.label}`}
+              size='xs'
+              variant='ghost'
+              onClick={(event) => {
+                event.stopPropagation();
+                const document = documentsByPath.get(node.documentPath ?? '');
+                if (document) onDeleteDocument(document);
+              }}
+            />
+          )
+          : null}
+      </span>
+    );
+  }
   if (node.openPath && onOpenDocumentInNewTab) {
     return (
       <IconButton
@@ -155,4 +228,22 @@ function TreeRowAction(
     );
   }
   return null;
+}
+
+function documentsByPathMap(
+  rows: ReadonlyArray<FirestoreDocumentResult>,
+): ReadonlyMap<string, FirestoreDocumentResult> {
+  const map = new Map<string, FirestoreDocumentResult>();
+  for (const row of rows) appendDocument(row, map);
+  return map;
+}
+
+function appendDocument(
+  document: FirestoreDocumentResult,
+  map: Map<string, FirestoreDocumentResult>,
+) {
+  map.set(document.path, document);
+  for (const collection of document.subcollections ?? []) {
+    for (const child of documentsForCollectionNode(collection)) appendDocument(child, map);
+  }
 }

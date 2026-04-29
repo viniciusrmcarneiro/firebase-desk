@@ -26,6 +26,12 @@ export interface VirtualTableProps<T> {
   readonly onColumnResize?: (columnId: string, width: number) => void;
   readonly onRowClick?: (row: T) => void;
   readonly onRowDoubleClick?: (row: T) => void;
+  readonly cellWrapper?: (
+    cellElement: ReactNode,
+    row: T,
+    column: VirtualTableColumn<T>,
+    index: number,
+  ) => ReactNode;
   readonly rowHeight?: number;
   readonly rowClassName?: string | ((row: T) => string | undefined);
   readonly rowWrapper?: (rowElement: ReactNode, row: T, index: number) => ReactNode;
@@ -41,6 +47,7 @@ export function VirtualTable<T>(
     enableColumnResize = false,
     getRowKey,
     headerClassName,
+    cellWrapper,
     onColumnReorder,
     onColumnResize,
     onRowClick,
@@ -149,15 +156,20 @@ export function VirtualTable<T>(
               onClick={() => onRowClick?.(item)}
               onDoubleClick={() => onRowDoubleClick?.(item)}
             >
-              {columns.map((c) => (
-                <div
-                  key={c.id}
-                  className='min-w-0 truncate border-r border-border-subtle px-2 py-1 last:border-r-0'
-                  style={{ flex: columnFlex(c) }}
-                >
-                  {c.cell(item)}
-                </div>
-              ))}
+              {columns.map((c) => {
+                const cellElement = (
+                  <div
+                    className='min-w-0 truncate border-r border-border-subtle px-2 py-1 last:border-r-0'
+                    style={{ flex: columnFlex(c) }}
+                  >
+                    {c.cell(item)}
+                  </div>
+                );
+                const wrapped = cellWrapper
+                  ? cellWrapper(cellElement, item, c, row.index)
+                  : cellElement;
+                return <Fragment key={c.id}>{wrapped}</Fragment>;
+              })}
             </div>
           );
           const wrapped = rowWrapper ? rowWrapper(rowElement, item, row.index) : rowElement;

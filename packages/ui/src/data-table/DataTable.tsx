@@ -27,6 +27,7 @@ export interface DataTableColumnLayout {
 export interface DataTableProps<TData> {
   readonly columns: ReadonlyArray<DataTableColumn<TData>>;
   readonly data: ReadonlyArray<TData>;
+  readonly cellContextMenu?: (row: TData, columnId: string) => ReactNode | null;
   readonly columnLayout?: DataTableColumnLayout | null;
   readonly density?: DensityName;
   readonly emptyState?: ReactNode;
@@ -47,6 +48,7 @@ export function DataTable<TData>(
     columnLayout,
     columns,
     data,
+    cellContextMenu,
     density,
     emptyState,
     enableColumnReorder = false,
@@ -126,6 +128,15 @@ export function DataTable<TData>(
         )}
       {...(rowHeight === undefined ? {} : { rowHeight })}
       rows={rows}
+      {...(cellContextMenu
+        ? {
+          cellWrapper: (
+            cellElement: ReactNode,
+            row: Row<TData>,
+            column: VirtualTableColumn<Row<TData>>,
+          ) => wrapCellContextMenu(cellElement, row, column.id, cellContextMenu),
+        }
+        : {})}
       {...(rowContextMenu
         ? {
           rowWrapper: (rowElement: ReactNode, row: Row<TData>) => (
@@ -136,6 +147,22 @@ export function DataTable<TData>(
       onRowClick={(row) => onRowClick?.(row.original)}
       onRowDoubleClick={(row) => onRowDoubleClick?.(row.original)}
     />
+  );
+}
+
+function wrapCellContextMenu<TData>(
+  cellElement: ReactNode,
+  row: Row<TData>,
+  columnId: string,
+  cellContextMenu: (row: TData, columnId: string) => ReactNode | null,
+): ReactNode {
+  const content = cellContextMenu(row.original, columnId);
+  if (!content) return cellElement;
+  return (
+    <ContextMenu key={`${row.id}:${columnId}`}>
+      <ContextMenuTrigger asChild>{cellElement}</ContextMenuTrigger>
+      {content}
+    </ContextMenu>
   );
 }
 

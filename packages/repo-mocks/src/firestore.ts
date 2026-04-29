@@ -119,12 +119,6 @@ export class MockFirestoreRepository implements FirestoreRepository {
       collectionPath,
       collection.docs.filter((doc) => doc.id !== docId),
     );
-    const subcollectionPrefix = `${documentPath}/`;
-    for (let index = this.collections.length - 1; index >= 0; index -= 1) {
-      if (this.collections[index]?.path.startsWith(subcollectionPrefix)) {
-        this.collections.splice(index, 1);
-      }
-    }
   }
 
   private replaceCollection(path: string, docs: ReadonlyArray<FixtureDoc>) {

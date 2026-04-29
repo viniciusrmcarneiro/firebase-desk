@@ -1,7 +1,11 @@
-import type { FirestoreDocumentResult } from '@firebase-desk/repo-contracts';
+import type {
+  FirestoreCollectionNode,
+  FirestoreDocumentResult,
+} from '@firebase-desk/repo-contracts';
 import { describe, expect, it } from 'vitest';
 import {
   fieldCatalogForRows,
+  findDocumentByPath,
   flattenResultTree,
   mergeLoadedSubcollections,
 } from './resultModel.tsx';
@@ -88,5 +92,46 @@ describe('firestore result model', () => {
       'zebra',
     ]);
     expect(treeRows.find((row) => row.label === 'alpha')?.value).toBe('{"nested":true}');
+  });
+
+  it('marks document-owned tree rows for selection', () => {
+    const expanded = new Set([
+      'root:orders',
+      'doc:orders/ord_1',
+      'doc:orders/ord_1:fields',
+      'doc:orders/ord_1:subcollections',
+    ]);
+
+    const treeRows = flattenResultTree('orders', rows, false, expanded, {}, false);
+
+    expect(treeRows.find((row) => row.label === 'Fields')?.documentPath).toBe('orders/ord_1');
+    expect(treeRows.find((row) => row.label === 'total')?.documentPath).toBe('orders/ord_1');
+    expect(treeRows.find((row) => row.label === 'Subcollections')?.documentPath).toBe(
+      'orders/ord_1',
+    );
+    expect(treeRows.find((row) => row.label === 'events')?.documentPath).toBe('orders/ord_1');
+  });
+
+  it('finds nested documents by path', () => {
+    const nestedDocument: FirestoreDocumentResult = {
+      id: 'evt_1',
+      path: 'orders/ord_1/events/evt_1',
+      data: { type: 'created' },
+      hasSubcollections: false,
+    };
+    const nestedCollection: FirestoreCollectionNode & {
+      readonly documents: ReadonlyArray<FirestoreDocumentResult>;
+    } = {
+      id: 'events',
+      path: 'orders/ord_1/events',
+      documents: [nestedDocument],
+    };
+    const rowsWithNestedDocument: ReadonlyArray<FirestoreDocumentResult> = [{
+      ...rows[0]!,
+      subcollections: [nestedCollection],
+    }];
+
+    expect(findDocumentByPath(rowsWithNestedDocument, nestedDocument.path)).toBe(nestedDocument);
+    expect(findDocumentByPath(rowsWithNestedDocument, 'orders/missing')).toBeNull();
   });
 });

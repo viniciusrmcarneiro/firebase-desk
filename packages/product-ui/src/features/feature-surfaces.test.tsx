@@ -645,8 +645,8 @@ describe('feature surfaces', () => {
     const treeTab = screen.getByRole('tab', { name: /Tree/ });
     fireEvent.mouseDown(treeTab, { button: 0, ctrlKey: false });
     expect(screen.queryByText('evt_created')).toBeNull();
-    fireEvent.click(screen.getByText('Subcollections'));
-    fireEvent.click(screen.getByText('events'));
+    fireEvent.click(screen.getAllByText('Subcollections')[0]!);
+    fireEvent.click(screen.getAllByText('events')[0]!);
     expect(await screen.findByText('evt_created')).toBeTruthy();
 
     const tableTab = screen.getByRole('tab', { name: /Table/ });
@@ -656,7 +656,7 @@ describe('feature surfaces', () => {
 
     fireEvent.mouseDown(tableTab, { button: 0, ctrlKey: false });
     fireEvent.doubleClick(screen.getAllByText('ord_1024')[0]!);
-    expect(await screen.findByRole('dialog', { name: 'Document editor' })).toBeTruthy();
+    expect(await screen.findByRole('dialog', { name: 'Edit document JSON' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
     expect(onSaveDocument).toHaveBeenCalledWith(
       'orders/ord_1024',

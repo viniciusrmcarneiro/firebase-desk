@@ -27,14 +27,23 @@ export interface ExplorerTreeProps<TNode extends ExplorerTreeRowModel = Explorer
   readonly contextMenu?: ((node: TNode) => ReactNode | null) | undefined;
   readonly estimateSize?: (index: number) => number;
   readonly onOpen?: ((id: string) => void) | undefined;
+  readonly onSelect?: ((id: string) => void) | undefined;
   readonly onToggle: (id: string) => void;
   readonly renderAction?: ((node: TNode) => ReactNode) | undefined;
   readonly rows: ReadonlyArray<TNode>;
 }
 
 export function ExplorerTree<TNode extends ExplorerTreeRowModel = ExplorerTreeRowModel>(
-  { className, contextMenu, estimateSize = () => 32, onOpen, onToggle, renderAction, rows }:
-    ExplorerTreeProps<TNode>,
+  {
+    className,
+    contextMenu,
+    estimateSize = () => 32,
+    onOpen,
+    onSelect,
+    onToggle,
+    renderAction,
+    rows,
+  }: ExplorerTreeProps<TNode>,
 ) {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const clampedFocusedIndex = rows.length === 0 ? 0 : Math.min(focusedIndex, rows.length - 1);
@@ -60,21 +69,24 @@ export function ExplorerTree<TNode extends ExplorerTreeRowModel = ExplorerTreeRo
       }
       if (event.key === 'ArrowRight' && node.hasChildren && !node.expanded) {
         event.preventDefault();
+        onSelect?.(node.id);
         onToggle(node.id);
         return;
       }
       if (event.key === 'ArrowLeft' && node.hasChildren && node.expanded) {
         event.preventDefault();
+        onSelect?.(node.id);
         onToggle(node.id);
         return;
       }
       if (event.key === 'Enter' || event.key === ' ') {
         event.preventDefault();
+        onSelect?.(node.id);
         if (node.hasChildren) onToggle(node.id);
         else onOpen?.(node.id);
       }
     },
-    [onOpen, onToggle, rows.length],
+    [onOpen, onSelect, onToggle, rows.length],
   );
   return (
     <div className={cn('h-full min-w-[680px] font-mono text-xs', className)} role='tree'>
@@ -92,6 +104,7 @@ export function ExplorerTree<TNode extends ExplorerTreeRowModel = ExplorerTreeRo
             setFocusedIndex={setFocusedIndex}
             onKeyDown={handleKeyDown}
             onOpen={onOpen}
+            onSelect={onSelect}
             onToggle={onToggle}
           />
         )}
@@ -101,22 +114,33 @@ export function ExplorerTree<TNode extends ExplorerTreeRowModel = ExplorerTreeRo
 }
 
 function ExplorerTreeRow<TNode extends ExplorerTreeRowModel>(
-  { contextMenu, focused, index, node, renderAction, setFocusedIndex, onKeyDown, onOpen, onToggle }:
-    {
-      readonly contextMenu?: ((node: TNode) => ReactNode | null) | undefined;
-      readonly focused: boolean;
-      readonly index: number;
-      readonly node: TNode;
-      readonly renderAction?: ((node: TNode) => ReactNode) | undefined;
-      readonly setFocusedIndex: (index: number) => void;
-      readonly onKeyDown: (
-        event: KeyboardEvent<HTMLDivElement>,
-        index: number,
-        node: TNode,
-      ) => void;
-      readonly onOpen?: ((id: string) => void) | undefined;
-      readonly onToggle: (id: string) => void;
-    },
+  {
+    contextMenu,
+    focused,
+    index,
+    node,
+    renderAction,
+    setFocusedIndex,
+    onKeyDown,
+    onOpen,
+    onSelect,
+    onToggle,
+  }: {
+    readonly contextMenu?: ((node: TNode) => ReactNode | null) | undefined;
+    readonly focused: boolean;
+    readonly index: number;
+    readonly node: TNode;
+    readonly renderAction?: ((node: TNode) => ReactNode) | undefined;
+    readonly setFocusedIndex: (index: number) => void;
+    readonly onKeyDown: (
+      event: KeyboardEvent<HTMLDivElement>,
+      index: number,
+      node: TNode,
+    ) => void;
+    readonly onOpen?: ((id: string) => void) | undefined;
+    readonly onSelect?: ((id: string) => void) | undefined;
+    readonly onToggle: (id: string) => void;
+  },
 ) {
   const rowRef = useRef<HTMLDivElement>(null);
 
@@ -139,6 +163,7 @@ function ExplorerTreeRow<TNode extends ExplorerTreeRowModel>(
       ref={rowRef}
       onClick={() => {
         setFocusedIndex(index);
+        onSelect?.(node.id);
         if (node.hasChildren) onToggle(node.id);
       }}
       onDoubleClick={() => onOpen?.(node.id)}

@@ -4,7 +4,7 @@ import type {
   FirestoreQuery,
   ProjectSummary,
 } from '@firebase-desk/repo-contracts';
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { selectionActions } from '../stores/selectionStore.ts';
 import { activePath, tabActions, tabsStore, type WorkspaceTab } from '../stores/tabsStore.ts';
 import {
@@ -43,6 +43,7 @@ export interface FirestoreTabState {
   readonly loadMore: () => void;
   readonly openTab: (connectionId: string, path: string) => string;
   readonly openTabInNewTab: (connectionId: string, path: string) => string;
+  readonly refreshQuery: () => string | null;
   readonly resetDraft: () => void;
   readonly runQuery: () => string | null;
   readonly selectDocument: (tabId: string, path: string | null) => void;
@@ -61,6 +62,9 @@ export function useFirestoreTabState(
   const [selectedDocumentPaths, setSelectedDocumentPaths] = useState<
     Readonly<Record<string, string>>
   >({});
+  const [pendingPageReloads, setPendingPageReloads] = useState<Readonly<Record<string, number>>>(
+    {},
+  );
   const nextRunId = useRef(1);
 
   const activeDraft = getDraft(activeTab, drafts);
@@ -98,6 +102,31 @@ export function useFirestoreTabState(
     ? messageFromError(queryDocumentResult.error)
     : messageFromError(queryResult.error);
 
+  const pendingPageReloadCount = activeTab?.kind === 'firestore-query'
+    ? pendingPageReloads[activeTab.id] ?? 0
+    : 0;
+  const loadedPageCount = queryResult.data?.pages.length ?? 0;
+
+  useEffect(() => {
+    if (
+      !activeTab || activeTab.kind !== 'firestore-query' || queryRequestIsDocument
+      || pendingPageReloadCount <= 1 || loadedPageCount === 0
+    ) {
+      return;
+    }
+    if (loadedPageCount >= pendingPageReloadCount || !queryResult.hasNextPage) {
+      setPendingPageReloads((current) => omitKey(current, activeTab.id));
+      return;
+    }
+    if (!queryResult.isFetchingNextPage) void queryResult.fetchNextPage();
+  }, [
+    activeTab,
+    loadedPageCount,
+    pendingPageReloadCount,
+    queryRequestIsDocument,
+    queryResult,
+  ]);
+
   function setDraft(draft: FirestoreQueryDraft) {
     if (!activeTab) return;
     setDrafts((current) => ({ ...current, [activeTab.id]: draft }));
@@ -115,13 +144,27 @@ export function useFirestoreTabState(
   }
 
   function runQuery(): string | null {
+    return submitQuery({ clearSelection: true });
+  }
+
+  function refreshQuery(): string | null {
+    const pagesToReload = Math.max(1, queryResult.data?.pages.length ?? 1);
+    const path = submitQuery({ clearSelection: false });
+    if (path && activeTab?.kind === 'firestore-query' && !queryRequestIsDocument) {
+      setPendingPageReloads((current) => ({ ...current, [activeTab.id]: pagesToReload }));
+    }
+    return path;
+  }
+
+  function submitQuery({ clearSelection }: { readonly clearSelection: boolean; }): string | null {
     if (!activeTab || activeTab.kind !== 'firestore-query' || !activeProject) return null;
     const nextQuery = draftToQuery(activeProject.id, activeDraft);
-    selectDocument(activeTab.id, null);
+    if (clearSelection) selectDocument(activeTab.id, null);
     setQueryRequests((current) => ({
       ...current,
       [activeTab.id]: { limit: activeDraft.limit, query: nextQuery, runId: nextRunId.current++ },
     }));
+    setPendingPageReloads((current) => omitKey(current, activeTab.id));
     tabActions.pushHistory(activeTab.id, activeDraft.path);
     tabActions.recordInteraction({
       activeTabId: activeTab.id,
@@ -178,6 +221,7 @@ export function useFirestoreTabState(
     openTab,
     openTabInNewTab,
     resetDraft,
+    refreshQuery,
     runQuery,
     selectDocument,
     setDraft,

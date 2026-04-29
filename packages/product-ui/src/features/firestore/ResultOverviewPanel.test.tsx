@@ -41,6 +41,30 @@ describe('ResultOverviewPanel', () => {
     expect(onCollapse).toHaveBeenCalledTimes(1);
   });
 
+  it('shows selection preview in tree view', () => {
+    render(
+      <ResultContextPanel
+        resultView='tree'
+        rows={[{
+          id: 'ord_1',
+          path: 'orders/ord_1',
+          data: { total: 10 },
+          hasSubcollections: false,
+        }]}
+        selectedDocument={{
+          id: 'ord_1',
+          path: 'orders/ord_1',
+          data: { total: 10 },
+          hasSubcollections: false,
+        }}
+        onCollapse={() => {}}
+      />,
+    );
+
+    expect(screen.getByText('Selection preview')).toBeTruthy();
+    expect(screen.getByText('orders/ord_1')).toBeTruthy();
+  });
+
   it('expands collapsed overview strip', () => {
     const onExpand = vi.fn();
 

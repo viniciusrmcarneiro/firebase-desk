@@ -67,6 +67,21 @@ describe('repo-mocks contract conformance', () => {
     expect(saved.path).toBe('orders/ord_saved');
     expect(await repo.getDocument('p', 'orders/ord_saved')).not.toBeNull();
 
+    await repo.saveDocument('p', 'orders/ord_fields', {
+      id: 'data-id',
+      path: 'data-path',
+      subcollections: 'data-subcollections',
+      'a.b': true,
+    });
+    await expect(repo.getDocument('p', 'orders/ord_fields')).resolves.toMatchObject({
+      data: {
+        id: 'data-id',
+        path: 'data-path',
+        subcollections: 'data-subcollections',
+        'a.b': true,
+      },
+    });
+
     await repo.saveDocument('p', 'objects/a', { value: { score: 2, toJSON: 'not callable' } });
     await repo.saveDocument('p', 'objects/b', { value: { score: 1 } });
     await expect(repo.runQuery({
