@@ -5,7 +5,11 @@ import type {
   SettingsRepository,
   SettingsSnapshot,
 } from '@firebase-desk/repo-contracts';
-import { DEFAULT_ACTIVITY_LOG_SETTINGS } from '@firebase-desk/repo-contracts';
+import {
+  DEFAULT_ACTIVITY_LOG_SETTINGS,
+  DEFAULT_FIRESTORE_WRITE_SETTINGS,
+  normalizeFirestoreWriteSettings,
+} from '@firebase-desk/repo-contracts';
 
 const DEFAULT_SNAPSHOT: SettingsSnapshot = {
   activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
@@ -16,6 +20,7 @@ const DEFAULT_SNAPSHOT: SettingsSnapshot = {
   hotkeyOverrides: {},
   resultTableLayouts: {},
   firestoreFieldCatalogs: {},
+  firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
 };
 
 export class MockSettingsRepository implements SettingsRepository {
@@ -43,6 +48,9 @@ export class MockSettingsRepository implements SettingsRepository {
       firestoreFieldCatalogs: patch.firestoreFieldCatalogs
         ? cloneFirestoreFieldCatalogs(patch.firestoreFieldCatalogs)
         : cloneFirestoreFieldCatalogs(this.snapshot.firestoreFieldCatalogs),
+      firestoreWrites: normalizeFirestoreWriteSettings(
+        patch.firestoreWrites ?? this.snapshot.firestoreWrites,
+      ),
     };
     return this.load();
   }
@@ -63,6 +71,7 @@ function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
     hotkeyOverrides: { ...snapshot.hotkeyOverrides },
     resultTableLayouts: cloneResultTableLayouts(snapshot.resultTableLayouts),
     firestoreFieldCatalogs: cloneFirestoreFieldCatalogs(snapshot.firestoreFieldCatalogs),
+    firestoreWrites: normalizeFirestoreWriteSettings(snapshot.firestoreWrites),
   };
 }
 

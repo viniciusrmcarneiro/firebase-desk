@@ -60,6 +60,8 @@ const api = {
       invoke('firestore.createDocument', request),
     saveDocument: (request: IpcRequest<'firestore.saveDocument'>) =>
       invoke('firestore.saveDocument', request),
+    updateDocumentFields: (request: IpcRequest<'firestore.updateDocumentFields'>) =>
+      invoke('firestore.updateDocumentFields', request),
     deleteDocument: (request: IpcRequest<'firestore.deleteDocument'>) =>
       invoke('firestore.deleteDocument', request),
   },

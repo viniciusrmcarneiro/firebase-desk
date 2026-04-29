@@ -4,6 +4,7 @@ import {
   DeleteDocumentRequestSchema,
   GenerateDocumentIdRequestSchema,
   SaveDocumentRequestSchema,
+  UpdateDocumentFieldsRequestSchema,
 } from './firestore.ts';
 
 describe('Firestore IPC schemas', () => {
@@ -84,6 +85,41 @@ describe('Firestore IPC schemas', () => {
         connectionId: 'emu',
         documentPath: 'orders/ord_1',
         options: { deleteSubcollectionPaths: ['orders/ord_1/events/evt_1'] },
+      })
+    ).toThrow();
+  });
+
+  it('validates field patch requests', () => {
+    expect(() =>
+      UpdateDocumentFieldsRequestSchema.parse({
+        connectionId: 'emu',
+        documentPath: 'orders/ord_1',
+        operations: [
+          {
+            baseValue: 'draft',
+            fieldPath: ['status'],
+            type: 'set',
+            value: 'paid',
+          },
+          {
+            baseValue: true,
+            fieldPath: ['metadata', 'obsolete'],
+            type: 'delete',
+          },
+        ],
+        options: {
+          lastUpdateTime: '2026-04-29T00:00:00.000Z',
+          staleBehavior: 'save-and-notify',
+        },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      UpdateDocumentFieldsRequestSchema.parse({
+        connectionId: 'emu',
+        documentPath: 'orders/ord_1',
+        operations: [{ fieldPath: ['__bad__'], type: 'set', value: 1 }],
+        options: { staleBehavior: 'block' },
       })
     ).toThrow();
   });

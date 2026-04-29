@@ -2,9 +2,11 @@ import { type AppearanceMode, type DensityName } from '@firebase-desk/design-tok
 import type {
   ActivityLogDetailMode,
   DataMode,
+  FirestoreFieldStaleBehavior,
   SettingsPatch,
   SettingsSnapshot,
 } from '@firebase-desk/repo-contracts';
+import { normalizeFirestoreWriteSettings } from '@firebase-desk/repo-contracts';
 import { Button, Dialog, DialogContent, InlineAlert, Input } from '@firebase-desk/ui';
 import { FolderOpen } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
@@ -24,6 +26,11 @@ const modes: ReadonlyArray<AppearanceMode> = ['system', 'light', 'dark'];
 const dataModes: ReadonlyArray<DataMode> = ['live', 'mock'];
 const densities: ReadonlyArray<DensityName> = ['compact', 'comfortable'];
 const activityDetailModes: ReadonlyArray<ActivityLogDetailMode> = ['metadata', 'fullPayload'];
+const fieldStaleBehaviors: ReadonlyArray<FirestoreFieldStaleBehavior> = [
+  'save-and-notify',
+  'confirm',
+  'block',
+];
 const BYTES_PER_MB = 1024 * 1024;
 
 export function SettingsDialog(
@@ -105,9 +112,36 @@ export function SettingsDialog(
     }
   }
 
+  async function handleFirestoreWritesChange(
+    patch: Partial<SettingsSnapshot['firestoreWrites']>,
+  ) {
+    const currentSnapshot = settingsSnapshotRef.current ?? settingsSnapshot;
+    if (!currentSnapshot) return;
+    setSettingsError(null);
+    const firestoreWrites = {
+      ...normalizeFirestoreWriteSettings(currentSnapshot.firestoreWrites),
+      ...patch,
+    };
+    const patchToSave = { firestoreWrites };
+    const optimisticSnapshot = { ...currentSnapshot, firestoreWrites };
+    applySettingsSnapshot(optimisticSnapshot);
+    try {
+      const next = await appearance.settings.save(patchToSave);
+      applySettingsSnapshot(next);
+      onSettingsSaved?.(patchToSave, next);
+    } catch (caught) {
+      applySettingsSnapshot(currentSnapshot);
+      setSettingsError(messageFromError(caught, 'Could not save settings.'));
+    }
+  }
+
   function applySettingsSnapshot(snapshot: SettingsSnapshot) {
-    settingsSnapshotRef.current = snapshot;
-    setSettingsSnapshot(snapshot);
+    const normalizedSnapshot = {
+      ...snapshot,
+      firestoreWrites: normalizeFirestoreWriteSettings(snapshot.firestoreWrites),
+    };
+    settingsSnapshotRef.current = normalizedSnapshot;
+    setSettingsSnapshot(normalizedSnapshot);
   }
 
   function handleActivityRetentionBlur() {
@@ -217,6 +251,30 @@ export function SettingsDialog(
             </div>
           )
           : null}
+        {settingsSnapshot
+          ? (
+            <div className='grid gap-2'>
+              <div className='text-sm font-medium text-text-primary'>Firestore writes</div>
+              <select
+                aria-label='Stale field edits'
+                className='h-[var(--density-compact-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
+                value={normalizeFirestoreWriteSettings(settingsSnapshot.firestoreWrites)
+                  .fieldStaleBehavior}
+                onChange={(event) =>
+                  void handleFirestoreWritesChange({
+                    fieldStaleBehavior: event.currentTarget.value as FirestoreFieldStaleBehavior,
+                  })}
+              >
+                {fieldStaleBehaviors.map((behavior) => (
+                  <option key={behavior} value={behavior}>{behavior}</option>
+                ))}
+              </select>
+              <div className='text-xs text-text-secondary'>
+                Controls field edits when the document changed elsewhere.
+              </div>
+            </div>
+          )
+          : null}
         {density && onDensityChange
           ? (
             <div className='grid gap-2'>
@@ -309,6 +367,10 @@ function SettingsSummary({ snapshot }: { readonly snapshot: SettingsSnapshot | n
         value={`${snapshot.activityLog.detailMode}, ${
           formatMegabytes(snapshot.activityLog.maxBytes)
         } MB`}
+      />
+      <SettingRow
+        label='Field stale edits'
+        value={normalizeFirestoreWriteSettings(snapshot.firestoreWrites).fieldStaleBehavior}
       />
       <SettingRow
         label='Hotkeys'

@@ -28,8 +28,11 @@ import type {
   AuthUser,
   FirestoreCollectionNode,
   FirestoreDocumentResult,
+  FirestoreFieldPatchOperation,
   FirestoreSaveDocumentOptions,
   FirestoreSaveDocumentResult,
+  FirestoreUpdateDocumentFieldsOptions,
+  FirestoreUpdateDocumentFieldsResult,
   ProjectAddInput,
   ProjectSummary,
   ProjectUpdatePatch,
@@ -887,6 +890,8 @@ export function AppShell(
         onRunQuery={handleRunQuery}
         onRunScript={handleRunScript}
         onSaveDocument={(path, data, options) => handleSaveDocument(path, data, options)}
+        onUpdateDocumentFields={(path, operations, options) =>
+          handleUpdateDocumentFields(path, operations, options)}
         onSaveUserCustomClaims={handleSaveUserCustomClaims}
         onScriptChange={jsTab.setScriptSource}
         onSelectDocument={(path) => firestoreTab.selectDocument(activeTab.id, path)}
@@ -1149,6 +1154,103 @@ export function AppShell(
           ...documentDataMetadata(data),
         },
         payload: { data },
+        status: 'failure',
+        summary: message,
+        target: {
+          connectionId: activeProject.id,
+          path: documentPath,
+          projectId: activeProject.projectId,
+          type: 'firestore-document',
+        },
+      });
+      throw error instanceof Error ? error : new Error(message);
+    }
+  }
+
+  async function handleUpdateDocumentFields(
+    documentPath: string,
+    operations: ReadonlyArray<FirestoreFieldPatchOperation>,
+    options: FirestoreUpdateDocumentFieldsOptions,
+  ): Promise<FirestoreUpdateDocumentFieldsResult | void> {
+    if (!activeProject) return;
+    const startedAt = Date.now();
+    try {
+      const result = await repositories.firestore.updateDocumentFields(
+        activeProject.id,
+        documentPath,
+        operations,
+        options,
+      );
+      if (result.status === 'conflict' || result.status === 'document-changed') {
+        const status = result.status === 'conflict' ? 'conflict' : 'success';
+        setLastAction(`${fieldPatchStatusLabel(result.status)}: ${documentPath}`);
+        recordActivity({
+          action: 'Update fields',
+          area: 'firestore',
+          durationMs: elapsedMs(startedAt),
+          metadata: {
+            classification: result.status,
+            lastUpdateTime: options.lastUpdateTime ?? null,
+            remoteUpdateTime: result.remoteDocument?.updateTime ?? null,
+            staleBehavior: options.staleBehavior,
+            ...fieldPatchMetadata(operations),
+          },
+          payload: { operations },
+          status,
+          summary: `${fieldPatchStatusLabel(result.status)} on ${documentPath}`,
+          target: {
+            connectionId: activeProject.id,
+            path: documentPath,
+            projectId: activeProject.projectId,
+            type: 'firestore-document',
+          },
+        });
+        return result;
+      }
+      if (dataMode !== 'mock') await queryClient.invalidateQueries({ queryKey: ['firestore'] });
+      setLastAction(
+        result.documentChanged
+          ? `Saved ${result.document.path}; document changed elsewhere`
+          : `Saved ${result.document.path}`,
+      );
+      recordActivity({
+        action: 'Update fields',
+        area: 'firestore',
+        durationMs: elapsedMs(startedAt),
+        metadata: {
+          classification: result.documentChanged ? 'document-changed-saved' : 'saved',
+          lastUpdateTime: options.lastUpdateTime ?? null,
+          staleBehavior: options.staleBehavior,
+          updateTime: result.document.updateTime ?? null,
+          ...fieldPatchMetadata(operations),
+        },
+        payload: { operations },
+        status: 'success',
+        summary: result.documentChanged
+          ? `Saved ${result.document.path}; document changed elsewhere`
+          : `Saved ${result.document.path}`,
+        target: {
+          connectionId: activeProject.id,
+          path: result.document.path,
+          projectId: activeProject.projectId,
+          type: 'firestore-document',
+        },
+      });
+      return result;
+    } catch (error) {
+      const message = messageFromError(error, 'Could not update fields.');
+      setLastAction(`Field update failed: ${message}`);
+      recordActivity({
+        action: 'Update fields',
+        area: 'firestore',
+        durationMs: elapsedMs(startedAt),
+        error: { message },
+        metadata: {
+          lastUpdateTime: options.lastUpdateTime ?? null,
+          staleBehavior: options.staleBehavior,
+          ...fieldPatchMetadata(operations),
+        },
+        payload: { operations },
         status: 'failure',
         summary: message,
         target: {
@@ -1839,6 +1941,14 @@ interface TabViewProps {
     data: Record<string, unknown>,
     options?: FirestoreSaveDocumentOptions,
   ) => Promise<FirestoreSaveDocumentResult | void> | FirestoreSaveDocumentResult | void;
+  readonly onUpdateDocumentFields: (
+    documentPath: string,
+    operations: ReadonlyArray<FirestoreFieldPatchOperation>,
+    options: FirestoreUpdateDocumentFieldsOptions,
+  ) =>
+    | Promise<FirestoreUpdateDocumentFieldsResult | void>
+    | FirestoreUpdateDocumentFieldsResult
+    | void;
   readonly onSaveUserCustomClaims: (
     uid: string,
     claims: Record<string, unknown>,
@@ -1921,6 +2031,7 @@ function TabView(props: TabViewProps) {
       onRefreshResults={props.onRefreshResults}
       onRun={props.onRunQuery}
       onSaveDocument={props.onSaveDocument}
+      onUpdateDocumentFields={props.onUpdateDocumentFields}
       onSelectDocument={props.onSelectDocument}
     />
   );
@@ -2007,6 +2118,26 @@ function documentDataMetadata(data: Record<string, unknown>): Record<string, unk
   };
 }
 
+function fieldPatchMetadata(
+  operations: ReadonlyArray<FirestoreFieldPatchOperation>,
+): Record<string, unknown> {
+  return {
+    operationCount: operations.length,
+    operations: operations.map((operation) => ({
+      fieldPath: operation.fieldPath,
+      type: operation.type,
+      ...(operation.type === 'set' ? { valueType: valueKind(operation.value) } : {}),
+    })),
+    writeMode: 'field-patch',
+  };
+}
+
+function fieldPatchStatusLabel(
+  status: 'conflict' | 'document-changed',
+): string {
+  return status === 'conflict' ? 'Field conflict' : 'Document changed elsewhere';
+}
+
 function valueKind(value: unknown): string {
   if (value === null) return 'null';
   if (Array.isArray(value)) return 'array';
@@ -2040,11 +2171,19 @@ function settingsPatchMetadata(patch: SettingsPatch): Record<string, unknown> {
         },
       }
       : {}),
+    ...(patch.firestoreWrites
+      ? {
+        firestoreWrites: {
+          fieldStaleBehavior: patch.firestoreWrites.fieldStaleBehavior,
+        },
+      }
+      : {}),
   };
 }
 
 function settingsPatchSummary(patch: SettingsPatch): string {
   if (patch.dataMode) return `Data mode changed to ${patch.dataMode}`;
   if (patch.activityLog) return 'Activity settings changed';
+  if (patch.firestoreWrites) return 'Firestore write settings changed';
   return 'Settings changed';
 }

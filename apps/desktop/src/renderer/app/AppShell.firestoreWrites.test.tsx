@@ -13,7 +13,7 @@ import {
 import { selectionActions, selectionStore } from './stores/selectionStore.ts';
 import { tabActions } from './stores/tabsStore.ts';
 
-type MockSurfaceAction = 'create' | 'delete' | 'save';
+type MockSurfaceAction = 'create' | 'delete' | 'patch' | 'save';
 
 interface MockSurfaceProps {
   readonly onCreateDocument?: (
@@ -32,6 +32,16 @@ interface MockSurfaceProps {
     documentPath: string,
     data: Record<string, unknown>,
     options?: { readonly lastUpdateTime?: string; },
+  ) => Promise<unknown> | unknown;
+  readonly onUpdateDocumentFields?: (
+    documentPath: string,
+    operations: ReadonlyArray<{
+      readonly baseValue: unknown;
+      readonly fieldPath: ReadonlyArray<string>;
+      readonly type: 'delete' | 'set';
+      readonly value?: unknown;
+    }>,
+    options: { readonly lastUpdateTime?: string; readonly staleBehavior: 'save-and-notify'; },
   ) => Promise<unknown> | unknown;
 }
 
@@ -61,6 +71,15 @@ vi.mock('@firebase-desk/product-ui', async (importOriginal) => {
                 deleteDescendantDocumentPaths: ['orders/ord_1024/events/event_1'],
                 deleteSubcollectionPaths: ['orders/ord_1024/events'],
               });
+              return;
+            }
+            if (surfaceState.action === 'patch') {
+              void props.onUpdateDocumentFields?.('orders/ord_1024', [{
+                baseValue: 'draft',
+                fieldPath: ['status'],
+                type: 'set',
+                value: 'paid',
+              }], { staleBehavior: 'save-and-notify' });
               return;
             }
             void props.onSaveDocument?.('orders/ord_1024', { status: 'paid' });
@@ -200,6 +219,34 @@ describe('desktop AppShell Firestore writes', () => {
       expect(createDocument).toHaveBeenCalledWith('emu', 'orders', 'ord_created', {
         status: 'new',
       })
+    );
+    await waitFor(() =>
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['firestore'] })
+    );
+  });
+
+  it('updates Firestore fields through patch writes and invalidates live Firestore queries', async () => {
+    surfaceState.action = 'patch';
+    const repositories = createMockRepositories();
+    const updateDocumentFields = vi.spyOn(repositories.firestore, 'updateDocumentFields');
+    const { queryClient } = renderShell({ dataMode: 'live', repositories });
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+
+    await waitFor(() => expect(screen.getAllByText('Local Emulator').length).toBeGreaterThan(0));
+    fireEvent.click(await screen.findByRole('button', { name: 'Trigger Firestore write' }));
+
+    await waitFor(() =>
+      expect(updateDocumentFields).toHaveBeenCalledWith(
+        'emu',
+        'orders/ord_1024',
+        [{
+          baseValue: 'draft',
+          fieldPath: ['status'],
+          type: 'set',
+          value: 'paid',
+        }],
+        { staleBehavior: 'save-and-notify' },
+      )
     );
     await waitFor(() =>
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['firestore'] })

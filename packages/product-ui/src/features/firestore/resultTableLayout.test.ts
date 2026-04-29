@@ -1,5 +1,6 @@
 import {
   DEFAULT_ACTIVITY_LOG_SETTINGS,
+  DEFAULT_FIRESTORE_WRITE_SETTINGS,
   type SettingsRepository,
   type SettingsSnapshot,
 } from '@firebase-desk/repo-contracts';
@@ -12,6 +13,7 @@ const settingsSnapshot: SettingsSnapshot = {
   activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
   dataMode: 'mock',
   firestoreFieldCatalogs: {},
+  firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
   hotkeyOverrides: {},
   inspectorWidth: 360,
   resultTableLayouts: {},

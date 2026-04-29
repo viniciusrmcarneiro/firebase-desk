@@ -1,6 +1,8 @@
 import {
   DEFAULT_ACTIVITY_LOG_SETTINGS,
+  DEFAULT_FIRESTORE_WRITE_SETTINGS,
   FIRESTORE_ARRAY_FIELD_TYPES,
+  FIRESTORE_FIELD_STALE_BEHAVIORS,
   FIRESTORE_PRIMITIVE_FIELD_TYPES,
 } from '@firebase-desk/repo-contracts';
 import { z } from 'zod';
@@ -35,6 +37,10 @@ export const FirestoreFieldCatalogsSchema = z.record(
   z.array(FirestoreFieldCatalogEntrySchema),
 );
 
+export const FirestoreWriteSettingsSchema = z.object({
+  fieldStaleBehavior: z.enum(FIRESTORE_FIELD_STALE_BEHAVIORS),
+});
+
 export const SettingsSnapshotSchema = z.object({
   activityLog: ActivityLogSettingsSchema.default(DEFAULT_ACTIVITY_LOG_SETTINGS),
   sidebarWidth: z.number().int().nonnegative(),
@@ -44,10 +50,19 @@ export const SettingsSnapshotSchema = z.object({
   hotkeyOverrides: HotkeyOverridesSchema,
   resultTableLayouts: ResultTableLayoutsSchema.default({}),
   firestoreFieldCatalogs: FirestoreFieldCatalogsSchema.default({}),
+  firestoreWrites: FirestoreWriteSettingsSchema.default(DEFAULT_FIRESTORE_WRITE_SETTINGS),
 });
 
-export const SettingsPatchSchema = SettingsSnapshotSchema.partial().extend({
+export const SettingsPatchSchema = z.object({
   activityLog: ActivityLogSettingsSchema.optional(),
+  sidebarWidth: z.number().int().nonnegative().optional(),
+  inspectorWidth: z.number().int().nonnegative().optional(),
+  theme: z.enum(['system', 'light', 'dark']).optional(),
+  dataMode: DataModeSchema.optional(),
+  hotkeyOverrides: HotkeyOverridesSchema.optional(),
+  resultTableLayouts: ResultTableLayoutsSchema.optional(),
+  firestoreFieldCatalogs: FirestoreFieldCatalogsSchema.optional(),
+  firestoreWrites: FirestoreWriteSettingsSchema.optional(),
 });
 
 export const SettingsFileSchema = z.object({

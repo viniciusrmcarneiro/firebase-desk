@@ -1,4 +1,7 @@
-import { DEFAULT_ACTIVITY_LOG_SETTINGS } from '@firebase-desk/repo-contracts';
+import {
+  DEFAULT_ACTIVITY_LOG_SETTINGS,
+  DEFAULT_FIRESTORE_WRITE_SETTINGS,
+} from '@firebase-desk/repo-contracts';
 import { describe, expect, it } from 'vitest';
 import { SettingsFileSchema, SettingsPatchSchema } from './settings.ts';
 
@@ -17,15 +20,22 @@ describe('settings schemas', () => {
       }).snapshot,
     ).toMatchObject({
       activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
+      firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
       resultTableLayouts: {},
     });
   });
 
   it('does not default activity settings in patches', () => {
-    expect(SettingsPatchSchema.parse({ sidebarWidth: 400 })).toEqual({
-      sidebarWidth: 400,
-      resultTableLayouts: {},
-      firestoreFieldCatalogs: {},
+    expect(SettingsPatchSchema.parse({ sidebarWidth: 400 })).toEqual({ sidebarWidth: 400 });
+  });
+
+  it('validates firestore write settings in patches', () => {
+    expect(
+      SettingsPatchSchema.parse({
+        firestoreWrites: { fieldStaleBehavior: 'block' },
+      }),
+    ).toEqual({
+      firestoreWrites: { fieldStaleBehavior: 'block' },
     });
   });
 
@@ -46,7 +56,6 @@ describe('settings schemas', () => {
           columnSizing: { team: 220 },
         },
       },
-      firestoreFieldCatalogs: {},
     });
   });
 
@@ -60,7 +69,6 @@ describe('settings schemas', () => {
         },
       }),
     ).toEqual({
-      resultTableLayouts: {},
       firestoreFieldCatalogs: {
         'orders/skiers': [
           { count: 2, field: 'profile.age', types: ['number', 'array<string>'] },

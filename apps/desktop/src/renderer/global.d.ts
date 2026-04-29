@@ -76,6 +76,9 @@ declare global {
     readonly saveDocument: (
       request: IpcRequest<'firestore.saveDocument'>,
     ) => Promise<IpcResponse<'firestore.saveDocument'>>;
+    readonly updateDocumentFields: (
+      request: IpcRequest<'firestore.updateDocumentFields'>,
+    ) => Promise<IpcResponse<'firestore.updateDocumentFields'>>;
     readonly deleteDocument: (
       request: IpcRequest<'firestore.deleteDocument'>,
     ) => Promise<IpcResponse<'firestore.deleteDocument'>>;

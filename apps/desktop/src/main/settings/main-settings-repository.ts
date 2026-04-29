@@ -5,6 +5,7 @@ import type {
   SettingsRepository,
   SettingsSnapshot,
 } from '@firebase-desk/repo-contracts';
+import { normalizeFirestoreWriteSettings } from '@firebase-desk/repo-contracts';
 
 interface SettingsStoreLike {
   readonly load: () => Promise<SettingsSnapshot>;
@@ -41,6 +42,9 @@ export class MainSettingsRepository implements SettingsRepository {
       firestoreFieldCatalogs: patch.firestoreFieldCatalogs
         ? cloneFirestoreFieldCatalogs(patch.firestoreFieldCatalogs)
         : cloneFirestoreFieldCatalogs(current.firestoreFieldCatalogs),
+      firestoreWrites: normalizeFirestoreWriteSettings(
+        patch.firestoreWrites ?? current.firestoreWrites,
+      ),
     });
   }
 

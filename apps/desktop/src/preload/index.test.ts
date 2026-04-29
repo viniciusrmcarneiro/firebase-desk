@@ -83,6 +83,16 @@ describe('preload script runner api', () => {
           updateTime: '2026-04-29T00:00:00.000Z',
         },
       })
+      .mockResolvedValueOnce({
+        status: 'saved',
+        document: {
+          id: 'ord_1',
+          path: 'orders/ord_1',
+          data: { status: 'shipped' },
+          hasSubcollections: false,
+          updateTime: '2026-04-29T00:00:01.000Z',
+        },
+      })
       .mockResolvedValueOnce(undefined);
 
     await expect(api.firestore.generateDocumentId({
@@ -100,6 +110,17 @@ describe('preload script runner api', () => {
       documentPath: 'orders/ord_1',
       data: { status: 'paid' },
       options: { lastUpdateTime: '2026-04-29T00:00:00.000Z' },
+    })).resolves.toMatchObject({ status: 'saved', document: { id: 'ord_1' } });
+    await expect(api.firestore.updateDocumentFields({
+      connectionId: 'emu',
+      documentPath: 'orders/ord_1',
+      operations: [
+        { baseValue: 'paid', fieldPath: ['status'], type: 'set', value: 'shipped' },
+      ],
+      options: {
+        lastUpdateTime: '2026-04-29T00:00:00.000Z',
+        staleBehavior: 'save-and-notify',
+      },
     })).resolves.toMatchObject({ status: 'saved', document: { id: 'ord_1' } });
     await expect(api.firestore.deleteDocument({
       connectionId: 'emu',
@@ -122,6 +143,17 @@ describe('preload script runner api', () => {
       documentPath: 'orders/ord_1',
       data: { status: 'paid' },
       options: { lastUpdateTime: '2026-04-29T00:00:00.000Z' },
+    });
+    expect(electronMocks.invoke).toHaveBeenCalledWith('firestore.updateDocumentFields', {
+      connectionId: 'emu',
+      documentPath: 'orders/ord_1',
+      operations: [
+        { baseValue: 'paid', fieldPath: ['status'], type: 'set', value: 'shipped' },
+      ],
+      options: {
+        lastUpdateTime: '2026-04-29T00:00:00.000Z',
+        staleBehavior: 'save-and-notify',
+      },
     });
     expect(electronMocks.invoke).toHaveBeenCalledWith('firestore.deleteDocument', {
       connectionId: 'emu',

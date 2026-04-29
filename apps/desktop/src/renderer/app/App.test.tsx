@@ -61,6 +61,7 @@ describe('desktop App', () => {
       hotkeyOverrides: {},
       resultTableLayouts: {},
       firestoreFieldCatalogs: {},
+      firestoreWrites: { fieldStaleBehavior: 'save-and-notify' },
     });
 
     render(<App />);

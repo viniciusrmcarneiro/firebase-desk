@@ -1,7 +1,13 @@
+import { FIRESTORE_FIELD_STALE_BEHAVIORS } from '@firebase-desk/repo-contracts';
 import { z } from 'zod';
 import { pageOf, PageRequestSchema } from './pagination.ts';
 
 const PathSegmentSchema = z.string().min(1);
+const FieldPathSegmentSchema = PathSegmentSchema.refine((value) => !/^__.*__$/.test(value), {
+  message: 'Field path segments cannot match __.*__.',
+}).refine((value) => utf8ByteLength(value) <= 1500, {
+  message: 'Field path segments must be 1,500 bytes or less.',
+});
 const DocumentPathSchema = z.string().refine((path) => isDocumentPath(path), {
   message: 'Document path must have an even number of path segments.',
 });
@@ -109,6 +115,25 @@ export const FirestoreSaveDocumentOptionsSchema = z.object({
   lastUpdateTime: z.string().min(1).optional(),
 });
 
+export const FirestoreUpdateDocumentFieldsOptionsSchema = z.object({
+  lastUpdateTime: z.string().min(1).optional(),
+  staleBehavior: z.enum(FIRESTORE_FIELD_STALE_BEHAVIORS),
+});
+
+export const FirestoreFieldPatchOperationSchema = z.discriminatedUnion('type', [
+  z.object({
+    baseValue: FirestoreEncodedValueSchema.optional(),
+    fieldPath: z.array(FieldPathSegmentSchema).min(1),
+    type: z.literal('delete'),
+  }),
+  z.object({
+    baseValue: FirestoreEncodedValueSchema.optional(),
+    fieldPath: z.array(FieldPathSegmentSchema).min(1),
+    type: z.literal('set'),
+    value: FirestoreEncodedValueSchema,
+  }),
+]);
+
 export const FirestoreGeneratedDocumentIdSchema = z.object({
   documentId: DocumentIdSchema,
 });
@@ -117,6 +142,22 @@ export const FirestoreSaveDocumentResultSchema = z.discriminatedUnion('status', 
   z.object({
     status: z.literal('saved'),
     document: FirestoreDocumentResultSchema,
+  }),
+  z.object({
+    status: z.literal('conflict'),
+    remoteDocument: FirestoreDocumentResultSchema.nullable(),
+  }),
+]);
+
+export const FirestoreUpdateDocumentFieldsResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('saved'),
+    document: FirestoreDocumentResultSchema,
+    documentChanged: z.boolean().optional(),
+  }),
+  z.object({
+    status: z.literal('document-changed'),
+    remoteDocument: FirestoreDocumentResultSchema.nullable(),
   }),
   z.object({
     status: z.literal('conflict'),
@@ -140,6 +181,13 @@ export const SaveDocumentRequestSchema = z.object({
   documentPath: DocumentPathSchema,
   data: FirestoreDocumentDataSchema,
   options: FirestoreSaveDocumentOptionsSchema.optional(),
+});
+
+export const UpdateDocumentFieldsRequestSchema = z.object({
+  connectionId: z.string(),
+  documentPath: DocumentPathSchema,
+  operations: z.array(FirestoreFieldPatchOperationSchema).min(1),
+  options: FirestoreUpdateDocumentFieldsOptionsSchema,
 });
 
 export const GenerateDocumentIdRequestSchema = z.object({
@@ -182,4 +230,17 @@ function pathSegments(path: string): ReadonlyArray<string> {
 function isBase64(value: string): boolean {
   if (value === '') return true;
   return /^[A-Za-z0-9+/]+={0,2}$/.test(value) && value.length % 4 === 0;
+}
+
+function utf8ByteLength(value: string): number {
+  let bytes = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const codePoint = value.codePointAt(index) ?? 0;
+    if (codePoint > 0xffff) index += 1;
+    if (codePoint <= 0x7f) bytes += 1;
+    else if (codePoint <= 0x7ff) bytes += 2;
+    else if (codePoint <= 0xffff) bytes += 3;
+    else bytes += 4;
+  }
+  return bytes;
 }

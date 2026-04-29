@@ -10,7 +10,9 @@ import type {
   FirestoreCollectionNode,
   FirestoreDocumentNode,
   FirestoreDocumentResult,
+  FirestoreFieldPatchOperation,
   FirestoreQuery,
+  FirestoreRepository,
   FirestoreSaveDocumentOptions,
   FirestoreSaveDocumentResult,
   Page,
@@ -178,6 +180,20 @@ export function registerIpcHandlers(): void {
           toSaveDocumentOptions(options),
         ),
       ),
+    'firestore.updateDocumentFields': async (
+      { connectionId, documentPath, operations, options },
+    ) =>
+      toIpcUpdateDocumentFieldsResult(
+        await firestoreRepository.updateDocumentFields(
+          connectionId,
+          documentPath,
+          operations.map(toFieldPatchOperation),
+          {
+            staleBehavior: options.staleBehavior,
+            ...(options.lastUpdateTime ? { lastUpdateTime: options.lastUpdateTime } : {}),
+          },
+        ),
+      ),
     'firestore.deleteDocument': async ({ connectionId, documentPath, options }) => {
       await firestoreRepository.deleteDocument(connectionId, documentPath, options);
     },
@@ -319,6 +335,23 @@ function toSaveDocumentOptions(
   return options?.lastUpdateTime ? { lastUpdateTime: options.lastUpdateTime } : undefined;
 }
 
+function toFieldPatchOperation(
+  operation: IpcRequest<'firestore.updateDocumentFields'>['operations'][number],
+): FirestoreFieldPatchOperation {
+  return operation.type === 'delete'
+    ? {
+      baseValue: operation.baseValue,
+      fieldPath: operation.fieldPath,
+      type: 'delete',
+    }
+    : {
+      baseValue: operation.baseValue,
+      fieldPath: operation.fieldPath,
+      type: 'set',
+      value: operation.value,
+    };
+}
+
 function toIpcResultPage(
   page: Page<FirestoreDocumentResult>,
 ): IpcResponse<'firestore.runQuery'> {
@@ -353,6 +386,22 @@ function toIpcSaveDocumentResult(
     };
   }
   return { status: 'saved', document: toIpcDocumentResult(result.document) };
+}
+
+function toIpcUpdateDocumentFieldsResult(
+  result: Awaited<ReturnType<FirestoreRepository['updateDocumentFields']>>,
+): IpcResponse<'firestore.updateDocumentFields'> {
+  if (result.status === 'conflict' || result.status === 'document-changed') {
+    return {
+      status: result.status,
+      remoteDocument: result.remoteDocument ? toIpcDocumentResult(result.remoteDocument) : null,
+    };
+  }
+  return {
+    status: 'saved',
+    document: toIpcDocumentResult(result.document),
+    ...(result.documentChanged ? { documentChanged: true } : {}),
+  };
 }
 
 function toIpcScriptRunResult(result: ScriptRunResult): IpcResponse<'scriptRunner.run'> {

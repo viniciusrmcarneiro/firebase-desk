@@ -21,10 +21,12 @@ import {
   FirestoreGeneratedDocumentIdSchema,
   FirestoreResultsPageSchema,
   FirestoreSaveDocumentResultSchema,
+  FirestoreUpdateDocumentFieldsResultSchema,
   GenerateDocumentIdRequestSchema,
   ListDocumentsRequestSchema,
   RunQueryRequestSchema,
   SaveDocumentRequestSchema,
+  UpdateDocumentFieldsRequestSchema,
 } from './firestore.ts';
 import { HealthCheckRequestSchema, HealthCheckResponseSchema } from './health.ts';
 import {
@@ -135,6 +137,10 @@ export const IPC_CHANNELS = {
   'firestore.saveDocument': {
     request: SaveDocumentRequestSchema,
     response: FirestoreSaveDocumentResultSchema,
+  },
+  'firestore.updateDocumentFields': {
+    request: UpdateDocumentFieldsRequestSchema,
+    response: FirestoreUpdateDocumentFieldsResultSchema,
   },
   'firestore.deleteDocument': {
     request: DeleteDocumentRequestSchema,

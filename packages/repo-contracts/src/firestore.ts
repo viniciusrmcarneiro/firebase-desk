@@ -1,4 +1,5 @@
 import type { Page, PageRequest } from './pagination.ts';
+import type { FirestoreFieldStaleBehavior } from './settings.ts';
 
 export interface FirestoreCollectionNode {
   readonly path: string;
@@ -63,6 +64,24 @@ export interface FirestoreSaveDocumentOptions {
   readonly lastUpdateTime?: string;
 }
 
+export interface FirestoreUpdateDocumentFieldsOptions {
+  readonly lastUpdateTime?: string;
+  readonly staleBehavior: FirestoreFieldStaleBehavior;
+}
+
+export type FirestoreFieldPatchOperation =
+  | {
+    readonly baseValue: unknown;
+    readonly fieldPath: ReadonlyArray<string>;
+    readonly type: 'delete';
+  }
+  | {
+    readonly baseValue: unknown;
+    readonly fieldPath: ReadonlyArray<string>;
+    readonly type: 'set';
+    readonly value: unknown;
+  };
+
 export type FirestoreSaveDocumentResult =
   | {
     readonly status: 'saved';
@@ -71,6 +90,21 @@ export type FirestoreSaveDocumentResult =
   | {
     readonly status: 'conflict';
     readonly remoteDocument: FirestoreDocumentResult | null;
+  };
+
+export type FirestoreUpdateDocumentFieldsResult =
+  | {
+    readonly document: FirestoreDocumentResult;
+    readonly documentChanged?: boolean;
+    readonly status: 'saved';
+  }
+  | {
+    readonly remoteDocument: FirestoreDocumentResult | null;
+    readonly status: 'document-changed';
+  }
+  | {
+    readonly remoteDocument: FirestoreDocumentResult | null;
+    readonly status: 'conflict';
   };
 
 export interface FirestoreRepository {
@@ -105,6 +139,12 @@ export interface FirestoreRepository {
     data: Record<string, unknown>,
     options?: FirestoreSaveDocumentOptions,
   ): Promise<FirestoreSaveDocumentResult>;
+  updateDocumentFields(
+    connectionId: string,
+    documentPath: string,
+    operations: ReadonlyArray<FirestoreFieldPatchOperation>,
+    options: FirestoreUpdateDocumentFieldsOptions,
+  ): Promise<FirestoreUpdateDocumentFieldsResult>;
   deleteDocument(
     connectionId: string,
     documentPath: string,

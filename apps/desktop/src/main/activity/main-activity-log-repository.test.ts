@@ -144,6 +144,7 @@ class MemorySettingsRepository implements SettingsRepository {
       ...(patch.firestoreFieldCatalogs
         ? { firestoreFieldCatalogs: patch.firestoreFieldCatalogs }
         : {}),
+      ...(patch.firestoreWrites ? { firestoreWrites: patch.firestoreWrites } : {}),
       ...(patch.hotkeyOverrides ? { hotkeyOverrides: patch.hotkeyOverrides } : {}),
       ...(patch.inspectorWidth === undefined ? {} : { inspectorWidth: patch.inspectorWidth }),
       ...(patch.resultTableLayouts ? { resultTableLayouts: patch.resultTableLayouts } : {}),

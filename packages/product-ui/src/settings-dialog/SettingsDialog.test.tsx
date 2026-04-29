@@ -1,3 +1,4 @@
+import type { SettingsRepository, SettingsSnapshot } from '@firebase-desk/repo-contracts';
 import { MockSettingsRepository } from '@firebase-desk/repo-mocks';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -120,6 +121,53 @@ describe('SettingsDialog', () => {
       )
     );
     expect(onSettingsSaved).toHaveBeenCalled();
+  });
+
+  it('updates Firestore stale field write behavior', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    const onSettingsSaved = vi.fn();
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} onSettingsSaved={onSettingsSaved} />
+      </AppearanceProvider>,
+    );
+
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Stale field edits' }), {
+      target: { value: 'block' },
+    });
+
+    await waitFor(async () =>
+      expect((await settings.load()).firestoreWrites.fieldStaleBehavior).toBe('block')
+    );
+    expect(onSettingsSaved).toHaveBeenCalled();
+  });
+
+  it('defaults Firestore write settings for older saved settings', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = createLegacySettingsRepository();
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    const select = await screen.findByRole('combobox', { name: 'Stale field edits' });
+    expect((select as HTMLSelectElement).value).toBe('save-and-notify');
   });
 
   it('keeps full payload detail when another activity setting saves before rerender', async () => {
@@ -299,3 +347,16 @@ describe('SettingsDialog', () => {
     expect(screen.getByText('About')).toBeTruthy();
   });
 });
+
+function createLegacySettingsRepository(): SettingsRepository {
+  const delegate = new MockSettingsRepository();
+  return {
+    async load() {
+      const { firestoreWrites: _firestoreWrites, ...snapshot } = await delegate.load();
+      return snapshot as unknown as SettingsSnapshot;
+    },
+    save: (patch) => delegate.save(patch),
+    getHotkeyOverrides: () => delegate.getHotkeyOverrides(),
+    setHotkeyOverrides: (overrides) => delegate.setHotkeyOverrides(overrides),
+  };
+}

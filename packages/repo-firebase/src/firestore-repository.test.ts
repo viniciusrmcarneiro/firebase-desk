@@ -1,5 +1,11 @@
 import type { ProjectSummary } from '@firebase-desk/repo-contracts';
-import { DocumentReference, type Firestore, GeoPoint, Timestamp } from 'firebase-admin/firestore';
+import {
+  DocumentReference,
+  FieldPath,
+  type Firestore,
+  GeoPoint,
+  Timestamp,
+} from 'firebase-admin/firestore';
 import { describe, expect, it, vi } from 'vitest';
 import type { AdminFirestoreProvider } from './admin-firestore-provider.ts';
 import { FirebaseFirestoreRepository } from './firestore-repository.ts';
@@ -136,6 +142,193 @@ describe('FirebaseFirestoreRepository', () => {
     expect(savedData).toEqual({ status: 'local' });
   });
 
+  it('updates field patches with FieldPath and never uses set', async () => {
+    let savedData: Record<string, unknown> = {
+      'a.b': 'literal',
+      nested: { count: 1 },
+      status: 'draft',
+    };
+    const ref = fakeDocumentReference('orders/ord_1', {
+      getData: () => savedData,
+      getUpdateTime: () => Timestamp.fromDate(new Date('2026-04-29T00:00:00.000Z')),
+    });
+    const transaction = {
+      get: vi.fn(async () => await ref.get()),
+      set: vi.fn(),
+      update: vi.fn((_ref: DocumentReference, fieldPath: FieldPath, value: unknown) => {
+        if (fieldPath.isEqual(new FieldPath('a.b'))) savedData = { ...savedData, 'a.b': value };
+        if (fieldPath.isEqual(new FieldPath('nested', 'count'))) {
+          savedData = { ...savedData, nested: {} };
+        }
+      }),
+    };
+    const db = {
+      doc: vi.fn(() => ref),
+      runTransaction: vi.fn(async (callback: (tx: typeof transaction) => Promise<unknown>) =>
+        await callback(transaction)
+      ),
+    } as unknown as Firestore;
+    const repository = new FirebaseFirestoreRepository(providerFor(db));
+
+    const result = await repository.updateDocumentFields(
+      'test',
+      'orders/ord_1',
+      [{
+        baseValue: 'literal',
+        fieldPath: ['a.b'],
+        type: 'set',
+        value: 'changed',
+      }, {
+        baseValue: 1,
+        fieldPath: ['nested', 'count'],
+        type: 'delete',
+      }],
+      {
+        lastUpdateTime: '2026-04-29T00:00:00.000Z',
+        staleBehavior: 'save-and-notify',
+      },
+    );
+
+    expect(result).toMatchObject({
+      status: 'saved',
+      document: { data: { 'a.b': 'changed', nested: {} } },
+    });
+    expect(transaction.set).not.toHaveBeenCalled();
+    expect(transaction.update).toHaveBeenCalledTimes(2);
+    const firstFieldPath = transaction.update.mock.calls[0]![1] as FieldPath;
+    const secondFieldPath = transaction.update.mock.calls[1]![1] as FieldPath;
+    expect(firstFieldPath.isEqual(new FieldPath('a.b'))).toBe(true);
+    expect(secondFieldPath.isEqual(new FieldPath('nested', 'count'))).toBe(true);
+  });
+
+  it('saves stale unchanged field patches and reports documentChanged', async () => {
+    let savedData: Record<string, unknown> = { remote: 'new', status: 'draft' };
+    const ref = fakeDocumentReference('orders/ord_1', {
+      getData: () => savedData,
+      getUpdateTime: () => Timestamp.fromDate(new Date('2026-04-29T01:00:00.000Z')),
+    });
+    const transaction = {
+      get: vi.fn(async () => await ref.get()),
+      update: vi.fn((_ref: DocumentReference, fieldPath: FieldPath, value: unknown) => {
+        if (fieldPath.isEqual(new FieldPath('status'))) savedData = { ...savedData, status: value };
+      }),
+    };
+    const db = {
+      doc: vi.fn(() => ref),
+      runTransaction: vi.fn(async (callback: (tx: typeof transaction) => Promise<unknown>) =>
+        await callback(transaction)
+      ),
+    } as unknown as Firestore;
+    const repository = new FirebaseFirestoreRepository(providerFor(db));
+
+    const result = await repository.updateDocumentFields('test', 'orders/ord_1', [{
+      baseValue: 'draft',
+      fieldPath: ['status'],
+      type: 'set',
+      value: 'paid',
+    }], {
+      lastUpdateTime: '2026-04-29T00:00:00.000Z',
+      staleBehavior: 'save-and-notify',
+    });
+
+    expect(result).toMatchObject({
+      documentChanged: true,
+      status: 'saved',
+      document: { data: { remote: 'new', status: 'paid' } },
+    });
+    expect(transaction.update).toHaveBeenCalledTimes(1);
+  });
+
+  it('classifies stale field patch conflicts without mutating', async () => {
+    const ref = fakeDocumentReference('orders/ord_1', {
+      getData: () => ({ remote: 'new', status: 'remote' }),
+      getUpdateTime: () => Timestamp.fromDate(new Date('2026-04-29T01:00:00.000Z')),
+    });
+    const transaction = {
+      get: vi.fn(async () => await ref.get()),
+      update: vi.fn(),
+    };
+    const db = {
+      doc: vi.fn(() => ref),
+      runTransaction: vi.fn(async (callback: (tx: typeof transaction) => Promise<unknown>) =>
+        await callback(transaction)
+      ),
+    } as unknown as Firestore;
+    const repository = new FirebaseFirestoreRepository(providerFor(db));
+
+    await expect(repository.updateDocumentFields('test', 'orders/ord_1', [{
+      baseValue: 'draft',
+      fieldPath: ['status'],
+      type: 'set',
+      value: 'local',
+    }], {
+      lastUpdateTime: '2026-04-29T00:00:00.000Z',
+      staleBehavior: 'save-and-notify',
+    })).resolves.toMatchObject({
+      status: 'conflict',
+      remoteDocument: { data: { status: 'remote' } },
+    });
+    expect(transaction.update).not.toHaveBeenCalled();
+  });
+
+  it('blocks stale unchanged field patches when configured', async () => {
+    const ref = fakeDocumentReference('orders/ord_1', {
+      getData: () => ({ remote: 'new', status: 'draft' }),
+      getUpdateTime: () => Timestamp.fromDate(new Date('2026-04-29T01:00:00.000Z')),
+    });
+    const transaction = {
+      get: vi.fn(async () => await ref.get()),
+      update: vi.fn(),
+    };
+    const db = {
+      doc: vi.fn(() => ref),
+      runTransaction: vi.fn(async (callback: (tx: typeof transaction) => Promise<unknown>) =>
+        await callback(transaction)
+      ),
+    } as unknown as Firestore;
+    const repository = new FirebaseFirestoreRepository(providerFor(db));
+
+    await expect(repository.updateDocumentFields('test', 'orders/ord_1', [{
+      baseValue: 'draft',
+      fieldPath: ['status'],
+      type: 'set',
+      value: 'paid',
+    }], {
+      lastUpdateTime: '2026-04-29T00:00:00.000Z',
+      staleBehavior: 'block',
+    })).resolves.toMatchObject({
+      status: 'document-changed',
+      remoteDocument: { data: { status: 'draft' } },
+    });
+    expect(transaction.update).not.toHaveBeenCalled();
+  });
+
+  it('returns field patch conflict for missing documents', async () => {
+    const ref = fakeDocumentReference('orders/missing', { exists: false });
+    const transaction = {
+      get: vi.fn(async () => await ref.get()),
+      update: vi.fn(),
+    };
+    const db = {
+      doc: vi.fn(() => ref),
+      runTransaction: vi.fn(async (callback: (tx: typeof transaction) => Promise<unknown>) =>
+        await callback(transaction)
+      ),
+    } as unknown as Firestore;
+    const repository = new FirebaseFirestoreRepository(providerFor(db));
+
+    await expect(repository.updateDocumentFields('test', 'orders/missing', [{
+      baseValue: 'draft',
+      fieldPath: ['status'],
+      type: 'set',
+      value: 'paid',
+    }], {
+      lastUpdateTime: '2026-04-29T00:00:00.000Z',
+      staleBehavior: 'save-and-notify',
+    })).resolves.toEqual({ status: 'conflict', remoteDocument: null });
+    expect(transaction.update).not.toHaveBeenCalled();
+  });
+
   it('recursively deletes selected subcollections before deleting the parent document', async () => {
     const parentDelete = vi.fn();
     const parentRef = fakeDocumentReference('orders/ord_1', { onDelete: parentDelete });
@@ -187,6 +380,9 @@ describe('FirebaseFirestoreRepository', () => {
     await expect(repository.saveDocument('test', '/orders/ord_1', {})).rejects.toThrow(
       'Invalid Firestore document path',
     );
+    await expect(repository.updateDocumentFields('test', 'orders/ord_1', [], {
+      staleBehavior: 'save-and-notify',
+    })).rejects.toThrow('At least one Firestore field operation is required.');
     await expect(repository.generateDocumentId('test', 'orders/')).rejects.toThrow(
       'Invalid Firestore collection path',
     );
@@ -232,6 +428,7 @@ function fakeDocumentReference(
   options: {
     readonly getData?: (() => Record<string, unknown>) | undefined;
     readonly getUpdateTime?: (() => Timestamp | undefined) | undefined;
+    readonly exists?: boolean | undefined;
     readonly onCreate?: ((data: Record<string, unknown>) => void | Promise<void>) | undefined;
     readonly onDelete?: (() => void | Promise<void>) | undefined;
     readonly onSet?: ((data: Record<string, unknown>) => void | Promise<void>) | undefined;
@@ -253,7 +450,7 @@ function fakeDocumentReference(
     get: {
       value: async () => ({
         data: () => options.getData?.() ?? {},
-        exists: true,
+        exists: options.exists ?? true,
         id,
         ref: fakeDocumentReference(path),
         updateTime: options.getUpdateTime?.()
