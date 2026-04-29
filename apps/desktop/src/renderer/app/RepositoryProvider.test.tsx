@@ -8,6 +8,8 @@ const snapshot: SettingsSnapshot = {
   theme: 'system',
   dataMode: 'mock',
   hotkeyOverrides: {},
+  resultTableLayouts: {},
+  firestoreFieldCatalogs: {},
 };
 
 afterEach(() => {

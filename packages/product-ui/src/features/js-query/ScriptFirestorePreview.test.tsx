@@ -31,9 +31,9 @@ describe('ScriptFirestorePreview', () => {
     expect(screen.getByTestId('browser').textContent).toBe('orders:1:orders/ord_1');
   });
 
-  it('falls back to json preview for non-document values', () => {
+  it('falls back to json preview for non-document values', async () => {
     render(<ScriptFirestorePreview value={{ ok: true }} />);
 
-    expect(screen.getByText(/"ok": true/)).toBeTruthy();
+    expect(await screen.findByText(/"ok": true/)).toBeTruthy();
   });
 });

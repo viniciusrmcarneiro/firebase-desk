@@ -54,6 +54,8 @@ describe('desktop App', () => {
       theme: 'system',
       dataMode: 'mock',
       hotkeyOverrides: {},
+      resultTableLayouts: {},
+      firestoreFieldCatalogs: {},
     });
 
     render(<App />);

@@ -101,8 +101,16 @@ describe('repo-mocks contract conformance', () => {
 
   it('settings repo: load/save with hotkey overrides', async () => {
     const repo = new MockSettingsRepository();
-    await repo.save({ sidebarWidth: 320 });
+    await repo.save({
+      sidebarWidth: 320,
+      firestoreFieldCatalogs: {
+        orders: [{ count: 1, field: 'status', types: ['string'] }],
+      },
+    });
     expect((await repo.load()).sidebarWidth).toBe(320);
+    expect((await repo.load()).firestoreFieldCatalogs.orders).toEqual([
+      { count: 1, field: 'status', types: ['string'] },
+    ]);
     await repo.setHotkeyOverrides({ 'sidebar.toggle': 'Ctrl+Shift+B' });
     expect((await repo.getHotkeyOverrides())['sidebar.toggle']).toBe('Ctrl+Shift+B');
   });

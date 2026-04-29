@@ -1,4 +1,4 @@
-import type { ScriptRunResult } from '@firebase-desk/repo-contracts';
+import type { ScriptRunResult, SettingsRepository } from '@firebase-desk/repo-contracts';
 import { ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@firebase-desk/ui';
 import { useMediaQuery } from '../../hooks/useMediaQuery.ts';
 import { JsQueryEditorPanel } from './JsQueryEditorPanel.tsx';
@@ -14,6 +14,7 @@ export interface JsQuerySurfaceProps {
   readonly onSourceChange: (source: string) => void;
   readonly result?: ScriptRunResult | null;
   readonly runId?: string | null;
+  readonly settings?: SettingsRepository | undefined;
   readonly source: string;
 }
 
@@ -26,6 +27,7 @@ export function JsQuerySurface(
     result,
     runId = null,
     runStartedAt = null,
+    settings,
     source,
   }: JsQuerySurfaceProps,
 ) {
@@ -62,6 +64,7 @@ export function JsQuerySurface(
             isRunning={isRunning}
             result={result ?? null}
             runId={runId}
+            settings={settings}
             startedAt={runStartedAt}
           />
         </ResizablePanel>

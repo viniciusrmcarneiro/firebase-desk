@@ -1,10 +1,18 @@
-import type { ScriptStreamItem } from '@firebase-desk/repo-contracts';
+import type { ScriptStreamItem, SettingsRepository } from '@firebase-desk/repo-contracts';
 import { Badge, EmptyState } from '@firebase-desk/ui';
 import { TerminalSquare } from 'lucide-react';
 import { JsonPreview } from './JsonPreview.tsx';
 import { ScriptFirestorePreview } from './ScriptFirestorePreview.tsx';
 
-export function ScriptStream({ items }: { readonly items: ReadonlyArray<ScriptStreamItem>; }) {
+export function ScriptStream(
+  {
+    items,
+    settings,
+  }: {
+    readonly items: ReadonlyArray<ScriptStreamItem>;
+    readonly settings?: SettingsRepository | undefined;
+  },
+) {
   if (!items.length) {
     return (
       <EmptyState
@@ -17,12 +25,20 @@ export function ScriptStream({ items }: { readonly items: ReadonlyArray<ScriptSt
 
   return (
     <div className='grid content-start gap-2 p-3'>
-      {items.map((item) => <ScriptStreamCard key={item.id} item={item} />)}
+      {items.map((item) => <ScriptStreamCard key={item.id} item={item} settings={settings} />)}
     </div>
   );
 }
 
-function ScriptStreamCard({ item }: { readonly item: ScriptStreamItem; }) {
+function ScriptStreamCard(
+  {
+    item,
+    settings,
+  }: {
+    readonly item: ScriptStreamItem;
+    readonly settings?: SettingsRepository | undefined;
+  },
+) {
   return (
     <details className='overflow-hidden rounded-md border border-border-subtle bg-bg-panel shadow-sm'>
       <summary className='flex cursor-pointer list-inside flex-wrap items-center justify-between gap-2 border-b border-border-subtle bg-bg-subtle px-3 py-2 text-sm font-semibold text-text-primary'>
@@ -30,8 +46,12 @@ function ScriptStreamCard({ item }: { readonly item: ScriptStreamItem; }) {
         <Badge>{item.badge}</Badge>
       </summary>
       {item.view === 'table'
-        ? <ScriptFirestorePreview value={item.value} />
-        : <JsonPreview className='m-3' value={item.value} />}
+        ? <ScriptFirestorePreview settings={settings} value={item.value} />
+        : (
+          <div className='p-3'>
+            <JsonPreview value={item.value} />
+          </div>
+        )}
     </details>
   );
 }

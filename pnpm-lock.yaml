@@ -379,6 +379,9 @@ importers:
 
   packages/ipc-schemas:
     dependencies:
+      '@firebase-desk/repo-contracts':
+        specifier: workspace:*
+        version: link:../repo-contracts
       zod:
         specifier: 4.3.6
         version: 4.3.6
@@ -392,9 +395,6 @@ importers:
       '@firebase-desk/config-vitest':
         specifier: workspace:*
         version: link:../config-vitest
-      '@firebase-desk/repo-contracts':
-        specifier: workspace:*
-        version: link:../repo-contracts
       oxlint:
         specifier: 1.61.0
         version: 1.61.0

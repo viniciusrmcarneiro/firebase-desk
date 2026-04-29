@@ -1,5 +1,12 @@
 import { ChevronRight } from 'lucide-react';
-import { type ReactNode } from 'react';
+import {
+  type KeyboardEvent,
+  type ReactNode,
+  useCallback,
+  useEffect,
+  useRef,
+  useState,
+} from 'react';
 import { cn } from '../cn.ts';
 import { ContextMenu, ContextMenuTrigger } from '../context-menu/index.ts';
 import { VirtualList } from '../VirtualList.tsx';
@@ -29,17 +36,61 @@ export function ExplorerTree<TNode extends ExplorerTreeRowModel = ExplorerTreeRo
   { className, contextMenu, estimateSize = () => 32, onOpen, onToggle, renderAction, rows }:
     ExplorerTreeProps<TNode>,
 ) {
+  const [focusedIndex, setFocusedIndex] = useState(0);
+  const clampedFocusedIndex = rows.length === 0 ? 0 : Math.min(focusedIndex, rows.length - 1);
+
+  useEffect(() => {
+    setFocusedIndex((current) => {
+      if (rows.length === 0) return 0;
+      return Math.min(Math.max(current, 0), rows.length - 1);
+    });
+  }, [rows.length]);
+
+  const handleKeyDown = useCallback(
+    (event: KeyboardEvent<HTMLDivElement>, index: number, node: TNode) => {
+      if (event.key === 'ArrowDown') {
+        event.preventDefault();
+        setFocusedIndex(Math.min(index + 1, rows.length - 1));
+        return;
+      }
+      if (event.key === 'ArrowUp') {
+        event.preventDefault();
+        setFocusedIndex(Math.max(index - 1, 0));
+        return;
+      }
+      if (event.key === 'ArrowRight' && node.hasChildren && !node.expanded) {
+        event.preventDefault();
+        onToggle(node.id);
+        return;
+      }
+      if (event.key === 'ArrowLeft' && node.hasChildren && node.expanded) {
+        event.preventDefault();
+        onToggle(node.id);
+        return;
+      }
+      if (event.key === 'Enter' || event.key === ' ') {
+        event.preventDefault();
+        if (node.hasChildren) onToggle(node.id);
+        else onOpen?.(node.id);
+      }
+    },
+    [onOpen, onToggle, rows.length],
+  );
   return (
     <div className={cn('h-full min-w-[680px] font-mono text-xs', className)} role='tree'>
       <VirtualList
         estimateSize={estimateSize}
         getItemKey={(item) => item.id}
         items={rows}
-        renderItem={(item) => (
+        renderItem={(item, index) => (
           <ExplorerTreeRow
             contextMenu={contextMenu}
+            focused={index === clampedFocusedIndex}
+            index={index}
             node={item}
             renderAction={renderAction}
+            setFocusedIndex={setFocusedIndex}
+            onKeyDown={handleKeyDown}
             onOpen={onOpen}
             onToggle={onToggle}
           />
@@ -50,24 +101,48 @@ export function ExplorerTree<TNode extends ExplorerTreeRowModel = ExplorerTreeRo
 }
 
 function ExplorerTreeRow<TNode extends ExplorerTreeRowModel>(
-  { contextMenu, node, renderAction, onOpen, onToggle }: {
-    readonly contextMenu?: ((node: TNode) => ReactNode | null) | undefined;
-    readonly node: TNode;
-    readonly renderAction?: ((node: TNode) => ReactNode) | undefined;
-    readonly onOpen?: ((id: string) => void) | undefined;
-    readonly onToggle: (id: string) => void;
-  },
+  { contextMenu, focused, index, node, renderAction, setFocusedIndex, onKeyDown, onOpen, onToggle }:
+    {
+      readonly contextMenu?: ((node: TNode) => ReactNode | null) | undefined;
+      readonly focused: boolean;
+      readonly index: number;
+      readonly node: TNode;
+      readonly renderAction?: ((node: TNode) => ReactNode) | undefined;
+      readonly setFocusedIndex: (index: number) => void;
+      readonly onKeyDown: (
+        event: KeyboardEvent<HTMLDivElement>,
+        index: number,
+        node: TNode,
+      ) => void;
+      readonly onOpen?: ((id: string) => void) | undefined;
+      readonly onToggle: (id: string) => void;
+    },
 ) {
+  const rowRef = useRef<HTMLDivElement>(null);
+
+  useEffect(() => {
+    const element = rowRef.current;
+    if (!element || !focused) return;
+    const activeElement = element.ownerDocument.activeElement;
+    if (activeElement === element || element.contains(activeElement)) return;
+    if (element.parentElement?.contains(activeElement)) element.focus();
+  }, [focused]);
+
   const row = (
     <div
       className='grid min-h-8 grid-cols-[16px_16px_minmax(140px,0.8fr)_minmax(160px,1fr)_112px_auto] items-center gap-2 border-b border-border-subtle pr-3 text-text-primary transition-colors hover:bg-action-ghost-hover'
       role='treeitem'
+      tabIndex={focused ? 0 : -1}
       style={{ paddingLeft: 12 + node.level * 22 }}
       aria-expanded={node.hasChildren ? Boolean(node.expanded) : undefined}
+      aria-level={node.level + 1}
+      ref={rowRef}
       onClick={() => {
+        setFocusedIndex(index);
         if (node.hasChildren) onToggle(node.id);
       }}
       onDoubleClick={() => onOpen?.(node.id)}
+      onKeyDown={(event) => onKeyDown(event, index, node)}
     >
       <span>
         {node.hasChildren

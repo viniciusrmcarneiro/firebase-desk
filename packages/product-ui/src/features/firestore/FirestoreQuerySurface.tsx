@@ -1,9 +1,11 @@
 import type {
   FirestoreCollectionNode,
   FirestoreDocumentResult,
+  SettingsRepository,
 } from '@firebase-desk/repo-contracts';
 import { useState } from 'react';
 import { DocumentEditorModal } from './DocumentEditorModal.tsx';
+import { useFirestoreFieldCatalog } from './fieldCatalog.ts';
 import { FirestoreDocumentBrowser } from './FirestoreDocumentBrowser.tsx';
 import { QueryBuilder } from './QueryBuilder.tsx';
 import type { FirestoreQueryDraft, FirestoreResultView } from './types.ts';
@@ -37,6 +39,7 @@ export interface FirestoreQuerySurfaceProps {
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocument?: FirestoreDocumentResult | null;
   readonly selectedDocumentPath?: string | null;
+  readonly settings?: SettingsRepository | undefined;
 }
 
 export function FirestoreQuerySurface(
@@ -58,10 +61,16 @@ export function FirestoreQuerySurface(
     rows,
     selectedDocument = null,
     selectedDocumentPath = null,
+    settings,
   }: FirestoreQuerySurfaceProps,
 ) {
   const [resultView, setResultView] = useState<FirestoreResultView>('table');
   const [editorDocument, setEditorDocument] = useState<FirestoreDocumentResult | null>(null);
+  const fieldSuggestions = useFirestoreFieldCatalog({
+    queryPath: draft.path,
+    rows,
+    settings,
+  });
 
   return (
     <div className='h-full min-h-0 p-2'>
@@ -71,6 +80,7 @@ export function FirestoreQuerySurface(
         header={
           <QueryBuilder
             draft={draft}
+            fieldSuggestions={fieldSuggestions}
             isLoading={isLoading}
             onDraftChange={onDraftChange}
             onReset={onReset}
@@ -84,6 +94,7 @@ export function FirestoreQuerySurface(
         rows={rows}
         selectedDocument={selectedDocument}
         selectedDocumentPath={selectedDocumentPath}
+        settings={settings}
         onDeleteDocument={onDeleteDocument}
         onEditDocument={setEditorDocument}
         onLoadMore={onLoadMore}

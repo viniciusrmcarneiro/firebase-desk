@@ -51,6 +51,30 @@ describe('SettingsStore', () => {
       DEFAULT_SETTINGS_SNAPSHOT,
     );
   });
+
+  it('defaults table layouts for existing settings files', async () => {
+    const userDataPath = await makeTempDir();
+    await writeFile(
+      join(userDataPath, 'settings.json'),
+      JSON.stringify({
+        version: 1,
+        snapshot: {
+          sidebarWidth: 320,
+          inspectorWidth: 360,
+          theme: 'system',
+          dataMode: 'mock',
+          hotkeyOverrides: {},
+        },
+      }),
+    );
+
+    await expect(new SettingsStore(userDataPath).load()).resolves.toEqual({
+      ...DEFAULT_SETTINGS_SNAPSHOT,
+      dataMode: 'mock',
+      resultTableLayouts: {},
+      firestoreFieldCatalogs: {},
+    });
+  });
 });
 
 async function makeTempDir(): Promise<string> {

@@ -500,6 +500,7 @@ export function AppShell(
         isFetchingMore={firestoreTab.isFetchingMore}
         isLoading={firestoreTab.isLoading}
         queryRows={firestoreTab.queryRows}
+        repositories={repositories}
         scriptIsRunning={jsTab.isRunning}
         scriptResult={jsTab.scriptResult}
         scriptRunId={jsTab.scriptRunId}
@@ -1097,6 +1098,7 @@ interface TabViewProps {
   readonly onSelectDocument: (documentPath: string) => void;
   readonly onSelectUser: (uid: string) => void;
   readonly queryRows: ReadonlyArray<FirestoreDocumentResult>;
+  readonly repositories: RepositorySet;
   readonly scriptIsRunning: boolean;
   readonly scriptResult: ScriptRunResult | undefined;
   readonly scriptRunId: string | null;
@@ -1138,6 +1140,7 @@ function TabView(props: TabViewProps) {
         result={props.scriptResult ?? null}
         runId={props.scriptRunId}
         runStartedAt={props.scriptStartedAt}
+        settings={props.repositories.settings}
         source={props.scriptSource}
         onCancel={props.onCancelScript}
         onRun={props.onRunScript}
@@ -1155,6 +1158,7 @@ function TabView(props: TabViewProps) {
       rows={props.queryRows}
       selectedDocument={props.selectedDocument}
       selectedDocumentPath={props.selectedDocumentPath}
+      settings={props.repositories.settings}
       onDraftChange={props.onDraftChange}
       onDeleteDocument={props.onDeleteDocument}
       onLoadMore={props.onLoadMore}

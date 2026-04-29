@@ -10,12 +10,16 @@ import {
   type CollectionReference,
   type DocumentSnapshot,
   FieldPath,
+  type Firestore,
   type OrderByDirection,
   type Query,
   type QueryDocumentSnapshot,
   type WhereFilterOp,
 } from 'firebase-admin/firestore';
-import type { AdminFirestoreProvider } from './admin-firestore-provider.ts';
+import type {
+  AdminFirestoreProvider,
+  FirebaseConnectionConfig,
+} from './admin-firestore-provider.ts';
 import { FirestoreCursorCache } from './cursor-cache.ts';
 import { decodeFilterValue, encodeAdminData } from './value-codec.ts';
 
@@ -35,9 +39,10 @@ export class FirebaseFirestoreRepository implements FirestoreRepository {
   }
 
   async listRootCollections(connectionId: string): Promise<ReadonlyArray<FirestoreCollectionNode>> {
-    const db = await this.provider.getFirestore(connectionId);
-    const collections = await db.listCollections();
-    return collections.map((collection) => collectionNode(collection));
+    return await this.withConnection(connectionId, async (db) => {
+      const collections = await db.listCollections();
+      return collections.map((collection) => collectionNode(collection));
+    });
   }
 
   async listDocuments(
@@ -46,14 +51,15 @@ export class FirebaseFirestoreRepository implements FirestoreRepository {
     request?: PageRequest,
   ): Promise<Page<FirestoreDocumentNode>> {
     assertCollectionPath(collectionPath);
-    const db = await this.provider.getFirestore(connectionId);
-    let query: Query = db.collection(collectionPath).orderBy(FieldPath.documentId());
-    query = applyCursor(connectionId, query, this.cursors, request);
-    const snapshot = await query.limit(limitFor(request) + 1).get();
-    return pageFromSnapshots(connectionId, this.cursors, snapshot.docs, async (doc) => {
-      const subcollections = await doc.ref.listCollections();
-      return { id: doc.id, path: doc.ref.path, hasSubcollections: subcollections.length > 0 };
-    }, request);
+    return await this.withConnection(connectionId, async (db) => {
+      let query: Query = db.collection(collectionPath).orderBy(FieldPath.documentId());
+      query = applyCursor(connectionId, query, this.cursors, request);
+      const snapshot = await query.limit(limitFor(request) + 1).get();
+      return pageFromSnapshots(connectionId, this.cursors, snapshot.docs, async (doc) => {
+        const subcollections = await doc.ref.listCollections();
+        return { id: doc.id, path: doc.ref.path, hasSubcollections: subcollections.length > 0 };
+      }, request);
+    });
   }
 
   async listSubcollections(
@@ -61,9 +67,10 @@ export class FirebaseFirestoreRepository implements FirestoreRepository {
     documentPath: string,
   ): Promise<ReadonlyArray<FirestoreCollectionNode>> {
     assertDocumentPath(documentPath);
-    const db = await this.provider.getFirestore(connectionId);
-    const collections = await db.doc(documentPath).listCollections();
-    return collections.map((collection) => collectionNode(collection));
+    return await this.withConnection(connectionId, async (db) => {
+      const collections = await db.doc(documentPath).listCollections();
+      return collections.map((collection) => collectionNode(collection));
+    });
   }
 
   async runQuery(
@@ -71,27 +78,28 @@ export class FirebaseFirestoreRepository implements FirestoreRepository {
     request?: PageRequest,
   ): Promise<Page<FirestoreDocumentResult>> {
     assertCollectionPath(query.path);
-    const db = await this.provider.getFirestore(query.connectionId);
-    let adminQuery: Query = db.collection(query.path);
-    for (const filter of query.filters ?? []) {
-      adminQuery = adminQuery.where(
-        filter.field,
-        filter.op as WhereFilterOp,
-        decodeFilterValue(db, filter.value),
+    return await this.withConnection(query.connectionId, async (db) => {
+      let adminQuery: Query = db.collection(query.path);
+      for (const filter of query.filters ?? []) {
+        adminQuery = adminQuery.where(
+          filter.field,
+          filter.op as WhereFilterOp,
+          decodeFilterValue(db, filter.value),
+        );
+      }
+      for (const sort of query.sorts ?? []) {
+        adminQuery = adminQuery.orderBy(sort.field, sort.direction as OrderByDirection);
+      }
+      adminQuery = applyCursor(query.connectionId, adminQuery, this.cursors, request);
+      const snapshot = await adminQuery.limit(limitFor(request) + 1).get();
+      return pageFromSnapshots(
+        query.connectionId,
+        this.cursors,
+        snapshot.docs,
+        (doc) => documentResult(doc),
+        request,
       );
-    }
-    for (const sort of query.sorts ?? []) {
-      adminQuery = adminQuery.orderBy(sort.field, sort.direction as OrderByDirection);
-    }
-    adminQuery = applyCursor(query.connectionId, adminQuery, this.cursors, request);
-    const snapshot = await adminQuery.limit(limitFor(request) + 1).get();
-    return pageFromSnapshots(
-      query.connectionId,
-      this.cursors,
-      snapshot.docs,
-      (doc) => documentResult(doc),
-      request,
-    );
+    });
   }
 
   async getDocument(
@@ -99,10 +107,11 @@ export class FirebaseFirestoreRepository implements FirestoreRepository {
     documentPath: string,
   ): Promise<FirestoreDocumentResult | null> {
     assertDocumentPath(documentPath);
-    const db = await this.provider.getFirestore(connectionId);
-    const snapshot = await db.doc(documentPath).get();
-    if (!snapshot.exists) return null;
-    return await documentResult(snapshot);
+    return await this.withConnection(connectionId, async (db) => {
+      const snapshot = await db.doc(documentPath).get();
+      if (!snapshot.exists) return null;
+      return await documentResult(snapshot);
+    });
   }
 
   async saveDocument(): Promise<FirestoreDocumentResult> {
@@ -115,6 +124,18 @@ export class FirebaseFirestoreRepository implements FirestoreRepository {
 
   invalidateConnection(connectionId: string): void {
     this.cursors.invalidateConnection(connectionId);
+  }
+
+  private async withConnection<T>(
+    connectionId: string,
+    operation: (db: Firestore) => Promise<T>,
+  ): Promise<T> {
+    const { config, db } = await this.provider.getFirestoreConnection(connectionId);
+    try {
+      return await operation(db);
+    } catch (caught) {
+      throw firestoreOperationError(caught, config);
+    }
   }
 }
 
@@ -184,4 +205,24 @@ function assertDocumentPath(path: string): void {
 
 function pathParts(path: string): ReadonlyArray<string> {
   return path.split('/').filter(Boolean);
+}
+
+function firestoreOperationError(caught: unknown, config: FirebaseConnectionConfig): Error {
+  if (config.project.target === 'emulator' && isConnectivityError(caught)) {
+    const host = config.project.emulator?.firestoreHost ?? 'the configured host';
+    const error = new Error(
+      `Firestore emulator is not reachable at ${host}. Start the emulator or update the connection settings.`,
+    );
+    (error as Error & { cause?: unknown; }).cause = caught;
+    return error;
+  }
+  return caught instanceof Error ? caught : new Error(String(caught));
+}
+
+function isConnectivityError(caught: unknown): boolean {
+  if (!caught || typeof caught !== 'object') return false;
+  const code = (caught as { readonly code?: unknown; }).code;
+  if (code === 4 || code === 14) return true;
+  const message = caught instanceof Error ? caught.message : String(caught);
+  return /ECONNREFUSED|UNAVAILABLE|No connection established|Total timeout/i.test(message);
 }

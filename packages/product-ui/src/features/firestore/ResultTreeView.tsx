@@ -7,7 +7,7 @@ import {
   IconButton,
 } from '@firebase-desk/ui';
 import { ExternalLink, Folder, Loader2 } from 'lucide-react';
-import { useMemo } from 'react';
+import { useCallback, useMemo } from 'react';
 import {
   flattenResultTree,
   type ResultTreeRowModel,
@@ -53,10 +53,18 @@ export function ResultTreeView(
       ),
     [canLoadSubcollections, expandedIds, hasMore, queryPath, rows, subcollectionStates],
   );
+  const openNode = useCallback(
+    (id: string) => {
+      const node = treeRows.find((item) => item.id === id);
+      if (node?.openPath) onOpenDocumentInNewTab?.(node.openPath);
+    },
+    [onOpenDocumentInNewTab, treeRows],
+  );
 
   return (
     <ExplorerTree
       rows={treeRows}
+      onOpen={openNode}
       onToggle={onToggleNode}
       contextMenu={(node) =>
         node.openPath && onOpenDocumentInNewTab

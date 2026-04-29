@@ -1,6 +1,7 @@
 import type {
   FirestoreCollectionNode,
   FirestoreDocumentResult,
+  SettingsRepository,
 } from '@firebase-desk/repo-contracts';
 import { cn, ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@firebase-desk/ui';
 import { type ReactNode, useMemo, useState } from 'react';
@@ -37,6 +38,7 @@ export interface FirestoreDocumentBrowserProps {
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocument?: FirestoreDocumentResult | null;
   readonly selectedDocumentPath?: string | null;
+  readonly settings?: SettingsRepository | undefined;
 }
 
 export function FirestoreDocumentBrowser(
@@ -59,6 +61,7 @@ export function FirestoreDocumentBrowser(
     rows,
     selectedDocument = null,
     selectedDocumentPath = null,
+    settings,
   }: FirestoreDocumentBrowserProps,
 ) {
   const [overviewCollapsed, setOverviewCollapsed] = useState(false);
@@ -106,8 +109,8 @@ export function FirestoreDocumentBrowser(
   const mainColumn = (
     <div
       className={header
-        ? 'grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)] gap-2'
-        : 'grid h-full min-h-0 grid-rows-[minmax(0,1fr)]'}
+        ? 'grid h-full min-h-0 flex-1 self-stretch grid-rows-[auto_minmax(0,1fr)] gap-2'
+        : 'grid h-full min-h-0 flex-1 self-stretch grid-rows-[minmax(0,1fr)]'}
     >
       {header}
       <ResultPanel
@@ -119,6 +122,7 @@ export function FirestoreDocumentBrowser(
         resultView={resultView}
         rows={rowsWithSubcollections}
         selectedDocumentPath={selectedDocumentPath}
+        settings={settings}
         subcollectionStates={subcollectionStates}
         onEditDocument={onEditDocument}
         onLoadMore={onLoadMore}
@@ -153,10 +157,12 @@ export function FirestoreDocumentBrowser(
             direction='horizontal'
             className='h-full min-h-0'
           >
-            <ResizablePanel className='h-full' minSize='420px'>{mainColumn}</ResizablePanel>
+            <ResizablePanel className='flex h-full min-h-0 flex-col' minSize='420px'>
+              {mainColumn}
+            </ResizablePanel>
             <ResizableHandle className='mx-2 h-full w-px' />
             <ResizablePanel
-              className='h-full'
+              className='flex h-full min-h-0 flex-col'
               defaultSize={overviewCollapsed ? '42px' : '34%'}
               maxSize={overviewCollapsed ? '42px' : '520px'}
               minSize={overviewCollapsed ? '42px' : '280px'}

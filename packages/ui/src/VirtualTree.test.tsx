@@ -10,6 +10,7 @@ vi.mock('@tanstack/react-virtual', () => ({
       getTotalSize: () => count * size,
       getVirtualItems: () =>
         Array.from({ length: count }, (_, i) => ({ index: i, key: i, start: i * size, size })),
+      scrollToIndex: vi.fn(),
     };
   },
 }));
@@ -120,5 +121,15 @@ describe('VirtualTree', () => {
     fireEvent.keyDown(screen.getAllByRole('treeitem')[0]!, { key: 'ArrowUp' });
     expect(screen.getAllByRole('treeitem').map((i) => i.getAttribute('tabindex')))
       .toEqual(['0', '-1', '-1']);
+  });
+
+  it('moves focus with Home / End', () => {
+    render(<VirtualTree flattenedNodes={nodes} rowHeight={20} onToggle={() => {}} />);
+    fireEvent.keyDown(screen.getAllByRole('treeitem')[0]!, { key: 'End' });
+    let items = screen.getAllByRole('treeitem');
+    expect(items.map((i) => i.getAttribute('tabindex'))).toEqual(['-1', '-1', '0']);
+    fireEvent.keyDown(items[2]!, { key: 'Home' });
+    items = screen.getAllByRole('treeitem');
+    expect(items.map((i) => i.getAttribute('tabindex'))).toEqual(['0', '-1', '-1']);
   });
 });

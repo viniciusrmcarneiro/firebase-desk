@@ -1,4 +1,8 @@
-import type { ScriptLogEntry, ScriptRunResult } from '@firebase-desk/repo-contracts';
+import type {
+  ScriptLogEntry,
+  ScriptRunResult,
+  SettingsRepository,
+} from '@firebase-desk/repo-contracts';
 import {
   Badge,
   EmptyState,
@@ -25,11 +29,13 @@ export function ScriptOutput(
     isRunning,
     result,
     runId = null,
+    settings,
     startedAt = null,
   }: {
     readonly isRunning: boolean;
     readonly result: ScriptRunResult | null;
     readonly runId?: string | null;
+    readonly settings?: SettingsRepository | undefined;
     readonly startedAt?: number | null;
   },
 ) {
@@ -76,15 +82,24 @@ export function ScriptOutput(
         >
           Output
         </PanelHeader>
-        <PanelBody className='min-h-0 overflow-hidden p-0'>
-          <TabsContent className='h-full min-h-0 overflow-auto' value='results'>
-            <ScriptStream items={streamItems} />
+        <PanelBody className='grid min-h-0 overflow-hidden p-0'>
+          <TabsContent
+            className='col-start-1 row-start-1 m-0 h-full min-h-0 overflow-auto data-[state=inactive]:hidden'
+            value='results'
+          >
+            <ScriptStream items={streamItems} settings={settings} />
           </TabsContent>
-          <TabsContent className='h-full min-h-0 overflow-auto' value='logs'>
-            <LogList logs={logItems} />
+          <TabsContent
+            className='col-start-1 row-start-1 m-0 h-full min-h-0 overflow-auto data-[state=inactive]:hidden'
+            value='logs'
+          >
+            <LogList active={view === 'logs'} logs={logItems} />
           </TabsContent>
-          <TabsContent className='h-full min-h-0 overflow-auto' value='errors'>
-            <ErrorList errors={errorItems} />
+          <TabsContent
+            className='col-start-1 row-start-1 m-0 h-full min-h-0 overflow-auto data-[state=inactive]:hidden'
+            value='errors'
+          >
+            <ErrorList active={view === 'errors'} errors={errorItems} />
           </TabsContent>
         </PanelBody>
       </Panel>
@@ -140,7 +155,9 @@ function ScriptOutputActions(
   );
 }
 
-function LogList({ logs }: { readonly logs: ReadonlyArray<ScriptLogEntry>; }) {
+function LogList(
+  { active, logs }: { readonly active: boolean; readonly logs: ReadonlyArray<ScriptLogEntry>; },
+) {
   if (logs.length === 0) {
     return (
       <EmptyState
@@ -150,11 +167,15 @@ function LogList({ logs }: { readonly logs: ReadonlyArray<ScriptLogEntry>; }) {
       />
     );
   }
-  return <JsonPreview className='m-3' value={logs.map(formatLogEntry)} />;
+  return (
+    <div className='h-full min-h-0 p-3'>
+      <JsonPreview active={active} value={logs.map(formatLogEntry)} />
+    </div>
+  );
 }
 
 function ErrorList(
-  { errors }: { readonly errors: ScriptRunResult['errors']; },
+  { active, errors }: { readonly active: boolean; readonly errors: ScriptRunResult['errors']; },
 ) {
   if (!errors.length) {
     return (
@@ -170,5 +191,9 @@ function ErrorList(
   const errorValue = errors.length === 1 && firstError
     ? toFirebaseError(firstError)
     : errors.map(toFirebaseError);
-  return <JsonPreview className='m-3' value={errorValue} />;
+  return (
+    <div className='h-full min-h-0 p-3'>
+      <JsonPreview active={active} value={errorValue} />
+    </div>
+  );
 }

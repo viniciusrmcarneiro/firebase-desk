@@ -63,4 +63,30 @@ describe('firestore result model', () => {
       'ord_2',
     ]);
   });
+
+  it('sorts object field keys and shows collapsed object previews', () => {
+    const expanded = new Set(['root:orders', 'doc:orders/ord_3', 'doc:orders/ord_3:fields']);
+    const treeRows = flattenResultTree(
+      'orders',
+      [{
+        id: 'ord_3',
+        path: 'orders/ord_3',
+        data: { zebra: 1, alpha: { nested: true } },
+        hasSubcollections: false,
+      }],
+      false,
+      expanded,
+      {},
+      false,
+    );
+
+    expect(treeRows.map((row) => row.label)).toEqual([
+      'orders',
+      'ord_3',
+      'Fields',
+      'alpha',
+      'zebra',
+    ]);
+    expect(treeRows.find((row) => row.label === 'alpha')?.value).toBe('{"nested":true}');
+  });
 });

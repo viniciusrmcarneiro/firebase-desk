@@ -31,6 +31,12 @@ export class MainSettingsRepository implements SettingsRepository {
       hotkeyOverrides: patch.hotkeyOverrides
         ? { ...patch.hotkeyOverrides }
         : { ...current.hotkeyOverrides },
+      resultTableLayouts: patch.resultTableLayouts
+        ? cloneResultTableLayouts(patch.resultTableLayouts)
+        : cloneResultTableLayouts(current.resultTableLayouts),
+      firestoreFieldCatalogs: patch.firestoreFieldCatalogs
+        ? cloneFirestoreFieldCatalogs(patch.firestoreFieldCatalogs)
+        : cloneFirestoreFieldCatalogs(current.firestoreFieldCatalogs),
     });
   }
 
@@ -41,4 +47,33 @@ export class MainSettingsRepository implements SettingsRepository {
   async setHotkeyOverrides(overrides: HotkeyOverrides): Promise<void> {
     await this.save({ hotkeyOverrides: { ...overrides } });
   }
+}
+
+function cloneResultTableLayouts(
+  layouts: SettingsSnapshot['resultTableLayouts'],
+): SettingsSnapshot['resultTableLayouts'] {
+  return Object.fromEntries(
+    Object.entries(layouts).map(([key, value]) => [
+      key,
+      {
+        columnOrder: [...value.columnOrder],
+        columnSizing: { ...value.columnSizing },
+      },
+    ]),
+  );
+}
+
+function cloneFirestoreFieldCatalogs(
+  catalogs: SettingsSnapshot['firestoreFieldCatalogs'],
+): SettingsSnapshot['firestoreFieldCatalogs'] {
+  return Object.fromEntries(
+    Object.entries(catalogs).map(([key, entries]) => [
+      key,
+      entries.map((entry) => ({
+        count: entry.count,
+        field: entry.field,
+        types: [...entry.types],
+      })),
+    ]),
+  );
 }

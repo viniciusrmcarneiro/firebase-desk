@@ -355,12 +355,30 @@ describe('feature surfaces', () => {
             projectTarget: 'emulator',
           },
           {
+            id: 'project:prod',
+            kind: 'project',
+            label: 'Acme Prod',
+            depth: 0,
+            hasChildren: false,
+            expanded: false,
+            projectTarget: 'production',
+          },
+          {
             id: 'firestore:emu',
             kind: 'firestore',
             label: 'Firestore',
             depth: 1,
             hasChildren: true,
             expanded: false,
+          },
+          {
+            id: 'collection:emu:orders',
+            kind: 'collection',
+            label: 'orders',
+            depth: 2,
+            hasChildren: false,
+            expanded: false,
+            secondary: '99',
           },
         ]}
         onAddProject={onAddProject}
@@ -376,6 +394,9 @@ describe('feature surfaces', () => {
     fireEvent.click(screen.getByRole('button', { name: 'Add project' }));
     fireEvent.click(screen.getByText('Firestore'));
 
+    expect(screen.getByText('emulator')).toBeTruthy();
+    expect(screen.queryByText('production')).toBeNull();
+    expect(screen.queryByText('99')).toBeNull();
     expect(onAddProject).toHaveBeenCalledTimes(1);
     expect(onSelectItem).toHaveBeenCalledWith('firestore:emu');
     expect(onToggleItem).toHaveBeenCalledWith('firestore:emu');
@@ -411,9 +432,75 @@ describe('feature surfaces', () => {
     fireEvent.pointerDown(closeAuthButton);
     fireEvent.click(closeAuthButton);
 
+    expect(screen.queryByRole('button', { name: 'Scroll tabs left' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Scroll tabs right' })).toBeNull();
     expect(onSelectTab).toHaveBeenCalledWith('tab-auth');
     expect(onPointerDown).not.toHaveBeenCalled();
     expect(onCloseTab).toHaveBeenCalledWith('tab-auth');
+  });
+
+  it('WorkspaceTabStrip shows scroll controls only when tabs overflow', async () => {
+    const scrollWidthSpy = vi.spyOn(HTMLElement.prototype, 'scrollWidth', 'get')
+      .mockImplementation(function scrollWidth(this: HTMLElement) {
+        return this.getAttribute('role') === 'tablist' ? 900 : 0;
+      });
+    const clientWidthSpy = vi.spyOn(HTMLElement.prototype, 'clientWidth', 'get')
+      .mockImplementation(function clientWidth(this: HTMLElement) {
+        return this.getAttribute('role') === 'tablist' ? 300 : 0;
+      });
+    const originalScrollBy = HTMLElement.prototype.scrollBy;
+    const scrollBy = vi.fn();
+    Object.defineProperty(HTMLElement.prototype, 'scrollBy', {
+      configurable: true,
+      value: scrollBy,
+    });
+
+    try {
+      render(
+        <WorkspaceTabStrip
+          activeTabId='tab-1'
+          projects={projects}
+          tabs={Array.from({ length: 8 }, (_, index) => ({
+            id: `tab-${index + 1}`,
+            kind: 'firestore-query',
+            title: `orders-${index + 1}`,
+            connectionId: 'emu',
+          }))}
+          onCloseAllTabs={() => {}}
+          onCloseOtherTabs={() => {}}
+          onCloseTab={() => {}}
+          onCloseTabsToLeft={() => {}}
+          onCloseTabsToRight={() => {}}
+          onReorderTabs={() => {}}
+          onSelectTab={() => {}}
+          onSortByProject={() => {}}
+        />,
+      );
+
+      const left = await screen.findByRole('button', { name: 'Scroll tabs left' });
+      const right = screen.getByRole('button', { name: 'Scroll tabs right' });
+      expect((left as HTMLButtonElement).disabled).toBe(true);
+      expect((right as HTMLButtonElement).disabled).toBe(false);
+
+      fireEvent.click(right);
+      await waitFor(() =>
+        expect(scrollBy).toHaveBeenCalledWith({
+          behavior: 'smooth',
+          left: 210,
+        })
+      );
+    } finally {
+      scrollWidthSpy.mockRestore();
+      clientWidthSpy.mockRestore();
+      if (originalScrollBy) {
+        Object.defineProperty(HTMLElement.prototype, 'scrollBy', {
+          configurable: true,
+          value: originalScrollBy,
+        });
+      } else {
+        delete (HTMLElement.prototype as { scrollBy?: unknown; }).scrollBy;
+      }
+    }
   });
 
   it('AuthUsersSurface renders provided users, selects users, and exposes Load more', () => {
@@ -558,8 +645,7 @@ describe('feature surfaces', () => {
     const treeTab = screen.getByRole('tab', { name: /Tree/ });
     fireEvent.mouseDown(treeTab, { button: 0, ctrlKey: false });
     expect(screen.queryByText('evt_created')).toBeNull();
-    fireEvent.click(screen.getByText('orders'));
-    fireEvent.click(screen.getByText('ord_1024'));
+    fireEvent.click(screen.getByText('Subcollections'));
     fireEvent.click(screen.getByText('events'));
     expect(await screen.findByText('evt_created')).toBeTruthy();
 
@@ -600,6 +686,33 @@ describe('feature surfaces', () => {
     expect(screen.getByText('ref')).toBeTruthy();
     expect(screen.getByText('customers/cus_ada')).toBeTruthy();
     expect(screen.queryByText(/__type__/)).toBeNull();
+  });
+
+  it('FirestoreQuerySurface persists field metadata from loaded rows', async () => {
+    const settings = new MockSettingsRepository();
+    renderWithAppearance(
+      <FirestoreQuerySurface
+        draft={draft}
+        hasMore={false}
+        rows={documents}
+        settings={settings}
+        onDraftChange={() => {}}
+        onLoadMore={() => {}}
+        onOpenDocumentInNewTab={() => {}}
+        onReset={() => {}}
+        onRun={() => {}}
+        onSelectDocument={() => {}}
+      />,
+    );
+
+    await waitFor(async () => {
+      const snapshot = await settings.load();
+      expect(snapshot.firestoreFieldCatalogs.orders).toEqual(expect.arrayContaining([
+        { count: 2, field: 'status', types: ['string'] },
+        { count: 1, field: 'tags', types: ['array<string>'] },
+        { count: 1, field: 'updatedAt', types: ['timestamp'] },
+      ]));
+    });
   });
 
   it('FirestoreDocumentBrowser renders native Firestore values as scalar cells', () => {
@@ -691,7 +804,7 @@ describe('feature surfaces', () => {
 
     const treeTab = screen.getByRole('tab', { name: /Tree/ });
     fireEvent.mouseDown(treeTab, { button: 0, ctrlKey: false });
-    fireEvent.click(screen.getByText('orders'));
+    fireEvent.click(screen.getByText('ord_lazy'));
     fireEvent.click(screen.getByText('ord_lazy'));
 
     await waitFor(() => expect(onLoadSubcollections).toHaveBeenCalledWith('orders/ord_lazy'));
@@ -753,10 +866,9 @@ describe('feature surfaces', () => {
     );
 
     const tree = screen.getByRole('tree');
-    fireEvent.click(within(tree).getByText('orders'));
-    fireEvent.click(within(tree).getByText('ord_tree'));
     expect(within(tree).getByText('Fields')).toBeTruthy();
     expect(within(tree).getByText('Subcollections')).toBeTruthy();
+    fireEvent.click(within(tree).getByText('Subcollections'));
 
     expect(within(tree).getByText('skiers')).toBeTruthy();
     expect(within(tree).queryByText('Documents')).toBeNull();
