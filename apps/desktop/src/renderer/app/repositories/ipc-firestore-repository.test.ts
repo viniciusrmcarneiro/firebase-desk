@@ -29,6 +29,13 @@ describe('IpcFirestoreRepository', () => {
         data: { status: 'paid' },
         hasSubcollections: false,
       }),
+      saveDocument: vi.fn().mockResolvedValue({
+        id: 'ord_2',
+        path: 'orders/ord_2',
+        data: { status: 'draft' },
+        hasSubcollections: false,
+      }),
+      deleteDocument: vi.fn().mockResolvedValue(undefined),
     } satisfies Partial<DesktopFirestoreApi>;
     Object.defineProperty(window, 'firebaseDesk', {
       configurable: true,
@@ -67,6 +74,17 @@ describe('IpcFirestoreRepository', () => {
       data: { status: 'paid' },
       hasSubcollections: false,
     });
+    await expect(repository.saveDocument('emu', 'orders/ord_2', {
+      status: 'draft',
+    })).resolves.toEqual({
+      id: 'ord_2',
+      path: 'orders/ord_2',
+      data: { status: 'draft' },
+      hasSubcollections: false,
+    });
+    await expect(repository.deleteDocument('emu', 'orders/ord_2', {
+      deleteSubcollectionPaths: ['orders/ord_2/events'],
+    })).resolves.toBeUndefined();
 
     expect(firestore.listDocuments).toHaveBeenCalledWith({
       collectionPath: 'orders',
@@ -79,6 +97,16 @@ describe('IpcFirestoreRepository', () => {
         path: 'orders',
         filters: [{ field: 'status', op: '==', value: 'paid' }],
       },
+    });
+    expect(firestore.saveDocument).toHaveBeenCalledWith({
+      connectionId: 'emu',
+      documentPath: 'orders/ord_2',
+      data: { status: 'draft' },
+    });
+    expect(firestore.deleteDocument).toHaveBeenCalledWith({
+      connectionId: 'emu',
+      documentPath: 'orders/ord_2',
+      options: { deleteSubcollectionPaths: ['orders/ord_2/events'] },
     });
   });
 });

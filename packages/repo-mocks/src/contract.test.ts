@@ -82,6 +82,21 @@ describe('repo-mocks contract conformance', () => {
       },
     });
 
+    await repo.saveDocument('p', 'orders/ord_encoded', {
+      customerRef: { __type__: 'reference', path: 'customers/cus_ada' },
+      deliveredAt: { __type__: 'timestamp', value: '2026-04-29T10:30:00.000Z' },
+      payload: { __type__: 'bytes', base64: 'aGVsbG8=' },
+      place: { __type__: 'geoPoint', latitude: -36.8485, longitude: 174.7633 },
+    });
+    await expect(repo.getDocument('p', 'orders/ord_encoded')).resolves.toMatchObject({
+      data: {
+        customerRef: { __type__: 'reference', path: 'customers/cus_ada' },
+        deliveredAt: { __type__: 'timestamp', value: '2026-04-29T10:30:00.000Z' },
+        payload: { __type__: 'bytes', base64: 'aGVsbG8=' },
+        place: { __type__: 'geoPoint', latitude: -36.8485, longitude: 174.7633 },
+      },
+    });
+
     await repo.saveDocument('p', 'objects/a', { value: { score: 2, toJSON: 'not callable' } });
     await repo.saveDocument('p', 'objects/b', { value: { score: 1 } });
     await expect(repo.runQuery({
@@ -92,6 +107,19 @@ describe('repo-mocks contract conformance', () => {
 
     await repo.deleteDocument('p', 'orders/ord_saved');
     expect(await repo.getDocument('p', 'orders/ord_saved')).toBeNull();
+
+    await repo.saveDocument('p', 'orders/ord_nested', { status: 'draft' });
+    await repo.saveDocument('p', 'orders/ord_nested/events/evt_1', { type: 'deleted' });
+    await repo.saveDocument('p', 'orders/ord_nested/audit/aud_1', { type: 'kept' });
+    await repo.deleteDocument('p', 'orders/ord_nested', {
+      deleteSubcollectionPaths: ['orders/ord_nested/events'],
+    });
+    expect(await repo.getDocument('p', 'orders/ord_nested')).toBeNull();
+    expect(await repo.getDocument('p', 'orders/ord_nested/events/evt_1')).toBeNull();
+    expect(await repo.getDocument('p', 'orders/ord_nested/audit/aud_1')).not.toBeNull();
+    await expect(repo.listSubcollections('p', 'orders/ord_nested')).resolves.toEqual([
+      expect.objectContaining({ path: 'orders/ord_nested/audit' }),
+    ]);
 
     await expect(repo.listRootCollections(MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID)).rejects
       .toBeInstanceOf(MockFirebaseError);

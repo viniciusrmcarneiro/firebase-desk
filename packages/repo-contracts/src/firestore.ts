@@ -50,6 +50,10 @@ export interface FirestoreDocumentResult {
   readonly subcollections?: ReadonlyArray<FirestoreCollectionNode>;
 }
 
+export interface FirestoreDeleteDocumentOptions {
+  readonly deleteSubcollectionPaths: ReadonlyArray<string>;
+}
+
 export interface FirestoreRepository {
   listRootCollections(connectionId: string): Promise<ReadonlyArray<FirestoreCollectionNode>>;
   listDocuments(
@@ -71,5 +75,9 @@ export interface FirestoreRepository {
     documentPath: string,
     data: Record<string, unknown>,
   ): Promise<FirestoreDocumentResult>;
-  deleteDocument(connectionId: string, documentPath: string): Promise<void>;
+  deleteDocument(
+    connectionId: string,
+    documentPath: string,
+    options?: FirestoreDeleteDocumentOptions,
+  ): Promise<void>;
 }

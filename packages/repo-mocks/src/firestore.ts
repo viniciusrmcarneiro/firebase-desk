@@ -1,6 +1,7 @@
-import { encode } from '@firebase-desk/data-format';
+import { decode, encode } from '@firebase-desk/data-format';
 import type {
   FirestoreCollectionNode,
+  FirestoreDeleteDocumentOptions,
   FirestoreDocumentNode,
   FirestoreDocumentResult,
   FirestoreFilter,
@@ -101,7 +102,7 @@ export class MockFirestoreRepository implements FirestoreRepository {
     }
     const docs = [...collection.docs];
     const existingIndex = docs.findIndex((doc) => doc.id === docId);
-    const nextDoc = { id: docId, data: { ...data } };
+    const nextDoc = { id: docId, data: decodeDocumentData(data) };
     if (existingIndex >= 0) docs.splice(existingIndex, 1, nextDoc);
     else docs.push(nextDoc);
     this.replaceCollection(collectionPath, docs);
@@ -110,9 +111,17 @@ export class MockFirestoreRepository implements FirestoreRepository {
     return saved;
   }
 
-  async deleteDocument(connectionId: string, documentPath: string): Promise<void> {
+  async deleteDocument(
+    connectionId: string,
+    documentPath: string,
+    options?: FirestoreDeleteDocumentOptions,
+  ): Promise<void> {
     assertConnectionAvailable(connectionId);
     const { collectionPath, docId } = splitDocumentPath(documentPath);
+    for (const subcollectionPath of options?.deleteSubcollectionPaths ?? []) {
+      assertDirectSubcollectionPath(documentPath, subcollectionPath);
+      this.deleteCollectionTree(subcollectionPath);
+    }
     const collection = this.collections.find((item) => item.path === collectionPath);
     if (!collection) return;
     this.replaceCollection(
@@ -126,6 +135,15 @@ export class MockFirestoreRepository implements FirestoreRepository {
     const next = { path, docs };
     if (index >= 0) this.collections.splice(index, 1, next);
     else this.collections.push(next);
+  }
+
+  private deleteCollectionTree(path: string) {
+    for (let index = this.collections.length - 1; index >= 0; index -= 1) {
+      const collection = this.collections[index]!;
+      if (collection.path === path || collection.path.startsWith(`${path}/`)) {
+        this.collections.splice(index, 1);
+      }
+    }
   }
 }
 
@@ -311,6 +329,35 @@ function splitDocumentPath(documentPath: string) {
     collectionPath: parts.slice(0, -1).join('/'),
     docId: parts.at(-1)!,
   };
+}
+
+function assertDirectSubcollectionPath(documentPath: string, collectionPath: string) {
+  const documentParts = documentPath.split('/').filter(Boolean);
+  const collectionParts = collectionPath.split('/').filter(Boolean);
+  if (collectionParts.length === 0 || collectionParts.length % 2 === 0) {
+    throw new MockFirebaseError('invalid-argument', `Invalid collection path: ${collectionPath}`);
+  }
+  if (
+    collectionParts.length !== documentParts.length + 1
+    || collectionParts.slice(0, documentParts.length).join('/') !== documentParts.join('/')
+  ) {
+    throw new MockFirebaseError(
+      'invalid-argument',
+      `Invalid subcollection path ${collectionPath} for document ${documentPath}`,
+    );
+  }
+}
+
+function decodeDocumentData(data: Record<string, unknown>): Record<string, unknown> {
+  const decoded = decode(data as never);
+  if (!isPlainObject(decoded)) {
+    throw new MockFirebaseError('invalid-argument', 'Firestore document data must be an object.');
+  }
+  return decoded;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function cloneCollections(

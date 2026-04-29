@@ -1,11 +1,11 @@
 import type {
   FirestoreCollectionNode,
+  FirestoreDeleteDocumentOptions,
   FirestoreDocumentResult,
 } from '@firebase-desk/repo-contracts';
 import { documentsForCollectionNode } from './resultModel.tsx';
 
-export interface DeleteDocumentOptions {
-  readonly deleteSubcollectionPaths: ReadonlyArray<string>;
+export interface DeleteDocumentOptions extends FirestoreDeleteDocumentOptions {
   readonly deleteDescendantDocumentPaths: ReadonlyArray<string>;
 }
 

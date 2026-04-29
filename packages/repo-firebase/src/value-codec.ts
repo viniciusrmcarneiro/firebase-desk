@@ -13,6 +13,16 @@ export function encodeAdminData(data: Record<string, unknown>): Record<string, u
   return encode(normalizeAdminValue(data) as NativeValue) as Record<string, unknown>;
 }
 
+export function decodeAdminData(
+  db: Firestore,
+  data: Record<string, unknown>,
+): Record<string, unknown> {
+  const native = decode(data as never);
+  const decoded = toAdminValue(db, native);
+  if (!isPlainObject(decoded)) throw new Error('Firestore document data must be an object.');
+  return decoded;
+}
+
 export function decodeFilterValue(db: Firestore, value: unknown): unknown {
   const native = decode(value as never);
   return toAdminValue(db, native);
@@ -52,4 +62,8 @@ function toAdminValue(db: Firestore, value: NativeValue): unknown {
     return out;
   }
   return value;
+}
+
+function isPlainObject(value: unknown): value is Record<string, unknown> {
+  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }

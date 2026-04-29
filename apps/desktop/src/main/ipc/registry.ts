@@ -136,6 +136,13 @@ export function registerIpcHandlers(): void {
       firestoreRepository.getDocument(connectionId, documentPath).then((document) =>
         document ? toIpcDocumentResult(document) : null
       ),
+    'firestore.saveDocument': async ({ connectionId, data, documentPath }) =>
+      toIpcDocumentResult(
+        await firestoreRepository.saveDocument(connectionId, documentPath, data),
+      ),
+    'firestore.deleteDocument': async ({ connectionId, documentPath, options }) => {
+      await firestoreRepository.deleteDocument(connectionId, documentPath, options);
+    },
     'scriptRunner.run': async (request) =>
       toIpcScriptRunResult(await scriptRunnerRepository.run(request)),
     'scriptRunner.cancel': async ({ runId }) => {

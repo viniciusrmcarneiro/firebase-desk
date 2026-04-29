@@ -1,5 +1,6 @@
 import type {
   FirestoreCollectionNode,
+  FirestoreDeleteDocumentOptions,
   FirestoreDocumentNode,
   FirestoreDocumentResult,
   FirestoreRepository,
@@ -21,7 +22,7 @@ import type {
   FirebaseConnectionConfig,
 } from './admin-firestore-provider.ts';
 import { FirestoreCursorCache } from './cursor-cache.ts';
-import { decodeFilterValue, encodeAdminData } from './value-codec.ts';
+import { decodeAdminData, decodeFilterValue, encodeAdminData } from './value-codec.ts';
 
 const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 250;
@@ -114,12 +115,38 @@ export class FirebaseFirestoreRepository implements FirestoreRepository {
     });
   }
 
-  async saveDocument(): Promise<FirestoreDocumentResult> {
-    throw new Error('Firestore writes are not available until Phase 8.');
+  async saveDocument(
+    connectionId: string,
+    documentPath: string,
+    data: Record<string, unknown>,
+  ): Promise<FirestoreDocumentResult> {
+    assertDocumentPath(documentPath);
+    return await this.withConnection(connectionId, async (db) => {
+      const ref = db.doc(documentPath);
+      await ref.set(decodeAdminData(db, data));
+      const snapshot = await ref.get();
+      return await documentResult(snapshot);
+    });
   }
 
-  async deleteDocument(): Promise<void> {
-    throw new Error('Firestore deletes are not available until Phase 8.');
+  async deleteDocument(
+    connectionId: string,
+    documentPath: string,
+    options?: FirestoreDeleteDocumentOptions,
+  ): Promise<void> {
+    assertDocumentPath(documentPath);
+    const deleteSubcollectionPaths = options?.deleteSubcollectionPaths ?? [];
+    for (const subcollectionPath of deleteSubcollectionPaths) {
+      assertDirectSubcollectionPath(documentPath, subcollectionPath);
+    }
+    await this.withConnection(connectionId, async (db) => {
+      await Promise.all(
+        deleteSubcollectionPaths.map((subcollectionPath) =>
+          db.recursiveDelete(db.collection(subcollectionPath))
+        ),
+      );
+      await db.doc(documentPath).delete();
+    });
   }
 
   invalidateConnection(connectionId: string): void {
@@ -200,6 +227,22 @@ function assertDocumentPath(path: string): void {
   const parts = pathParts(path);
   if (parts.length === 0 || parts.length % 2 !== 0) {
     throw new Error(`Invalid Firestore document path: ${path}`);
+  }
+}
+
+function assertDirectSubcollectionPath(documentPath: string, collectionPath: string): void {
+  assertCollectionPath(collectionPath);
+  const parentPrefix = `${documentPath}/`;
+  if (!collectionPath.startsWith(parentPrefix)) {
+    throw new Error(
+      `Invalid Firestore subcollection path ${collectionPath} for document ${documentPath}`,
+    );
+  }
+  const remainingParts = pathParts(collectionPath.slice(parentPrefix.length));
+  if (remainingParts.length !== 1) {
+    throw new Error(
+      `Invalid Firestore subcollection path ${collectionPath} for document ${documentPath}`,
+    );
   }
 }
 

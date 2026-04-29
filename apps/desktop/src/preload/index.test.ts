@@ -61,6 +61,40 @@ describe('preload script runner api', () => {
 
     expect(listener).not.toHaveBeenCalled();
   });
+
+  it('exposes Firestore write methods', async () => {
+    const api = exposedApi();
+    electronMocks.invoke
+      .mockResolvedValueOnce({
+        id: 'ord_1',
+        path: 'orders/ord_1',
+        data: { status: 'paid' },
+        hasSubcollections: false,
+      })
+      .mockResolvedValueOnce(undefined);
+
+    await expect(api.firestore.saveDocument({
+      connectionId: 'emu',
+      documentPath: 'orders/ord_1',
+      data: { status: 'paid' },
+    })).resolves.toMatchObject({ id: 'ord_1' });
+    await expect(api.firestore.deleteDocument({
+      connectionId: 'emu',
+      documentPath: 'orders/ord_1',
+      options: { deleteSubcollectionPaths: ['orders/ord_1/events'] },
+    })).resolves.toBeUndefined();
+
+    expect(electronMocks.invoke).toHaveBeenCalledWith('firestore.saveDocument', {
+      connectionId: 'emu',
+      documentPath: 'orders/ord_1',
+      data: { status: 'paid' },
+    });
+    expect(electronMocks.invoke).toHaveBeenCalledWith('firestore.deleteDocument', {
+      connectionId: 'emu',
+      documentPath: 'orders/ord_1',
+      options: { deleteSubcollectionPaths: ['orders/ord_1/events'] },
+    });
+  });
 });
 
 function exposedApi(): DesktopApi {

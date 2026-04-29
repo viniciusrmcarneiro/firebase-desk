@@ -1,6 +1,7 @@
 import type { IpcRequest, IpcResponse } from '@firebase-desk/ipc-schemas';
 import type {
   FirestoreCollectionNode,
+  FirestoreDeleteDocumentOptions,
   FirestoreDocumentNode,
   FirestoreDocumentResult,
   FirestoreQuery,
@@ -71,12 +72,29 @@ export class IpcFirestoreRepository implements FirestoreRepository {
     return document ? toDocumentResult(document) : null;
   }
 
-  async saveDocument(): Promise<FirestoreDocumentResult> {
-    throw new Error('Firestore writes are not available until Phase 8.');
+  async saveDocument(
+    connectionId: string,
+    documentPath: string,
+    data: Record<string, unknown>,
+  ): Promise<FirestoreDocumentResult> {
+    const document = await window.firebaseDesk.firestore.saveDocument({
+      connectionId,
+      data,
+      documentPath,
+    });
+    return toDocumentResult(document);
   }
 
-  async deleteDocument(): Promise<void> {
-    throw new Error('Firestore deletes are not available until Phase 8.');
+  async deleteDocument(
+    connectionId: string,
+    documentPath: string,
+    options?: FirestoreDeleteDocumentOptions,
+  ): Promise<void> {
+    await window.firebaseDesk.firestore.deleteDocument({
+      connectionId,
+      documentPath,
+      ...(options ? { options: toIpcDeleteOptions(options) } : {}),
+    });
   }
 }
 
@@ -95,6 +113,14 @@ function toIpcQuery(query: FirestoreQuery): IpcRequest<'firestore.runQuery'>['qu
       ? { filters: query.filters.map((filter) => ({ ...filter })) }
       : {}),
     ...(query.sorts !== undefined ? { sorts: query.sorts.map((sort) => ({ ...sort })) } : {}),
+  };
+}
+
+function toIpcDeleteOptions(
+  options: FirestoreDeleteDocumentOptions,
+): NonNullable<IpcRequest<'firestore.deleteDocument'>['options']> {
+  return {
+    deleteSubcollectionPaths: [...options.deleteSubcollectionPaths],
   };
 }
 

@@ -54,6 +54,12 @@ declare global {
     readonly getDocument: (
       request: IpcRequest<'firestore.getDocument'>,
     ) => Promise<IpcResponse<'firestore.getDocument'>>;
+    readonly saveDocument: (
+      request: IpcRequest<'firestore.saveDocument'>,
+    ) => Promise<IpcResponse<'firestore.saveDocument'>>;
+    readonly deleteDocument: (
+      request: IpcRequest<'firestore.deleteDocument'>,
+    ) => Promise<IpcResponse<'firestore.deleteDocument'>>;
   }
 
   interface DesktopScriptRunnerApi {

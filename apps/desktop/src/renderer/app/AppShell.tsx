@@ -660,12 +660,9 @@ export function AppShell(
   ) {
     if (!activeProject || !activeTab) return;
     try {
-      await Promise.all(
-        options.deleteDescendantDocumentPaths.map((descendantPath) =>
-          repositories.firestore.deleteDocument(activeProject.id, descendantPath)
-        ),
-      );
-      await repositories.firestore.deleteDocument(activeProject.id, documentPath);
+      await repositories.firestore.deleteDocument(activeProject.id, documentPath, {
+        deleteSubcollectionPaths: options.deleteSubcollectionPaths,
+      });
       if (dataMode !== 'mock') await queryClient.invalidateQueries({ queryKey: ['firestore'] });
       firestoreTab.selectDocument(activeTab.id, null);
       setLastAction(`Deleted ${documentPath}`);

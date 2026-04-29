@@ -48,6 +48,10 @@ const api = {
     runQuery: (request: IpcRequest<'firestore.runQuery'>) => invoke('firestore.runQuery', request),
     getDocument: (request: IpcRequest<'firestore.getDocument'>) =>
       invoke('firestore.getDocument', request),
+    saveDocument: (request: IpcRequest<'firestore.saveDocument'>) =>
+      invoke('firestore.saveDocument', request),
+    deleteDocument: (request: IpcRequest<'firestore.deleteDocument'>) =>
+      invoke('firestore.deleteDocument', request),
   },
   scriptRunner: {
     run: (request: IpcRequest<'scriptRunner.run'>) => invoke('scriptRunner.run', request),

@@ -59,10 +59,12 @@ type InitialTab = Parameters<typeof tabActions.openTab>[0];
 
 function renderShell(
   {
+    dataMode = 'mock',
     initialTab,
     repositories = createMockRepositories(),
     savedWorkspace,
   }: {
+    readonly dataMode?: 'live' | 'mock';
     readonly initialTab?: InitialTab;
     readonly repositories?: RepositorySet;
     readonly savedWorkspace?: PersistedWorkspaceState;
@@ -97,7 +99,7 @@ function renderShell(
       <QueryClientProvider client={queryClient}>
         <HotkeysProvider settings={repositories.settings}>
           <AppearanceProvider settings={repositories.settings}>
-            <AppShell />
+            <AppShell dataMode={dataMode} />
           </AppearanceProvider>
         </HotkeysProvider>
       </QueryClientProvider>
