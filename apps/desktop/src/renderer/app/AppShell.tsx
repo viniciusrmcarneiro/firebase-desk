@@ -72,7 +72,6 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { type ActivityStore, useActivityController } from '../app-core/activity/index.ts';
 import { firestoreQueryDraftMetadata } from '../app-core/firestore/query/index.ts';
 import { useFirestoreWriteController } from '../app-core/firestore/write/index.ts';
-import { documentDataMetadata } from '../app-core/shared/index.ts';
 import appIconUrl from '../assets/app-icon.png';
 import { AddProjectDialog } from './dialogs/AddProjectDialog.tsx';
 import { EditProjectDialog } from './dialogs/EditProjectDialog.tsx';
@@ -149,7 +148,6 @@ export function AppShell(
   const activeTab = tabsState.tabs.find((tab) => tab.id === tabsState.activeTabId)
     ?? tabsState.tabs[0];
   const activeProject = activeTab ? resolveProject(projects, activeTab.connectionId) : null;
-  const authConnectionId = activeProject?.id ?? null;
 
   const [density, setDensity] = useState<DensityName>('compact');
   const [settingsOpen, setSettingsOpen] = useState(false);
@@ -164,7 +162,6 @@ export function AppShell(
   >(null);
   const nextCreateDocumentRequestId = useRef(1);
   const loggedScriptRuns = useRef<Set<string>>(new Set());
-  const loggedAuthFailures = useRef<Set<string>>(new Set());
   const activity = useActivityController({
     loadIssuePreviewOnMount: !activityStore,
     onStatus: setLastAction,
@@ -192,9 +189,10 @@ export function AppShell(
     recordActivity,
   });
   const authTab = useAuthTabState({
+    activeProject,
     activeTab,
     initialAuthFilter: persistedWorkspace?.authFilter,
-    runtimeProjectId: authConnectionId,
+    recordActivity,
     selectedUserId: selection.authUserId,
   });
   const jsTab = useJsTabState({
@@ -250,21 +248,6 @@ export function AppShell(
       cancelled = true;
     };
   }, [settingsOpen]);
-
-  useEffect(() => {
-    if (!activeTab || activeTab.kind !== 'auth-users' || !authTab.errorMessage) return;
-    const key = `${activeTab.id}:${authTab.authFilter}:${authTab.errorMessage}`;
-    if (!rememberActivityKey(loggedAuthFailures.current, key)) return;
-    recordActivity({
-      action: authTab.authFilter.trim() ? 'Search users' : 'Load users',
-      area: 'auth',
-      error: { message: authTab.errorMessage },
-      metadata: { filter: authTab.authFilter.trim() || null },
-      status: 'failure',
-      summary: authTab.errorMessage,
-      target: { connectionId: activeTab.connectionId, type: 'auth-user' },
-    });
-  }, [activeTab, authTab.authFilter, authTab.errorMessage, recordActivity]);
 
   useEffect(() => {
     if (!activeTab || activeTab.kind !== 'js-query' || !jsTab.scriptRunId || !jsTab.scriptResult) {
@@ -683,17 +666,7 @@ export function AppShell(
   }
 
   function handleLoadMoreUsers() {
-    const startedAt = Date.now();
     authTab.loadMore();
-    recordActivity({
-      action: 'Load more users',
-      area: 'auth',
-      durationMs: elapsedMs(startedAt),
-      metadata: { filter: authTab.authFilter.trim() || null },
-      status: 'success',
-      summary: 'Requested more Authentication users',
-      target: { connectionId: activeTab?.connectionId, type: 'auth-user' },
-    });
   }
 
   function handleRunScript() {
@@ -794,7 +767,7 @@ export function AppShell(
         onRunScript={handleRunScript}
         onSaveDocument={firestoreWrite.saveDocument}
         onUpdateDocumentFields={firestoreWrite.updateDocumentFields}
-        onSaveUserCustomClaims={handleSaveUserCustomClaims}
+        onSaveUserCustomClaims={authTab.saveCustomClaims}
         onScriptChange={jsTab.setScriptSource}
         onSelectDocument={(path) => firestoreTab.selectDocument(activeTab.id, path)}
         onSelectUser={(uid) => selectionActions.selectAuthUser(uid)}
@@ -894,70 +867,10 @@ export function AppShell(
 
   function handleRefreshActiveTab() {
     if (!activeTab) return;
-    const startedAt = Date.now();
     if (activeTab.kind === 'firestore-query') handleRunQuery();
-    if (activeTab.kind === 'auth-users') {
-      authTab.refetch();
-      recordActivity({
-        action: 'Refresh users',
-        area: 'auth',
-        durationMs: elapsedMs(startedAt),
-        metadata: { filter: authTab.authFilter.trim() || null },
-        status: 'success',
-        summary: 'Requested Authentication refresh',
-        target: { connectionId: activeTab.connectionId, type: 'auth-user' },
-      });
-    }
+    if (activeTab.kind === 'auth-users') authTab.refetch();
     if (activeTab.kind === 'js-query') handleRunScript();
     setLastAction(`Refreshed ${activeTab.title}`);
-  }
-
-  async function handleSaveUserCustomClaims(
-    uid: string,
-    claims: Record<string, unknown>,
-  ): Promise<void> {
-    if (!activeProject) {
-      await authTab.saveCustomClaims(uid, claims);
-      return;
-    }
-    const startedAt = Date.now();
-    try {
-      await authTab.saveCustomClaims(uid, claims);
-      recordActivity({
-        action: 'Save custom claims',
-        area: 'auth',
-        durationMs: elapsedMs(startedAt),
-        metadata: documentDataMetadata(claims),
-        payload: { claims },
-        status: 'success',
-        summary: `Saved custom claims for ${uid}`,
-        target: {
-          connectionId: activeProject.id,
-          projectId: activeProject.projectId,
-          type: 'auth-user',
-          uid,
-        },
-      });
-    } catch (error) {
-      const message = messageFromError(error, 'Could not save custom claims.');
-      recordActivity({
-        action: 'Save custom claims',
-        area: 'auth',
-        durationMs: elapsedMs(startedAt),
-        error: { message },
-        metadata: documentDataMetadata(claims),
-        payload: { claims },
-        status: 'failure',
-        summary: message,
-        target: {
-          connectionId: activeProject.id,
-          projectId: activeProject.projectId,
-          type: 'auth-user',
-          uid,
-        },
-      });
-      throw error instanceof Error ? error : new Error(message);
-    }
   }
 
   async function handleLoadSubcollections(

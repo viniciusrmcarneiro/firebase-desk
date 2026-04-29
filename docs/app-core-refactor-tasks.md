@@ -209,25 +209,25 @@ Move write flows after query extraction.
 
 ## Phase 5: Auth Core
 
-- [ ] Create `app-core/auth`.
-- [ ] Model users list/search state:
-  - [ ] filter
-  - [ ] loading
-  - [ ] loading more
-  - [ ] selected user
-  - [ ] error
-  - [ ] has more
-- [ ] Model custom claims edit state.
-- [ ] Add commands:
-  - [ ] load users
-  - [ ] search users
-  - [ ] load more users
-  - [ ] select user
-  - [ ] save custom claims
-  - [ ] refresh users
-- [ ] Move Auth failure Activity logging into commands.
-- [ ] Remove AppShell effect that records Auth failures by watching `authTab.errorMessage`.
-- [ ] Add pure tests for filter/search, selection, paging, claims save, and failure states.
+- [x] Create `app-core/auth`.
+- [x] Model users list/search state:
+  - [x] filter
+  - [x] loading
+  - [x] loading more
+  - [x] selected user
+  - [x] error
+  - [x] has more
+- [x] Model custom claims edit state.
+- [x] Add commands:
+  - [x] load users
+  - [x] search users
+  - [x] load more users
+  - [x] select user
+  - [x] save custom claims
+  - [x] refresh users
+- [x] Move Auth failure Activity logging into commands.
+- [x] Remove AppShell effect that records Auth failures by watching `authTab.errorMessage`.
+- [x] Add pure tests for filter/search, selection, paging, claims save, and failure states.
 
 ## Phase 6: JavaScript Query Core
 
