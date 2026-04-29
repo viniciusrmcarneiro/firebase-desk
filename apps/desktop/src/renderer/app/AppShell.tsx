@@ -220,7 +220,6 @@ export function AppShell(
     try {
       const entries = await repositories.activity.list(activityListRequest);
       setActivityEntries(entries);
-      setLatestActivityIssue(entries.find(isActivityIssue) ?? null);
     } catch (error) {
       setLastAction(`Activity load failed: ${messageFromError(error, 'Could not load activity.')}`);
     } finally {
@@ -231,7 +230,7 @@ export function AppShell(
   const recordActivity = useCallback((input: ActivityLogAppendInput) => {
     void repositories.activity.append(input)
       .then((entry) => {
-        if (isActivityIssue(entry)) setLatestActivityIssue(entry);
+        if (isActivityIssue(entry) && !activityOpenRef.current) setLatestActivityIssue(entry);
         setActivityEntries((current) =>
           activityOpenRef.current
             && activityEntryMatchesRequest(entry, activityListRequestRef.current)
@@ -248,6 +247,7 @@ export function AppShell(
 
   useEffect(() => {
     activityOpenRef.current = activityOpen;
+    if (activityOpen) setLatestActivityIssue(null);
   }, [activityOpen]);
 
   useEffect(() => {
@@ -255,8 +255,8 @@ export function AppShell(
   }, [activityListRequest]);
 
   useEffect(() => {
-    void repositories.activity.list({ limit: 50 })
-      .then((entries) => setLatestActivityIssue(entries.find(isActivityIssue) ?? null))
+    void repositories.activity.list({ limit: 1 })
+      .then((entries) => setLatestActivityIssue(activityIssueFromLatestEntry(entries)))
       .catch(() => {});
   }, [repositories.activity]);
 
@@ -2053,6 +2053,13 @@ function messageFromError(error: unknown, fallback: string): string {
 
 function isActivityIssue(entry: ActivityLogEntry): boolean {
   return entry.status === 'failure' || entry.status === 'conflict';
+}
+
+function activityIssueFromLatestEntry(
+  entries: ReadonlyArray<ActivityLogEntry>,
+): ActivityLogEntry | null {
+  const latest = entries[0];
+  return latest && isActivityIssue(latest) ? latest : null;
 }
 
 function activityEntryMatchesRequest(

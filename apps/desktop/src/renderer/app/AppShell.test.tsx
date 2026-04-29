@@ -125,6 +125,42 @@ describe('desktop AppShell', () => {
     expect(await screen.findByText('Change theme')).toBeTruthy();
   });
 
+  it('clears the activity issue indicator when Activity is opened', async () => {
+    const repositories = createMockRepositories();
+    await repositories.activity.append({
+      action: 'Run query',
+      area: 'firestore',
+      status: 'failure',
+      summary: 'Failed to load orders',
+    });
+    renderShell({ repositories });
+
+    const activityButton = await screen.findByRole('button', { name: /Activity.*failure/ });
+    fireEvent.click(activityButton);
+
+    await waitFor(() => expect(activityButton.textContent).not.toContain('failure'));
+  });
+
+  it('keeps the activity issue indicator until Activity is opened', async () => {
+    const repositories = createMockRepositories();
+    await repositories.activity.append({
+      action: 'Run query',
+      area: 'firestore',
+      status: 'failure',
+      summary: 'Failed to load orders',
+    });
+    renderShell({ repositories });
+
+    const activityButton = await screen.findByRole('button', { name: /Activity.*failure/ });
+    fireEvent.click(screen.getByRole('button', { name: 'Dark theme' }));
+
+    await waitFor(() => expect(activityButton.textContent).toContain('failure'));
+
+    fireEvent.click(activityButton);
+
+    await waitFor(() => expect(activityButton.textContent).not.toContain('failure'));
+  });
+
   it('records Firestore query activity', async () => {
     const repositories = createMockRepositories();
     const appendActivity = vi.spyOn(repositories.activity, 'append');
