@@ -21,7 +21,6 @@ import {
 } from '@firebase-desk/product-ui';
 import type {
   ActivityLogEntry,
-  ActivityLogStatus,
   AuthUser,
   FirestoreCollectionNode,
   FirestoreDocumentResult,
@@ -113,8 +112,6 @@ interface DestructiveAction {
   readonly title: string;
 }
 
-const MAX_ACTIVITY_DEDUPE_KEYS = 500;
-
 export interface AppShellProps {
   readonly activityStore?: ActivityStore | undefined;
   readonly dataMode?: 'live' | 'mock';
@@ -161,7 +158,6 @@ export function AppShell(
     DestructiveAction | null
   >(null);
   const nextCreateDocumentRequestId = useRef(1);
-  const loggedScriptRuns = useRef<Set<string>>(new Set());
   const activity = useActivityController({
     loadIssuePreviewOnMount: !activityStore,
     onStatus: setLastAction,
@@ -198,6 +194,7 @@ export function AppShell(
   const jsTab = useJsTabState({
     activeTab,
     initialScripts: persistedWorkspace?.scripts,
+    recordActivity,
     selectedTreeItemId: selection.treeItemId,
   });
   const workspaceTree = useWorkspaceTree({
@@ -248,40 +245,6 @@ export function AppShell(
       cancelled = true;
     };
   }, [settingsOpen]);
-
-  useEffect(() => {
-    if (!activeTab || activeTab.kind !== 'js-query' || !jsTab.scriptRunId || !jsTab.scriptResult) {
-      return;
-    }
-    if (!rememberActivityKey(loggedScriptRuns.current, jsTab.scriptRunId)) return;
-    const result = jsTab.scriptResult;
-    const status: ActivityLogStatus = result.cancelled
-      ? 'cancelled'
-      : result.errors.length > 0
-      ? 'failure'
-      : 'success';
-    recordActivity({
-      action: result.cancelled ? 'Cancel JavaScript query' : 'Run JavaScript query',
-      area: 'js-query',
-      ...(result.errors[0] ? { error: result.errors[0] } : {}),
-      durationMs: result.durationMs,
-      metadata: {
-        errorCount: result.errors.length,
-        logCount: result.logs.length,
-        outputCount: result.stream?.length ?? 0,
-      },
-      payload: { source: jsTab.scriptSource },
-      status,
-      summary: result.cancelled
-        ? 'JavaScript query cancelled'
-        : result.errors.length > 0
-        ? `JavaScript query failed with ${result.errors.length} error${
-          result.errors.length === 1 ? '' : 's'
-        }`
-        : 'JavaScript query completed',
-      target: { connectionId: activeTab.connectionId, type: 'script' },
-    });
-  }, [activeTab, jsTab.scriptResult, jsTab.scriptRunId, jsTab.scriptSource, recordActivity]);
 
   const tabModels = useMemo<ReadonlyArray<WorkspaceTabModel>>(
     () =>
@@ -1536,17 +1499,6 @@ function persistSidebarWidth(repositories: RepositorySet, size: number) {
 function messageFromError(error: unknown, fallback: string): string {
   if (error instanceof Error) return error.message;
   return fallback;
-}
-
-function rememberActivityKey(keys: Set<string>, key: string): boolean {
-  if (keys.has(key)) return false;
-  keys.add(key);
-  while (keys.size > MAX_ACTIVITY_DEDUPE_KEYS) {
-    const oldestKey = keys.keys().next().value as string | undefined;
-    if (!oldestKey) break;
-    keys.delete(oldestKey);
-  }
-  return true;
 }
 
 function elapsedMs(startedAt: number): number {

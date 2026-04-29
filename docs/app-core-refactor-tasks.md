@@ -231,21 +231,21 @@ Move write flows after query extraction.
 
 ## Phase 6: JavaScript Query Core
 
-- [ ] Create `app-core/js-query`.
-- [ ] Model script state:
-  - [ ] source
-  - [ ] running
-  - [ ] cancelling
-  - [ ] result
-  - [ ] errors/logs/output counts
-- [ ] Add commands:
-  - [ ] run script
-  - [ ] cancel script
-  - [ ] update source
-  - [ ] clear result
-- [ ] Move script Activity logging into commands.
-- [ ] Remove AppShell effect that records script completion by watching `scriptRunId`/result.
-- [ ] Add pure tests for run success, failure, cancel, output counts, and activity metadata.
+- [x] Create `app-core/js-query`.
+- [x] Model script state:
+  - [x] source
+  - [x] running
+  - [x] cancelling
+  - [x] result
+  - [x] errors/logs/output counts
+- [x] Add commands:
+  - [x] run script
+  - [x] cancel script
+  - [x] update source
+  - [x] clear result
+- [x] Move script Activity logging into commands.
+- [x] Remove AppShell effect that records script completion by watching `scriptRunId`/result.
+- [x] Add pure tests for run success, failure, cancel, output counts, and activity metadata.
 
 ## Phase 7: Workspace, Tabs, And Selection
 
