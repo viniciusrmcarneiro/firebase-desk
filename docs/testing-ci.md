@@ -47,6 +47,14 @@
 - `pnpm package:linux:docker` for local Docker reproduction of the Linux release package smoke. The wrapper uses `linux/amd64` and the Docker capability required by Chromium's sandbox.
 - `pnpm dev` (parallel: desktop + wireframe)
 
+### Desktop Packaging Dependencies
+
+- Workspace packages in `apps/desktop/package.json` must be listed in `apps/desktop/src/main/packaging/main-externalize-deps.ts`.
+- `@firebase-desk/*` packages export TypeScript source for development. Packaged Electron must bundle them into main/preload/renderer output and must not load them from `node_modules`.
+- `apps/desktop/electron-builder.yml` excludes `node_modules/@firebase-desk/**` from `app.asar`; do not rely on workspace package files being present at runtime.
+- Main-process third-party runtime deps must be direct `apps/desktop` dependencies. Add them to `mainExternalizeDeps.include` only when they should stay external, like `firebase-admin`.
+- `apps/desktop/src/main/packaging/electron-vite-config.test.ts` guards new desktop workspace deps.
+
 ### Policy
 
 - Workflows are added before live wireframe UI work.
