@@ -35,14 +35,33 @@ apps/desktop/src/renderer/
 
 `AppShell` should eventually compose controllers and layout. It should not own domain workflows or infer completion from unrelated `useEffect` state watchers.
 
+## Current AppShell Responsibility Inventory
+
+Use this inventory to decide extraction boundaries and to avoid adding more workflow code to `AppShell` while the refactor is in progress.
+
+- Activity: drawer state, filters, loading, unread failure/conflict indicator, Activity persistence commands, target opening, and Activity records emitted by Firestore/Auth/JS/settings/workspace flows.
+- Firestore query: active draft wiring, query execution, pagination, refresh, query result selection, stale result banners, subcollection loading, and query completion Activity records.
+- Firestore writes: create document, full-document JSON save, field patch writes, conflict handling, delete document confirmation/subcollection options, query invalidation, and write Activity records.
+- Auth: list/search/pagination wiring, selected user, custom claims save, refresh/load-more actions, and failure/save Activity records.
+- JavaScript Query: script source wiring, run/cancel commands, result state, output counts, and completion Activity records.
+- Workspace/tabs/selection: tab lifecycle, history, tree selection, Auth user selection, Firestore document selection, persisted workspace restore/save, busy-tab close guards, and global command palette items.
+- Settings/appearance: settings dialog lifecycle, density, sidebar width, data directory display, data mode/Activity/write preference updates, and settings Activity records.
+
+Initial app-core folder naming:
+
+- Use `apps/desktop/src/renderer/app-core/<area>/`.
+- Export public feature APIs from each area `index.ts`.
+- Keep pure state/transitions/selectors in `*.ts` files, commands in `*Commands.ts`, adapters in `use*Controller.ts`, and tests next to the owning module.
+- Shared app-core utilities live in `apps/desktop/src/renderer/app-core/shared/`.
+
 ## Phase 0: Guardrails
 
-- [ ] Add this task doc and keep it linked from architecture docs.
-- [ ] Identify current AppShell responsibilities by area: activity, Firestore, Auth, JS Query, workspace, settings.
-- [ ] Mark current AppShell tests as regression coverage. Do not delete them before core coverage exists.
-- [ ] Add a short developer note in `AGENTS.md` that new renderer workflows must follow the app-core pattern.
-- [ ] Avoid new AppShell workflow effects while the refactor is in progress.
-- [ ] Decide initial app-core folder naming and export conventions.
+- [x] Add this task doc and keep it linked from architecture docs.
+- [x] Identify current AppShell responsibilities by area: activity, Firestore, Auth, JS Query, workspace, settings.
+- [x] Mark current AppShell tests as regression coverage. Do not delete them before core coverage exists.
+- [x] Add a short developer note in `AGENTS.md` that new renderer workflows must follow the app-core pattern.
+- [x] Avoid new AppShell workflow effects while the refactor is in progress.
+- [x] Decide initial app-core folder naming and export conventions.
 
 ## Phase 1: Activity Core
 
