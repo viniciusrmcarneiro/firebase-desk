@@ -249,27 +249,27 @@ Move write flows after query extraction.
 
 ## Phase 7: Workspace, Tabs, And Selection
 
-- [ ] Create `app-core/workspace`.
-- [ ] Move tab operations behind pure transitions:
-  - [ ] open
-  - [ ] focus
-  - [ ] close
-  - [ ] close others
-  - [ ] close left/right
-  - [ ] close all
-  - [ ] reorder
-  - [ ] sort by account
-  - [ ] back/forward history
-- [ ] Move selection state transitions into app-core:
-  - [ ] tree selection
-  - [ ] auth user selection
-  - [ ] Firestore document selection
-- [ ] Keep persistence explicit:
-  - [ ] serialize workspace state
-  - [ ] restore workspace state
-  - [ ] do not persist loaded query result data
-- [ ] Add tests for tab and selection transitions without React.
-- [ ] Reduce AppShell tab/selection plumbing to adapter calls.
+- [x] Create `app-core/workspace`.
+- [x] Move tab operations behind pure transitions:
+  - [x] open
+  - [x] focus
+  - [x] close
+  - [x] close others
+  - [x] close left/right
+  - [x] close all
+  - [x] reorder
+  - [x] sort by account
+  - [x] back/forward history
+- [x] Move selection state transitions into app-core:
+  - [x] tree selection
+  - [x] auth user selection
+  - [x] Firestore document selection
+- [x] Keep persistence explicit:
+  - [x] serialize workspace state
+  - [x] restore workspace state
+  - [x] do not persist loaded query result data
+- [x] Add tests for tab and selection transitions without React.
+- [x] Reduce AppShell tab/selection plumbing to adapter calls.
 
 ## Phase 8: Settings And Appearance
 
