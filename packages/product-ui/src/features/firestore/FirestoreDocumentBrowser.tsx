@@ -25,6 +25,7 @@ export interface FirestoreDocumentBrowserProps {
   readonly isFetchingMore?: boolean;
   readonly isLoading?: boolean;
   readonly actionErrorMessage?: string | null;
+  readonly actionNoticeMessage?: string | null;
   readonly onCreateDocument?: ((collectionPath: string) => void) | undefined;
   readonly onDeleteDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
   readonly onDeleteField?: ((target: FieldEditTarget) => void) | undefined;
@@ -58,6 +59,7 @@ export function FirestoreDocumentBrowser(
     hasMore,
     header,
     actionErrorMessage = null,
+    actionNoticeMessage = null,
     isFetchingMore = false,
     isLoading = false,
     onCreateDocument,
@@ -137,6 +139,7 @@ export function FirestoreDocumentBrowser(
         isFetchingMore={isFetchingMore}
         isLoading={isLoading}
         actionErrorMessage={actionErrorMessage}
+        actionNoticeMessage={actionNoticeMessage}
         queryPath={queryPath}
         resultView={resultView}
         resultsStale={resultsStale}

@@ -116,6 +116,89 @@ describe('repo-mocks contract conformance', () => {
       'Invalid document path',
     );
 
+    await repo.saveDocument('p', 'orders/ord_patch', {
+      status: 'draft',
+      remote: 'old',
+      'a.b': 'literal',
+      meta: { count: 1 },
+    });
+    const patchBase = await repo.getDocument('p', 'orders/ord_patch');
+    await expect(repo.updateDocumentFields('p', 'orders/ord_patch', [{
+      baseValue: 'draft',
+      fieldPath: ['status'],
+      type: 'set',
+      value: 'paid',
+    }], {
+      lastUpdateTime: patchBase!.updateTime!,
+      staleBehavior: 'save-and-notify',
+    })).resolves.toMatchObject({
+      status: 'saved',
+      document: { data: { status: 'paid', remote: 'old', 'a.b': 'literal' } },
+    });
+    const dottedBase = await repo.getDocument('p', 'orders/ord_patch');
+    await repo.updateDocumentFields('p', 'orders/ord_patch', [{
+      baseValue: 'literal',
+      fieldPath: ['a.b'],
+      type: 'delete',
+    }], {
+      lastUpdateTime: dottedBase!.updateTime!,
+      staleBehavior: 'save-and-notify',
+    });
+    await expect(repo.getDocument('p', 'orders/ord_patch')).resolves.toMatchObject({
+      data: { status: 'paid', remote: 'old', meta: { count: 1 } },
+    });
+    expect((await repo.getDocument('p', 'orders/ord_patch'))?.data['a.b']).toBeUndefined();
+
+    const staleBase = await repo.getDocument('p', 'orders/ord_patch');
+    await repo.saveDocument('p', 'orders/ord_patch', {
+      status: 'paid',
+      remote: 'new',
+      meta: { count: 1 },
+    });
+    await expect(repo.updateDocumentFields('p', 'orders/ord_patch', [{
+      baseValue: 'paid',
+      fieldPath: ['status'],
+      type: 'set',
+      value: 'shipped',
+    }], {
+      lastUpdateTime: staleBase!.updateTime!,
+      staleBehavior: 'save-and-notify',
+    })).resolves.toMatchObject({
+      documentChanged: true,
+      status: 'saved',
+      document: { data: { status: 'shipped', remote: 'new' } },
+    });
+    const patchConflictBase = await repo.getDocument('p', 'orders/ord_patch');
+    await repo.saveDocument('p', 'orders/ord_patch', {
+      status: 'remote',
+      remote: 'new',
+      meta: { count: 1 },
+    });
+    await expect(repo.updateDocumentFields('p', 'orders/ord_patch', [{
+      baseValue: 'shipped',
+      fieldPath: ['status'],
+      type: 'set',
+      value: 'local',
+    }], {
+      lastUpdateTime: patchConflictBase!.updateTime!,
+      staleBehavior: 'save-and-notify',
+    })).resolves.toMatchObject({
+      status: 'conflict',
+      remoteDocument: { data: { status: 'remote' } },
+    });
+    await expect(repo.updateDocumentFields('p', 'orders/ord_patch', [{
+      baseValue: 'new',
+      fieldPath: ['remote'],
+      type: 'set',
+      value: 'blocked',
+    }], {
+      lastUpdateTime: patchConflictBase!.updateTime!,
+      staleBehavior: 'block',
+    })).resolves.toMatchObject({
+      status: 'document-changed',
+      remoteDocument: { data: { remote: 'new' } },
+    });
+
     const conflictBase = await repo.getDocument('p', 'orders/ord_encoded');
     expect(conflictBase?.updateTime).toBeDefined();
     await repo.saveDocument('p', 'orders/ord_encoded', { status: 'remote' });

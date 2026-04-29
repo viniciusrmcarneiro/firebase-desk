@@ -1,8 +1,13 @@
-import type { SettingsSnapshot } from '@firebase-desk/repo-contracts';
+import {
+  DEFAULT_ACTIVITY_LOG_SETTINGS,
+  DEFAULT_FIRESTORE_WRITE_SETTINGS,
+  type SettingsSnapshot,
+} from '@firebase-desk/repo-contracts';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createRepositories } from './RepositoryProvider.tsx';
 
 const snapshot: SettingsSnapshot = {
+  activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
   sidebarWidth: 320,
   inspectorWidth: 360,
   theme: 'system',
@@ -10,6 +15,7 @@ const snapshot: SettingsSnapshot = {
   hotkeyOverrides: {},
   resultTableLayouts: {},
   firestoreFieldCatalogs: {},
+  firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
 };
 
 afterEach(() => {
@@ -37,6 +43,32 @@ describe('createRepositories', () => {
 
     expect(save).toHaveBeenCalledWith({ dataMode: 'live' });
     expect(onDataModeChange).toHaveBeenCalledWith('live');
+  });
+
+  it('uses desktop activity in mock data mode when the desktop API is available', async () => {
+    const listActivity = vi.fn(async () => []);
+    vi.stubGlobal('firebaseDesk', {
+      activity: {
+        append: vi.fn(),
+        clear: vi.fn(),
+        export: vi.fn(),
+        list: listActivity,
+      },
+      projects: {
+        list: vi.fn(async () => []),
+      },
+      settings: {
+        load: vi.fn(async () => snapshot),
+        save: vi.fn(async () => snapshot),
+        getHotkeyOverrides: vi.fn(async () => ({})),
+        setHotkeyOverrides: vi.fn(async () => {}),
+      },
+    });
+
+    const repositories = createRepositories({ dataMode: 'mock' });
+    await repositories.activity.list({ limit: 1 });
+
+    expect(listActivity).toHaveBeenCalledWith({ limit: 1 });
   });
 
   it('does not fall back to mock feature repositories in live data mode', async () => {

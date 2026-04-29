@@ -1,8 +1,13 @@
-import type { SettingsSnapshot } from '@firebase-desk/repo-contracts';
+import {
+  DEFAULT_ACTIVITY_LOG_SETTINGS,
+  DEFAULT_FIRESTORE_WRITE_SETTINGS,
+  type SettingsSnapshot,
+} from '@firebase-desk/repo-contracts';
 import { describe, expect, it } from 'vitest';
 import { readDataModeSwitch, resolveDataMode } from './data-mode.ts';
 
 const snapshot: SettingsSnapshot = {
+  activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
   sidebarWidth: 320,
   inspectorWidth: 360,
   theme: 'system',
@@ -10,6 +15,7 @@ const snapshot: SettingsSnapshot = {
   hotkeyOverrides: {},
   resultTableLayouts: {},
   firestoreFieldCatalogs: {},
+  firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
 };
 
 describe('data mode config', () => {

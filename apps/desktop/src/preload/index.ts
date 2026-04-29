@@ -21,6 +21,12 @@ const api = {
   health: {
     check: (request: IpcRequest<'health.check'>) => invoke('health.check', request),
   },
+  activity: {
+    append: (request: IpcRequest<'activity.append'>) => invoke('activity.append', request),
+    clear: () => invoke('activity.clear', {}),
+    export: (request: IpcRequest<'activity.export'>) => invoke('activity.export', request),
+    list: (request: IpcRequest<'activity.list'>) => invoke('activity.list', request),
+  },
   projects: {
     list: () => invoke('projects.list', {}),
     get: (request: IpcRequest<'projects.get'>) => invoke('projects.get', request),
@@ -54,6 +60,8 @@ const api = {
       invoke('firestore.createDocument', request),
     saveDocument: (request: IpcRequest<'firestore.saveDocument'>) =>
       invoke('firestore.saveDocument', request),
+    updateDocumentFields: (request: IpcRequest<'firestore.updateDocumentFields'>) =>
+      invoke('firestore.updateDocumentFields', request),
     deleteDocument: (request: IpcRequest<'firestore.deleteDocument'>) =>
       invoke('firestore.deleteDocument', request),
   },

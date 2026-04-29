@@ -1,4 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
+import { readFile } from 'node:fs/promises';
+import { join } from 'node:path';
 import { replaceMonacoEditorValue } from '../fixtures/editor.ts';
 import {
   deleteFirestoreEmulatorDocument,
@@ -13,9 +15,10 @@ import {
 } from '../fixtures/live-app.ts';
 
 test('Firestore query, create, edit, conflict, and delete flows use emulator UI', async () => {
-  const live = await openLiveApp();
+  const live = await openLiveApp({ activityExportFileName: 'activity-export.jsonl' });
   try {
     const page = live.page;
+    const activityExportPath = join(live.userDataDir, 'activity-export.jsonl');
     const suffix = uniqueSmokeId('ui');
     await addLocalEmulatorAccount(page);
     await openFirestore(page);
@@ -33,12 +36,20 @@ test('Firestore query, create, edit, conflict, and delete flows use emulator UI'
       await createAndEditDocument(page, suffix);
     });
 
+    await test.step('field patch writes preserve concurrent fields and delete fields', async () => {
+      await fieldPatchWrites(page, suffix);
+    });
+
     await test.step('resolve save conflict through UI', async () => {
       await resolveConflict(page, suffix);
     });
 
     await test.step('delete document with selected subcollection through UI', async () => {
       await deleteWithSelectedSubcollection(page, suffix);
+    });
+
+    await test.step('activity trail records UI actions and exports detail mode', async () => {
+      await verifyActivityTrail(page, suffix, activityExportPath);
     });
   } finally {
     await live.close();
@@ -218,6 +229,93 @@ async function createAndEditDocument(page: Page, suffix: string): Promise<void> 
   });
 }
 
+async function fieldPatchWrites(page: Page, suffix: string): Promise<void> {
+  const documentId = `patch-${suffix}`;
+  const path = `smokeUiPatches/${documentId}`;
+  await setFirestoreEmulatorDocument(path, {
+    remote: 'base',
+    removable: 'present',
+    status: 'base',
+  });
+
+  await runCollectionQuery(page, 'smokeUiPatches');
+  await selectDocument(page, documentId);
+  await setFirestoreEmulatorDocument(path, {
+    remote: 'outside',
+    removable: 'present',
+    status: 'base',
+  });
+
+  await openFieldEdit(page, 'status', 'Edit string');
+  const statusDialog = page.getByRole('dialog', { name: 'Edit status' });
+  await statusDialog.getByLabel('Field string value').fill('patched');
+  await statusDialog.getByRole('button', { name: 'Save' }).click();
+  await expectDialogHidden(statusDialog, 'Field patch dialog stayed open');
+  await expect(page.getByText(/Document changed elsewhere/)).toBeVisible();
+  await refreshChangedResults(page);
+
+  let patched = await getFirestoreEmulatorDocument(path);
+  expect(patched?.fields).toMatchObject({
+    remote: { stringValue: 'outside' },
+    removable: { stringValue: 'present' },
+    status: { stringValue: 'patched' },
+  });
+
+  await selectDocument(page, documentId);
+  await openFieldEdit(page, 'status', 'Edit string');
+  const conflictFieldDialog = page.getByRole('dialog', { name: 'Edit status' });
+  await setFirestoreEmulatorDocument(path, {
+    remote: 'outside',
+    removable: 'present',
+    status: 'remote-conflict',
+  });
+  await conflictFieldDialog.getByLabel('Field string value').fill('local-conflict');
+  await conflictFieldDialog.getByRole('button', { name: 'Save' }).click();
+
+  const conflictDialog = page.getByRole('dialog', { name: 'Resolve save conflict' });
+  await expect(conflictDialog).toBeVisible();
+  await replaceMonacoEditorValue(
+    page,
+    conflictDialog,
+    JSON.stringify(
+      {
+        conflictResolved: true,
+        remote: 'outside',
+        removable: 'present',
+        status: 'merged-conflict',
+      },
+      null,
+      2,
+    ),
+  );
+  await conflictDialog.getByRole('button', { name: 'Save merged' }).click();
+  await expectDialogHidden(conflictDialog, 'Field conflict dialog stayed open');
+  await refreshChangedResults(page);
+
+  patched = await getFirestoreEmulatorDocument(path);
+  expect(patched?.fields).toMatchObject({
+    conflictResolved: { booleanValue: true },
+    remote: { stringValue: 'outside' },
+    removable: { stringValue: 'present' },
+    status: { stringValue: 'merged-conflict' },
+  });
+
+  await selectDocument(page, documentId);
+  await openFieldMenu(page, 'removable', 'Delete field');
+  const deleteDialog = page.getByRole('dialog', { name: 'Delete field' });
+  await deleteDialog.getByRole('button', { name: 'Delete' }).click();
+  await expectDialogHidden(deleteDialog, 'Delete field dialog stayed open');
+
+  await expect.poll(async () => (await getFirestoreEmulatorDocument(path))?.fields?.['removable'])
+    .toBeUndefined();
+  patched = await getFirestoreEmulatorDocument(path);
+  expect(patched?.fields).toMatchObject({
+    conflictResolved: { booleanValue: true },
+    remote: { stringValue: 'outside' },
+    status: { stringValue: 'merged-conflict' },
+  });
+}
+
 async function resolveConflict(page: Page, suffix: string): Promise<void> {
   const documentId = `conflict-${suffix}`;
   const path = `smokeUiConflicts/${documentId}`;
@@ -312,6 +410,62 @@ async function deleteWithSelectedSubcollection(page: Page, suffix: string): Prom
   await deleteFirestoreEmulatorDocument(keptChildPath);
 }
 
+async function verifyActivityTrail(
+  page: Page,
+  suffix: string,
+  activityExportPath: string,
+): Promise<void> {
+  await openActivity(page);
+  const activity = page.getByRole('region', { name: 'Activity' });
+  await expect(activity.getByText('Create document').first()).toBeVisible();
+  await expect(activity.getByText('Update fields').first()).toBeVisible();
+  await expect(activity.getByText('Save document').first()).toBeVisible();
+  await expect(activity.getByText('Delete document').first()).toBeVisible();
+
+  await page.getByRole('button', { name: 'Settings' }).click();
+  const settings = page.getByRole('dialog', { name: 'Settings' });
+  await expect(settings).toBeVisible();
+  await settings.getByLabel('Activity detail').selectOption('fullPayload');
+  await expect(settings.getByLabel('Activity detail')).toHaveValue('fullPayload');
+  await expect(settings.getByText(/fullPayload, 5 MB/)).toBeVisible();
+  await settings.getByRole('button', { name: 'Close dialog' }).click();
+  await expect(settings).toBeHidden();
+
+  const documentId = `activity-${suffix}`;
+  await runCollectionQuery(page, 'smokeUiActivity');
+  await page.getByRole('button', { name: 'New document' }).click();
+  const createDialog = page.getByRole('dialog', { name: 'New document' });
+  await expect(createDialog).toBeVisible();
+  await createDialog.getByLabel('Document ID').fill(documentId);
+  await replaceMonacoEditorValue(
+    page,
+    createDialog,
+    JSON.stringify({ source: 'activity-full-payload' }, null, 2),
+  );
+  await createDialog.getByRole('button', { name: 'Create' }).click();
+  await expectDialogHidden(createDialog, 'Activity create dialog stayed open');
+  await refreshChangedResults(page);
+  await expectResultDocumentId(page, documentId);
+  await selectDocument(page, documentId);
+  await openFieldEdit(page, 'source', 'Edit string');
+  const editDialog = page.getByRole('dialog', { name: 'Edit source' });
+  await editDialog.getByLabel('Field string value').fill('activity-patched');
+  await editDialog.getByRole('button', { name: 'Save' }).click();
+  await expectDialogHidden(editDialog, 'Activity field edit dialog stayed open');
+  await refreshChangedResults(page);
+
+  await openActivity(page);
+  await activity.getByRole('button', { name: 'Export' }).click();
+
+  await expect.poll(async () => readFile(activityExportPath, 'utf8').catch(() => '')).toContain(
+    'activity-full-payload',
+  );
+  const exported = await readFile(activityExportPath, 'utf8');
+  expect(exported).toContain('"payload"');
+  expect(exported).toContain('"operations"');
+  expect(exported).toContain('activity-patched');
+}
+
 async function runCollectionQuery(page: Page, path: string): Promise<void> {
   await page.getByRole('tab', { name: 'Table' }).click();
   await page.getByLabel('Query path').fill(path);
@@ -356,10 +510,29 @@ async function selectDocument(page: Page, documentId: string): Promise<void> {
   await expect(page.getByText(new RegExp(`/${escapeRegExp(documentId)}$`)).first()).toBeVisible();
 }
 
+async function openFieldEdit(page: Page, fieldName: string, menuItem: string): Promise<void> {
+  await openFieldMenu(page, fieldName, menuItem);
+  await expect(page.getByRole('dialog', { name: `Edit ${fieldName}` })).toBeVisible();
+}
+
+async function openFieldMenu(page: Page, fieldName: string, menuItem: string): Promise<void> {
+  await page.getByRole('treeitem', { name: new RegExp(`\\b${escapeRegExp(fieldName)}\\b`) })
+    .last()
+    .click({ button: 'right' });
+  await page.getByRole('menuitem', { name: menuItem }).click();
+}
+
 async function refreshChangedResults(page: Page): Promise<void> {
   const bannerText = page.getByText('Results changed.');
   await expect(bannerText).toBeVisible();
   await bannerText.locator('xpath=..').getByRole('button', { name: 'Refresh' }).click();
+}
+
+async function openActivity(page: Page): Promise<void> {
+  const activity = page.getByRole('region', { name: 'Activity' });
+  if (await activity.count()) return;
+  await page.getByRole('button', { name: /Activity/ }).click();
+  await expect(activity).toBeVisible();
 }
 
 async function expectDialogHidden(dialog: ReturnType<Page['getByRole']>, message: string) {

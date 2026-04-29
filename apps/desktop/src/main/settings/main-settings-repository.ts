@@ -1,9 +1,11 @@
 import type {
+  ActivityLogSettings,
   HotkeyOverrides,
   SettingsPatch,
   SettingsRepository,
   SettingsSnapshot,
 } from '@firebase-desk/repo-contracts';
+import { normalizeFirestoreWriteSettings } from '@firebase-desk/repo-contracts';
 
 interface SettingsStoreLike {
   readonly load: () => Promise<SettingsSnapshot>;
@@ -24,6 +26,9 @@ export class MainSettingsRepository implements SettingsRepository {
   async save(patch: SettingsPatch): Promise<SettingsSnapshot> {
     const current = await this.store.load();
     return await this.store.save({
+      activityLog: patch.activityLog
+        ? cloneActivityLogSettings(patch.activityLog)
+        : cloneActivityLogSettings(current.activityLog),
       sidebarWidth: patch.sidebarWidth ?? current.sidebarWidth,
       inspectorWidth: patch.inspectorWidth ?? current.inspectorWidth,
       theme: patch.theme ?? current.theme,
@@ -37,6 +42,9 @@ export class MainSettingsRepository implements SettingsRepository {
       firestoreFieldCatalogs: patch.firestoreFieldCatalogs
         ? cloneFirestoreFieldCatalogs(patch.firestoreFieldCatalogs)
         : cloneFirestoreFieldCatalogs(current.firestoreFieldCatalogs),
+      firestoreWrites: normalizeFirestoreWriteSettings(
+        patch.firestoreWrites ?? current.firestoreWrites,
+      ),
     });
   }
 
@@ -47,6 +55,10 @@ export class MainSettingsRepository implements SettingsRepository {
   async setHotkeyOverrides(overrides: HotkeyOverrides): Promise<void> {
     await this.save({ hotkeyOverrides: { ...overrides } });
   }
+}
+
+function cloneActivityLogSettings(settings: ActivityLogSettings): ActivityLogSettings {
+  return { ...settings };
 }
 
 function cloneResultTableLayouts(

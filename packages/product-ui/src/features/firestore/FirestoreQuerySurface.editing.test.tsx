@@ -1,6 +1,9 @@
 import type {
   FirestoreDocumentResult,
   FirestoreSaveDocumentResult,
+  FirestoreUpdateDocumentFieldsResult,
+  SettingsRepository,
+  SettingsSnapshot,
 } from '@firebase-desk/repo-contracts';
 import { MockSettingsRepository } from '@firebase-desk/repo-mocks';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -174,66 +177,124 @@ const documentWithSubcollections: FirestoreDocumentResult = {
 
 describe('FirestoreQuerySurface editing UX', () => {
   it('quick toggles a boolean field from the selection preview', async () => {
-    const onSaveDocument = vi.fn<SaveDocument>();
-    renderSurface({ onSaveDocument });
+    const onUpdateDocumentFields = vi.fn<UpdateDocumentFields>();
+    renderSurface({ onUpdateDocumentFields });
 
     fireEvent.click(screen.getByRole('checkbox', { name: 'Toggle active' }));
 
     await waitFor(() =>
-      expect(onSaveDocument).toHaveBeenCalledWith('orders/ord_1', {
-        active: false,
-        meta: { count: 2 },
-        'a.b': 'literal',
-      }, { lastUpdateTime: document.updateTime })
+      expect(onUpdateDocumentFields).toHaveBeenCalledWith(
+        'orders/ord_1',
+        [{
+          baseValue: true,
+          fieldPath: ['active'],
+          type: 'set',
+          value: false,
+        }],
+        {
+          lastUpdateTime: document.updateTime,
+          staleBehavior: 'save-and-notify',
+        },
+      )
     );
   });
 
   it('sets a field to null and shows manual refresh banner', async () => {
-    const onSaveDocument = vi.fn<SaveDocument>();
-    renderSurface({ onSaveDocument });
+    const onUpdateDocumentFields = vi.fn<UpdateDocumentFields>();
+    renderSurface({ onUpdateDocumentFields });
 
     fireEvent.click(screen.getAllByRole('button', { name: 'set null active' })[0]!);
 
     await waitFor(() =>
-      expect(onSaveDocument).toHaveBeenCalledWith('orders/ord_1', {
-        active: null,
-        meta: { count: 2 },
-        'a.b': 'literal',
-      }, { lastUpdateTime: document.updateTime })
+      expect(onUpdateDocumentFields).toHaveBeenCalledWith(
+        'orders/ord_1',
+        [{
+          baseValue: true,
+          fieldPath: ['active'],
+          type: 'set',
+          value: null,
+        }],
+        {
+          lastUpdateTime: document.updateTime,
+          staleBehavior: 'save-and-notify',
+        },
+      )
     );
     expect(await screen.findByText('Results changed.')).toBeTruthy();
   });
 
+  it('defaults stale behavior when settings predate Firestore write settings', async () => {
+    const onUpdateDocumentFields = vi.fn<UpdateDocumentFields>();
+    renderSurface({
+      onUpdateDocumentFields,
+      settings: createLegacySettingsRepository(),
+    });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'set null active' })[0]!);
+
+    await waitFor(() =>
+      expect(onUpdateDocumentFields).toHaveBeenCalledWith(
+        'orders/ord_1',
+        [{
+          baseValue: true,
+          fieldPath: ['active'],
+          type: 'set',
+          value: null,
+        }],
+        {
+          lastUpdateTime: document.updateTime,
+          staleBehavior: 'save-and-notify',
+        },
+      )
+    );
+  });
+
   it('confirms before deleting a field', async () => {
-    const onSaveDocument = vi.fn<SaveDocument>();
-    renderSurface({ onSaveDocument });
+    const onUpdateDocumentFields = vi.fn<UpdateDocumentFields>();
+    renderSurface({ onUpdateDocumentFields });
 
     fireEvent.click(screen.getAllByRole('button', { name: 'delete active' })[0]!);
     expect(screen.getByRole('dialog', { name: 'Delete field' })).toBeTruthy();
     fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
 
     await waitFor(() =>
-      expect(onSaveDocument).toHaveBeenCalledWith('orders/ord_1', {
-        meta: { count: 2 },
-        'a.b': 'literal',
-      }, { lastUpdateTime: document.updateTime })
+      expect(onUpdateDocumentFields).toHaveBeenCalledWith(
+        'orders/ord_1',
+        [{
+          baseValue: true,
+          fieldPath: ['active'],
+          type: 'delete',
+        }],
+        {
+          lastUpdateTime: document.updateTime,
+          staleBehavior: 'save-and-notify',
+        },
+      )
     );
   });
 
   it('edits a literal dotted field name without treating it as nested', async () => {
-    const onSaveDocument = vi.fn<SaveDocument>();
-    renderSurface({ onSaveDocument });
+    const onUpdateDocumentFields = vi.fn<UpdateDocumentFields>();
+    renderSurface({ onUpdateDocumentFields });
 
     fireEvent.click(screen.getAllByRole('button', { name: 'edit a.b' })[0]!);
     fireEvent.change(screen.getByLabelText('Field string value'), { target: { value: 'changed' } });
     fireEvent.click(screen.getByRole('button', { name: 'Save' }));
 
     await waitFor(() =>
-      expect(onSaveDocument).toHaveBeenCalledWith('orders/ord_1', {
-        active: true,
-        meta: { count: 2 },
-        'a.b': 'changed',
-      }, { lastUpdateTime: document.updateTime })
+      expect(onUpdateDocumentFields).toHaveBeenCalledWith(
+        'orders/ord_1',
+        [{
+          baseValue: 'literal',
+          fieldPath: ['a.b'],
+          type: 'set',
+          value: 'changed',
+        }],
+        {
+          lastUpdateTime: document.updateTime,
+          staleBehavior: 'save-and-notify',
+        },
+      )
     );
   });
 
@@ -243,7 +304,6 @@ describe('FirestoreQuerySurface editing UX', () => {
     renderSurface({
       onCreateDocument,
       onGenerateDocumentId,
-      onSaveDocument: vi.fn<SaveDocument>(),
     });
 
     fireEvent.click(screen.getAllByRole('button', { name: 'New document' })[0]!);
@@ -270,7 +330,6 @@ describe('FirestoreQuerySurface editing UX', () => {
       },
       onCreateDocument,
       onGenerateDocumentId: () => 'generated_id',
-      onSaveDocument: vi.fn<SaveDocument>(),
     });
 
     expect(await screen.findByRole('dialog', { name: 'New collection' })).toBeTruthy();
@@ -296,10 +355,11 @@ describe('FirestoreQuerySurface editing UX', () => {
       data: { active: false, meta: { count: 3 }, 'a.b': 'remote' },
       updateTime: '2026-04-29T00:01:00.000Z',
     };
+    const onUpdateDocumentFields = vi.fn<UpdateDocumentFields>()
+      .mockResolvedValueOnce({ status: 'conflict', remoteDocument });
     const onSaveDocument = vi.fn<SaveDocument>()
-      .mockResolvedValueOnce({ status: 'conflict', remoteDocument })
       .mockResolvedValueOnce({ status: 'saved', document: remoteDocument });
-    renderSurface({ onSaveDocument });
+    renderSurface({ onSaveDocument, onUpdateDocumentFields });
 
     fireEvent.click(screen.getAllByRole('button', { name: 'set null active' })[0]!);
     expect(await screen.findByRole('dialog', { name: 'Resolve save conflict' })).toBeTruthy();
@@ -317,6 +377,84 @@ describe('FirestoreQuerySurface editing UX', () => {
         { lastUpdateTime: remoteDocument.updateTime },
       )
     );
+  });
+
+  it('saves stale unchanged fields by default and shows a notice', async () => {
+    const onUpdateDocumentFields = vi.fn<UpdateDocumentFields>().mockResolvedValue({
+      status: 'saved',
+      document,
+      documentChanged: true,
+    });
+    renderSurface({ onUpdateDocumentFields });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'set null active' })[0]!);
+
+    await waitFor(() => expect(onUpdateDocumentFields).toHaveBeenCalledTimes(1));
+    expect(await screen.findByText(/Document changed elsewhere/)).toBeTruthy();
+  });
+
+  it('confirms stale unchanged field writes when configured', async () => {
+    const settings = new MockSettingsRepository();
+    await settings.save({ firestoreWrites: { fieldStaleBehavior: 'confirm' } });
+    const remoteDocument = {
+      ...document,
+      updateTime: '2026-04-29T00:02:00.000Z',
+    };
+    const onUpdateDocumentFields = vi.fn<UpdateDocumentFields>()
+      .mockResolvedValueOnce({ status: 'document-changed', remoteDocument })
+      .mockResolvedValueOnce({ status: 'saved', document: remoteDocument });
+    renderSurface({ onUpdateDocumentFields, settings });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'set null active' })[0]!);
+    expect(await screen.findByRole('dialog', { name: 'Document changed elsewhere' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save field' }));
+
+    await waitFor(() =>
+      expect(onUpdateDocumentFields).toHaveBeenLastCalledWith(
+        'orders/ord_1',
+        expect.any(Array),
+        {
+          lastUpdateTime: remoteDocument.updateTime,
+          staleBehavior: 'confirm',
+        },
+      )
+    );
+  });
+
+  it('shows an error when confirmed stale field writes fail', async () => {
+    const settings = new MockSettingsRepository();
+    await settings.save({ firestoreWrites: { fieldStaleBehavior: 'confirm' } });
+    const remoteDocument = {
+      ...document,
+      updateTime: '2026-04-29T00:02:00.000Z',
+    };
+    const onUpdateDocumentFields = vi.fn<UpdateDocumentFields>()
+      .mockResolvedValueOnce({ status: 'document-changed', remoteDocument })
+      .mockRejectedValueOnce(new Error('retry failed'));
+    renderSurface({ onUpdateDocumentFields, settings });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'set null active' })[0]!);
+    expect(await screen.findByRole('dialog', { name: 'Document changed elsewhere' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Save field' }));
+
+    expect(await screen.findByText('retry failed')).toBeTruthy();
+  });
+
+  it('blocks stale unchanged field writes when configured', async () => {
+    const settings = new MockSettingsRepository();
+    await settings.save({ firestoreWrites: { fieldStaleBehavior: 'block' } });
+    const remoteDocument = {
+      ...document,
+      updateTime: '2026-04-29T00:02:00.000Z',
+    };
+    const onUpdateDocumentFields = vi.fn<UpdateDocumentFields>()
+      .mockResolvedValueOnce({ status: 'document-changed', remoteDocument });
+    renderSurface({ onUpdateDocumentFields, settings });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'set null active' })[0]!);
+
+    expect(await screen.findByText('Document changed elsewhere. Refresh before saving this field.'))
+      .toBeTruthy();
   });
   it('confirms document delete and includes selected subcollections', async () => {
     const onSaveDocument = vi.fn<SaveDocument>();
@@ -367,6 +505,8 @@ function renderSurface(
     onCreateDocument,
     onGenerateDocumentId,
     onSaveDocument,
+    onUpdateDocumentFields,
+    settings = new MockSettingsRepository(),
   }: {
     readonly createDocumentRequest?: {
       readonly collectionPath: string;
@@ -377,11 +517,13 @@ function renderSurface(
     readonly onCreateDocument?: CreateDocument;
     readonly onDeleteDocument?: DeleteDocument;
     readonly onGenerateDocumentId?: (collectionPath: string) => Promise<string> | string;
-    readonly onSaveDocument: SaveDocument;
+    readonly onSaveDocument?: SaveDocument;
+    readonly onUpdateDocumentFields?: UpdateDocumentFields;
+    readonly settings?: SettingsRepository;
   },
 ) {
   render(
-    <AppearanceProvider settings={new MockSettingsRepository()}>
+    <AppearanceProvider settings={settings}>
       <FirestoreQuerySurface
         createDocumentRequest={createDocumentRequest}
         draft={draft}
@@ -397,8 +539,10 @@ function renderSurface(
         onOpenDocumentInNewTab={() => {}}
         onReset={() => {}}
         onRun={() => {}}
-        onSaveDocument={onSaveDocument}
+        onSaveDocument={onSaveDocument ?? vi.fn<SaveDocument>()}
+        {...(onUpdateDocumentFields ? { onUpdateDocumentFields } : {})}
         onSelectDocument={() => {}}
+        settings={settings}
       />
     </AppearanceProvider>,
   );
@@ -409,6 +553,22 @@ type SaveDocument = (
   data: Record<string, unknown>,
   options?: { readonly lastUpdateTime?: string; },
 ) => FirestoreSaveDocumentResult | void | Promise<FirestoreSaveDocumentResult | void>;
+type UpdateDocumentFields = (
+  documentPath: string,
+  operations: ReadonlyArray<{
+    readonly baseValue: unknown;
+    readonly fieldPath: ReadonlyArray<string>;
+    readonly type: 'delete' | 'set';
+    readonly value?: unknown;
+  }>,
+  options: {
+    readonly lastUpdateTime?: string;
+    readonly staleBehavior: 'block' | 'confirm' | 'save-and-notify';
+  },
+) =>
+  | FirestoreUpdateDocumentFieldsResult
+  | void
+  | Promise<FirestoreUpdateDocumentFieldsResult | void>;
 type CreateDocument = (
   collectionPath: string,
   documentId: string,
@@ -418,3 +578,16 @@ type DeleteDocument = (documentPath: string, options: DeleteDocumentOptions) => 
 type CollectionWithDocuments = NonNullable<FirestoreDocumentResult['subcollections']>[number] & {
   readonly documents: ReadonlyArray<FirestoreDocumentResult>;
 };
+
+function createLegacySettingsRepository(): SettingsRepository {
+  const delegate = new MockSettingsRepository();
+  return {
+    async load() {
+      const { firestoreWrites: _firestoreWrites, ...snapshot } = await delegate.load();
+      return snapshot as unknown as SettingsSnapshot;
+    },
+    save: (patch) => delegate.save(patch),
+    getHotkeyOverrides: () => delegate.getHotkeyOverrides(),
+    setHotkeyOverrides: (overrides) => delegate.setHotkeyOverrides(overrides),
+  };
+}

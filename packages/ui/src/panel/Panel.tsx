@@ -39,3 +39,27 @@ export function PanelBody({ className, ...props }: HTMLAttributes<HTMLDivElement
     />
   );
 }
+
+export interface DockedPanelProps extends HTMLAttributes<HTMLElement> {
+  readonly edge?: 'bottom' | 'left' | 'right' | 'top';
+}
+
+const dockedPanelEdgeClasses: Record<NonNullable<DockedPanelProps['edge']>, string> = {
+  bottom: 'border-b border-border-strong',
+  left: 'border-l border-border-strong',
+  right: 'border-r border-border-strong',
+  top: 'border-t border-border-strong',
+};
+
+export function DockedPanel({ className, edge = 'top', ...props }: DockedPanelProps) {
+  return (
+    <section
+      className={cn(
+        'min-h-0 overflow-hidden bg-bg-panel',
+        dockedPanelEdgeClasses[edge],
+        className,
+      )}
+      {...props}
+    />
+  );
+}

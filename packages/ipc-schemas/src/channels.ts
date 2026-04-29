@@ -1,5 +1,11 @@
 import { z } from 'zod';
 import {
+  ActivityLogAppendInputSchema,
+  ActivityLogEntrySchema,
+  ActivityLogExportResultSchema,
+  ActivityLogListRequestSchema,
+} from './activity.ts';
+import {
   AuthUserSchema,
   AuthUsersPageSchema,
   ListUsersRequestSchema,
@@ -15,10 +21,12 @@ import {
   FirestoreGeneratedDocumentIdSchema,
   FirestoreResultsPageSchema,
   FirestoreSaveDocumentResultSchema,
+  FirestoreUpdateDocumentFieldsResultSchema,
   GenerateDocumentIdRequestSchema,
   ListDocumentsRequestSchema,
   RunQueryRequestSchema,
   SaveDocumentRequestSchema,
+  UpdateDocumentFieldsRequestSchema,
 } from './firestore.ts';
 import { HealthCheckRequestSchema, HealthCheckResponseSchema } from './health.ts';
 import {
@@ -53,6 +61,22 @@ export const IPC_CHANNELS = {
   'app.openDataDirectory': {
     request: z.object({}),
     response: z.void(),
+  },
+  'activity.append': {
+    request: ActivityLogAppendInputSchema,
+    response: ActivityLogEntrySchema,
+  },
+  'activity.clear': {
+    request: z.object({}),
+    response: z.void(),
+  },
+  'activity.export': {
+    request: ActivityLogListRequestSchema,
+    response: ActivityLogExportResultSchema,
+  },
+  'activity.list': {
+    request: ActivityLogListRequestSchema,
+    response: z.array(ActivityLogEntrySchema),
   },
   'projects.list': {
     request: z.object({}),
@@ -113,6 +137,10 @@ export const IPC_CHANNELS = {
   'firestore.saveDocument': {
     request: SaveDocumentRequestSchema,
     response: FirestoreSaveDocumentResultSchema,
+  },
+  'firestore.updateDocumentFields': {
+    request: UpdateDocumentFieldsRequestSchema,
+    response: FirestoreUpdateDocumentFieldsResultSchema,
   },
   'firestore.deleteDocument': {
     request: DeleteDocumentRequestSchema,

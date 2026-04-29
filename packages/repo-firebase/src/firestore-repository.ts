@@ -3,9 +3,12 @@ import type {
   FirestoreDeleteDocumentOptions,
   FirestoreDocumentNode,
   FirestoreDocumentResult,
+  FirestoreFieldPatchOperation,
   FirestoreRepository,
   FirestoreSaveDocumentOptions,
   FirestoreSaveDocumentResult,
+  FirestoreUpdateDocumentFieldsOptions,
+  FirestoreUpdateDocumentFieldsResult,
   Page,
   PageRequest,
 } from '@firebase-desk/repo-contracts';
@@ -13,6 +16,7 @@ import {
   type CollectionReference,
   type DocumentSnapshot,
   FieldPath,
+  FieldValue,
   type Firestore,
   type OrderByDirection,
   type Query,
@@ -172,6 +176,59 @@ export class FirebaseFirestoreRepository implements FirestoreRepository {
     });
   }
 
+  async updateDocumentFields(
+    connectionId: string,
+    documentPath: string,
+    operations: ReadonlyArray<FirestoreFieldPatchOperation>,
+    options: FirestoreUpdateDocumentFieldsOptions,
+  ): Promise<FirestoreUpdateDocumentFieldsResult> {
+    assertDocumentPath(documentPath);
+    assertFieldPatchOperations(operations);
+    return await this.withConnection(connectionId, async (db) => {
+      const ref = db.doc(documentPath);
+      const transactionResult = await db.runTransaction(async (transaction) => {
+        const current = await transaction.get(ref);
+        if (!current.exists) return { status: 'conflict' as const, remoteDocument: null };
+
+        const currentUpdateTime = snapshotUpdateTime(current);
+        const documentChanged = Boolean(
+          options.lastUpdateTime && currentUpdateTime !== options.lastUpdateTime,
+        );
+
+        if (documentChanged) {
+          const remoteDocument = await documentResult(current);
+          if (fieldPatchHasChangedRemoteValue(remoteDocument.data, operations)) {
+            return { status: 'conflict' as const, remoteDocument };
+          }
+          if (options.staleBehavior !== 'save-and-notify') {
+            return { status: 'document-changed' as const, remoteDocument };
+          }
+        }
+
+        for (const operation of operations) {
+          transaction.update(
+            ref,
+            new FieldPath(...operation.fieldPath),
+            operation.type === 'delete'
+              ? FieldValue.delete()
+              : decodeFilterValue(db, operation.value),
+          );
+        }
+        return { status: 'saved' as const, documentChanged };
+      });
+
+      if (transactionResult.status !== 'saved') return transactionResult;
+
+      const snapshot = await ref.get();
+      if (!snapshot.exists) return { status: 'conflict', remoteDocument: null };
+      return {
+        status: 'saved',
+        document: await documentResult(snapshot),
+        ...(transactionResult.documentChanged ? { documentChanged: true } : {}),
+      };
+    });
+  }
+
   async deleteDocument(
     connectionId: string,
     documentPath: string,
@@ -284,6 +341,20 @@ function assertDocumentId(id: string): void {
   }
 }
 
+function assertFieldPatchOperations(
+  operations: ReadonlyArray<FirestoreFieldPatchOperation>,
+): void {
+  if (!operations.length) throw new Error('At least one Firestore field operation is required.');
+  for (const operation of operations) {
+    if (!operation.fieldPath.length) throw new Error('Firestore field path is required.');
+    for (const segment of operation.fieldPath) {
+      if (!segment || /^__.*__$/.test(segment) || Buffer.byteLength(segment, 'utf8') > 1500) {
+        throw new Error(`Invalid Firestore field path segment: ${segment}`);
+      }
+    }
+  }
+}
+
 function assertDirectSubcollectionPath(documentPath: string, collectionPath: string): void {
   assertCollectionPath(collectionPath);
   const parentPrefix = `${documentPath}/`;
@@ -303,6 +374,50 @@ function assertDirectSubcollectionPath(documentPath: string, collectionPath: str
 function pathParts(path: string): ReadonlyArray<string> {
   const parts = path.split('/');
   return parts.some((part) => part.length === 0) ? [] : parts;
+}
+
+function fieldPatchHasChangedRemoteValue(
+  remoteData: Record<string, unknown>,
+  operations: ReadonlyArray<FirestoreFieldPatchOperation>,
+): boolean {
+  return operations.some((operation) =>
+    !deepEqual(getNestedValue(remoteData, operation.fieldPath), operation.baseValue)
+  );
+}
+
+function getNestedValue(
+  data: Record<string, unknown>,
+  fieldPath: ReadonlyArray<string>,
+): unknown {
+  let current: unknown = data;
+  for (const segment of fieldPath) {
+    if (!current || typeof current !== 'object' || Array.isArray(current)) return undefined;
+    current = (current as Record<string, unknown>)[segment];
+  }
+  return current;
+}
+
+function deepEqual(left: unknown, right: unknown): boolean {
+  return JSON.stringify(sortJson(left)) === JSON.stringify(sortJson(right));
+}
+
+function sortJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortJson);
+  if (!value || typeof value !== 'object') return value;
+  return Object.fromEntries(
+    sortedEntriesByKey(value as Record<string, unknown>)
+      .map(([key, entry]) => [key, sortJson(entry)]),
+  );
+}
+
+function sortedEntriesByKey(value: Record<string, unknown>): ReadonlyArray<[string, unknown]> {
+  const sorted: Array<[string, unknown]> = [];
+  for (const entry of Object.entries(value)) {
+    const index = sorted.findIndex(([key]) => entry[0].localeCompare(key) < 0);
+    if (index < 0) sorted.push(entry);
+    else sorted.splice(index, 0, entry);
+  }
+  return sorted;
 }
 
 function firestoreOperationError(caught: unknown, config: FirebaseConnectionConfig): Error {

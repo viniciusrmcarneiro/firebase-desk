@@ -32,6 +32,7 @@ export interface ResultPanelProps {
   readonly isFetchingMore: boolean;
   readonly isLoading: boolean;
   readonly actionErrorMessage?: string | null;
+  readonly actionNoticeMessage?: string | null;
   readonly resultsStale?: boolean;
   readonly onCreateDocument?: ((collectionPath: string) => void) | undefined;
   readonly onDeleteDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
@@ -57,6 +58,7 @@ export function ResultPanel(
   {
     hasMore,
     actionErrorMessage = null,
+    actionNoticeMessage = null,
     errorMessage,
     isFetchingMore,
     isLoading,
@@ -166,6 +168,13 @@ export function ResultPanel(
             ? (
               <div className='border-b border-border-subtle p-2'>
                 <InlineAlert variant='danger'>{actionErrorMessage}</InlineAlert>
+              </div>
+            )
+            : null}
+          {actionNoticeMessage
+            ? (
+              <div className='border-b border-border-subtle p-2'>
+                <InlineAlert variant='warning'>{actionNoticeMessage}</InlineAlert>
               </div>
             )
             : null}

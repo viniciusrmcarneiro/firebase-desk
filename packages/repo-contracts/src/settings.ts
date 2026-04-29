@@ -1,3 +1,5 @@
+import type { ActivityLogSettings } from './activity.ts';
+
 /**
  * Future map of user-defined hotkey overrides.
  * Keys are central registry IDs (see @firebase-desk/hotkeys); values are accelerator strings.
@@ -51,7 +53,41 @@ export interface FirestoreFieldCatalogEntry {
 
 export type FirestoreFieldCatalogs = Record<string, FirestoreFieldCatalogEntry[]>;
 
+export const FIRESTORE_FIELD_STALE_BEHAVIORS = [
+  'save-and-notify',
+  'confirm',
+  'block',
+] as const;
+
+export type FirestoreFieldStaleBehavior = (typeof FIRESTORE_FIELD_STALE_BEHAVIORS)[number];
+
+export interface FirestoreWriteSettings {
+  readonly fieldStaleBehavior: FirestoreFieldStaleBehavior;
+}
+
+export const DEFAULT_FIRESTORE_WRITE_SETTINGS: FirestoreWriteSettings = {
+  fieldStaleBehavior: 'save-and-notify',
+};
+
+export function isFirestoreFieldStaleBehavior(
+  value: unknown,
+): value is FirestoreFieldStaleBehavior {
+  return typeof value === 'string'
+    && (FIRESTORE_FIELD_STALE_BEHAVIORS as ReadonlyArray<string>).includes(value);
+}
+
+export function normalizeFirestoreWriteSettings(
+  settings: Partial<FirestoreWriteSettings> | null | undefined,
+): FirestoreWriteSettings {
+  return {
+    fieldStaleBehavior: isFirestoreFieldStaleBehavior(settings?.fieldStaleBehavior)
+      ? settings.fieldStaleBehavior
+      : DEFAULT_FIRESTORE_WRITE_SETTINGS.fieldStaleBehavior,
+  };
+}
+
 export interface SettingsSnapshot {
+  readonly activityLog: ActivityLogSettings;
   readonly sidebarWidth: number;
   readonly inspectorWidth: number;
   readonly theme: 'system' | 'light' | 'dark';
@@ -59,9 +95,11 @@ export interface SettingsSnapshot {
   readonly hotkeyOverrides: HotkeyOverrides;
   readonly resultTableLayouts: ResultTableLayouts;
   readonly firestoreFieldCatalogs: FirestoreFieldCatalogs;
+  readonly firestoreWrites: FirestoreWriteSettings;
 }
 
 export interface SettingsPatch {
+  readonly activityLog?: ActivityLogSettings | undefined;
   readonly sidebarWidth?: number | undefined;
   readonly inspectorWidth?: number | undefined;
   readonly theme?: SettingsSnapshot['theme'] | undefined;
@@ -69,6 +107,7 @@ export interface SettingsPatch {
   readonly hotkeyOverrides?: HotkeyOverrides | undefined;
   readonly resultTableLayouts?: ResultTableLayouts | undefined;
   readonly firestoreFieldCatalogs?: FirestoreFieldCatalogs | undefined;
+  readonly firestoreWrites?: FirestoreWriteSettings | undefined;
 }
 
 export interface SettingsRepository {

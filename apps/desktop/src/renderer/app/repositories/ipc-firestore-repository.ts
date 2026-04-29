@@ -4,11 +4,14 @@ import type {
   FirestoreDeleteDocumentOptions,
   FirestoreDocumentNode,
   FirestoreDocumentResult,
+  FirestoreFieldPatchOperation,
   FirestoreGeneratedDocumentId,
   FirestoreQuery,
   FirestoreRepository,
   FirestoreSaveDocumentOptions,
   FirestoreSaveDocumentResult,
+  FirestoreUpdateDocumentFieldsOptions,
+  FirestoreUpdateDocumentFieldsResult,
   Page,
   PageRequest,
 } from '@firebase-desk/repo-contracts';
@@ -95,6 +98,31 @@ export class IpcFirestoreRepository implements FirestoreRepository {
       : { status: 'saved', document: toDocumentResult(result.document) };
   }
 
+  async updateDocumentFields(
+    connectionId: string,
+    documentPath: string,
+    operations: ReadonlyArray<FirestoreFieldPatchOperation>,
+    options: FirestoreUpdateDocumentFieldsOptions,
+  ): Promise<FirestoreUpdateDocumentFieldsResult> {
+    const result = await window.firebaseDesk.firestore.updateDocumentFields({
+      connectionId,
+      documentPath,
+      operations: operations.map(toIpcFieldPatchOperation),
+      options: toIpcUpdateFieldsOptions(options),
+    });
+    if (result.status === 'conflict' || result.status === 'document-changed') {
+      return {
+        status: result.status,
+        remoteDocument: result.remoteDocument ? toDocumentResult(result.remoteDocument) : null,
+      };
+    }
+    return {
+      status: 'saved',
+      document: toDocumentResult(result.document),
+      ...(result.documentChanged ? { documentChanged: true } : {}),
+    };
+  }
+
   async generateDocumentId(
     connectionId: string,
     collectionPath: string,
@@ -164,6 +192,32 @@ function toIpcSaveOptions(
   options: FirestoreSaveDocumentOptions,
 ): NonNullable<IpcRequest<'firestore.saveDocument'>['options']> {
   return options.lastUpdateTime ? { lastUpdateTime: options.lastUpdateTime } : {};
+}
+
+function toIpcUpdateFieldsOptions(
+  options: FirestoreUpdateDocumentFieldsOptions,
+): IpcRequest<'firestore.updateDocumentFields'>['options'] {
+  return {
+    staleBehavior: options.staleBehavior,
+    ...(options.lastUpdateTime ? { lastUpdateTime: options.lastUpdateTime } : {}),
+  };
+}
+
+function toIpcFieldPatchOperation(
+  operation: FirestoreFieldPatchOperation,
+): IpcRequest<'firestore.updateDocumentFields'>['operations'][number] {
+  return operation.type === 'delete'
+    ? {
+      baseValue: operation.baseValue,
+      fieldPath: [...operation.fieldPath],
+      type: 'delete',
+    }
+    : {
+      baseValue: operation.baseValue,
+      fieldPath: [...operation.fieldPath],
+      type: 'set',
+      value: operation.value,
+    };
 }
 
 function toCollectionNode(

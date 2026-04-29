@@ -1,10 +1,15 @@
 import type {
   FirestoreCollectionNode,
   FirestoreDocumentResult,
+  FirestoreFieldPatchOperation,
+  FirestoreFieldStaleBehavior,
   FirestoreSaveDocumentOptions,
   FirestoreSaveDocumentResult,
+  FirestoreUpdateDocumentFieldsOptions,
+  FirestoreUpdateDocumentFieldsResult,
   SettingsRepository,
 } from '@firebase-desk/repo-contracts';
+import { normalizeFirestoreWriteSettings } from '@firebase-desk/repo-contracts';
 import { useEffect, useState } from 'react';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
 import { ConflictMergeModal } from './ConflictMergeModal.tsx';
@@ -68,6 +73,14 @@ export interface FirestoreQuerySurfaceProps {
     data: Record<string, unknown>,
     options?: FirestoreSaveDocumentOptions,
   ) => Promise<FirestoreSaveDocumentResult | void> | FirestoreSaveDocumentResult | void;
+  readonly onUpdateDocumentFields?: (
+    documentPath: string,
+    operations: ReadonlyArray<FirestoreFieldPatchOperation>,
+    options: FirestoreUpdateDocumentFieldsOptions,
+  ) =>
+    | Promise<FirestoreUpdateDocumentFieldsResult | void>
+    | FirestoreUpdateDocumentFieldsResult
+    | void;
   readonly onSelectDocument: (documentPath: string) => void;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocument?: FirestoreDocumentResult | null;
@@ -86,17 +99,19 @@ interface CreateDocumentState {
   readonly collectionPathEditable: boolean;
 }
 
-interface SaveConflictContext {
-  readonly baseDocument: FirestoreDocumentResult | null;
-  readonly onResolve?: (() => void) | undefined;
-}
-
 interface ConflictMergeState {
-  readonly baseDocument: FirestoreDocumentResult | null;
   readonly documentPath: string;
   readonly localData: Record<string, unknown>;
   readonly onResolve?: (() => void) | undefined;
   readonly remoteDocument: FirestoreDocumentResult | null;
+}
+
+interface PendingStaleFieldPatch {
+  readonly documentPath: string;
+  readonly localData: Record<string, unknown>;
+  readonly onResolve?: (() => void) | undefined;
+  readonly operations: ReadonlyArray<FirestoreFieldPatchOperation>;
+  readonly remoteDocument: FirestoreDocumentResult;
 }
 
 export function FirestoreQuerySurface(
@@ -119,6 +134,7 @@ export function FirestoreQuerySurface(
     onRefreshResults,
     onRun,
     onSaveDocument,
+    onUpdateDocumentFields,
     onSelectDocument,
     rows,
     selectedDocument = null,
@@ -136,13 +152,19 @@ export function FirestoreQuerySurface(
   const [createDocumentState, setCreateDocumentState] = useState<CreateDocumentState | null>(null);
   const [handledCreateRequestId, setHandledCreateRequestId] = useState<number | null>(null);
   const [conflictMerge, setConflictMerge] = useState<ConflictMergeState | null>(null);
+  const [pendingStaleFieldPatch, setPendingStaleFieldPatch] = useState<
+    PendingStaleFieldPatch | null
+  >(null);
   const [resultsStale, setResultsStale] = useState(false);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
+  const [actionNoticeMessage, setActionNoticeMessage] = useState<string | null>(null);
   const fieldSuggestions = useFirestoreFieldCatalog({
     queryPath: draft.path,
     rows,
     settings,
   });
+  // Field-level actions require patch writes; falling back to full saves would overwrite documents.
+  const fieldActionsEnabled = Boolean(onUpdateDocumentFields);
 
   useEffect(() => {
     if (!createDocumentRequest || createDocumentRequest.requestId === handledCreateRequestId) {
@@ -165,30 +187,82 @@ export function FirestoreQuerySurface(
     await onCreateDocument?.(collectionPath, documentId, data);
     setResultsStale(true);
     setActionErrorMessage(null);
+    setActionNoticeMessage(null);
   }
 
   async function saveDocument(
     documentPath: string,
     data: Record<string, unknown>,
     options?: FirestoreSaveDocumentOptions,
-    conflictContext?: SaveConflictContext,
+    conflictContext?: { readonly onResolve?: (() => void) | undefined; },
   ): Promise<boolean> {
     validateFirestoreDocumentData(data);
     const result = await onSaveDocument?.(documentPath, data, options);
     if (result?.status === 'conflict') {
       setConflictMerge({
-        baseDocument: conflictContext?.baseDocument ?? null,
         documentPath,
         localData: data,
         onResolve: conflictContext?.onResolve,
         remoteDocument: result.remoteDocument,
       });
       setActionErrorMessage(null);
+      setActionNoticeMessage(null);
       return false;
     }
     setResultsStale(true);
     setActionErrorMessage(null);
+    setActionNoticeMessage(null);
     conflictContext?.onResolve?.();
+    return true;
+  }
+
+  async function updateDocumentFields(
+    documentPath: string,
+    operations: ReadonlyArray<FirestoreFieldPatchOperation>,
+    options: FirestoreUpdateDocumentFieldsOptions,
+    context: {
+      readonly localData: Record<string, unknown>;
+      readonly onResolve?: (() => void) | undefined;
+    },
+  ): Promise<boolean> {
+    if (!onUpdateDocumentFields) throw new Error('Firestore field patch writes are unavailable.');
+    validateFieldPatchOperations(operations);
+    const result = await onUpdateDocumentFields?.(documentPath, operations, options);
+    if (result?.status === 'conflict') {
+      setConflictMerge({
+        documentPath,
+        localData: context.localData,
+        onResolve: context.onResolve,
+        remoteDocument: result.remoteDocument,
+      });
+      setActionErrorMessage(null);
+      setActionNoticeMessage(null);
+      return false;
+    }
+    if (result?.status === 'document-changed') {
+      setActionNoticeMessage(null);
+      if (options.staleBehavior === 'confirm' && result.remoteDocument) {
+        setPendingStaleFieldPatch({
+          documentPath,
+          localData: context.localData,
+          onResolve: context.onResolve,
+          operations,
+          remoteDocument: result.remoteDocument,
+        });
+        setActionErrorMessage(null);
+      } else {
+        setActionErrorMessage('Document changed elsewhere. Refresh before saving this field.');
+      }
+      return false;
+    }
+    setResultsStale(true);
+    setActionErrorMessage(null);
+    setActionNoticeMessage(
+      result?.status === 'saved' && result.documentChanged
+        ? 'Saved field. Document changed elsewhere; refresh to view the latest data.'
+        : null,
+    );
+    context.onResolve?.();
     return true;
   }
 
@@ -196,11 +270,22 @@ export function FirestoreQuerySurface(
     const document = documentForTarget(target, rows, selectedDocument);
     if (!document) throw new Error(`Document ${target.documentPath} is not loaded.`);
     validateFirestoreValue(value, target.fieldPath);
-    const data = setNestedFieldValue(document.data, target.fieldPath, value);
-    return await saveDocument(target.documentPath, data, saveOptionsFor(document), {
-      baseDocument: document,
-      onResolve: () => setFieldEditor(null),
-    });
+    const operation: FirestoreFieldPatchOperation = {
+      baseValue: getNestedFieldValue(document.data, target.fieldPath),
+      fieldPath: target.fieldPath,
+      type: 'set',
+      value,
+    };
+    const localData = setNestedFieldValue(document.data, target.fieldPath, value);
+    return await updateDocumentFields(
+      target.documentPath,
+      [operation],
+      await fieldOptionsFor(document),
+      {
+        localData,
+        onResolve: () => setFieldEditor(null),
+      },
+    );
   }
 
   async function setFieldNull(target: FieldEditTarget) {
@@ -223,11 +308,19 @@ export function FirestoreQuerySurface(
     try {
       const document = documentForTarget(target, rows, selectedDocument);
       if (!document) throw new Error(`Document ${target.documentPath} is not loaded.`);
-      const saved = await saveDocument(
+      const operation: FirestoreFieldPatchOperation = {
+        baseValue: getNestedFieldValue(document.data, target.fieldPath),
+        fieldPath: target.fieldPath,
+        type: 'delete',
+      };
+      const saved = await updateDocumentFields(
         target.documentPath,
-        deleteNestedFieldValue(document.data, target.fieldPath),
-        saveOptionsFor(document),
-        { baseDocument: document },
+        [operation],
+        await fieldOptionsFor(document),
+        {
+          localData: deleteNestedFieldValue(document.data, target.fieldPath),
+          onResolve: () => setDeleteFieldTarget(null),
+        },
       );
       if (saved) setDeleteFieldTarget(null);
     } catch (caught) {
@@ -245,9 +338,19 @@ export function FirestoreQuerySurface(
     }
   }
 
+  async function fieldOptionsFor(
+    document: FirestoreDocumentResult,
+  ): Promise<FirestoreUpdateDocumentFieldsOptions> {
+    return {
+      ...(document.updateTime ? { lastUpdateTime: document.updateTime } : {}),
+      staleBehavior: await loadFieldStaleBehavior(settings),
+    };
+  }
+
   function refreshResults() {
     setResultsStale(false);
     setActionErrorMessage(null);
+    setActionNoticeMessage(null);
     (onRefreshResults ?? onRun)();
   }
 
@@ -264,10 +367,7 @@ export function FirestoreQuerySurface(
       conflictMerge.documentPath,
       data,
       { lastUpdateTime: conflictMerge.remoteDocument.updateTime },
-      {
-        baseDocument: conflictMerge.remoteDocument,
-        onResolve: conflictMerge.onResolve,
-      },
+      { onResolve: conflictMerge.onResolve },
     );
     if (saved) setConflictMerge(null);
   }
@@ -277,7 +377,31 @@ export function FirestoreQuerySurface(
     setEditorDocument(null);
     setFieldEditor(null);
     setDeleteFieldTarget(null);
+    setPendingStaleFieldPatch(null);
     refreshResults();
+  }
+
+  async function confirmStaleFieldPatch() {
+    const lastUpdateTime = pendingStaleFieldPatch?.remoteDocument.updateTime;
+    if (!lastUpdateTime) return;
+    const pending = pendingStaleFieldPatch;
+    setPendingStaleFieldPatch(null);
+    try {
+      await updateDocumentFields(
+        pending.documentPath,
+        pending.operations,
+        {
+          lastUpdateTime,
+          staleBehavior: 'confirm',
+        },
+        {
+          localData: pending.localData,
+          onResolve: pending.onResolve,
+        },
+      );
+    } catch (caught) {
+      setActionErrorMessage(messageFromError(caught, 'Could not save field.'));
+    }
   }
 
   return (
@@ -298,6 +422,7 @@ export function FirestoreQuerySurface(
         isFetchingMore={isFetchingMore}
         isLoading={isLoading}
         actionErrorMessage={actionErrorMessage}
+        actionNoticeMessage={actionNoticeMessage}
         queryPath={draft.path}
         resultView={resultView}
         resultsStale={resultsStale}
@@ -306,9 +431,9 @@ export function FirestoreQuerySurface(
         selectedDocumentPath={selectedDocumentPath}
         settings={settings}
         onDeleteDocument={onDeleteDocument ? setDeleteDocumentTarget : undefined}
-        onDeleteField={onSaveDocument ? setDeleteFieldTarget : undefined}
+        onDeleteField={fieldActionsEnabled ? setDeleteFieldTarget : undefined}
         onEditDocument={setEditorDocument}
-        onEditField={onSaveDocument
+        onEditField={fieldActionsEnabled
           ? (target) => {
             const document = documentForTarget(target, rows, selectedDocument);
             setFieldEditor({
@@ -328,15 +453,14 @@ export function FirestoreQuerySurface(
           ? openCreateDocument
           : undefined}
         onSelectDocument={onSelectDocument}
-        onSetFieldValue={onSaveDocument ? setFieldValue : undefined}
-        onSetFieldNull={onSaveDocument ? setFieldNull : undefined}
+        onSetFieldValue={fieldActionsEnabled ? setFieldValue : undefined}
+        onSetFieldNull={fieldActionsEnabled ? setFieldNull : undefined}
       />
       <DocumentEditorModal
         document={editorDocument}
         open={Boolean(editorDocument)}
         onSaveDocument={(documentPath, data) =>
           saveDocument(documentPath, data, saveOptionsFor(editorDocument), {
-            baseDocument: editorDocument,
             onResolve: () => setEditorDocument(null),
           })}
         onOpenChange={(open) => {
@@ -371,6 +495,18 @@ export function FirestoreQuerySurface(
         }}
         onOpenChange={(open) => {
           if (!open) setDeleteFieldTarget(null);
+        }}
+      />
+      <ConfirmDialog
+        confirmLabel='Save field'
+        description='The document changed elsewhere, but this field still matches your loaded value. Save this field change anyway?'
+        open={Boolean(pendingStaleFieldPatch)}
+        title='Document changed elsewhere'
+        onConfirm={() => {
+          void confirmStaleFieldPatch();
+        }}
+        onOpenChange={(open) => {
+          if (!open) setPendingStaleFieldPatch(null);
         }}
       />
       <CreateDocumentModal
@@ -409,6 +545,23 @@ function saveOptionsFor(
   document: FirestoreDocumentResult | null,
 ): FirestoreSaveDocumentOptions | undefined {
   return document?.updateTime ? { lastUpdateTime: document.updateTime } : undefined;
+}
+
+async function loadFieldStaleBehavior(
+  settings: SettingsRepository | undefined,
+): Promise<FirestoreFieldStaleBehavior> {
+  return normalizeFirestoreWriteSettings((await settings?.load())?.firestoreWrites)
+    .fieldStaleBehavior;
+}
+
+function validateFieldPatchOperations(
+  operations: ReadonlyArray<FirestoreFieldPatchOperation>,
+): void {
+  if (!operations.length) throw new Error('At least one field operation is required.');
+  for (const operation of operations) {
+    if (!operation.fieldPath.length) throw new Error('Field path is required.');
+    if (operation.type === 'set') validateFirestoreValue(operation.value, operation.fieldPath);
+  }
 }
 
 function documentForTarget(

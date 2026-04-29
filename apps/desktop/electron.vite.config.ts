@@ -4,6 +4,8 @@ import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import monacoEditorPlugin from 'vite-plugin-monaco-editor';
 
+import { mainExternalizeDeps } from './src/main/packaging/main-externalize-deps';
+
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const monacoEditorPluginFactory =
   (monacoEditorPlugin as unknown as { default?: typeof monacoEditorPlugin; }).default
@@ -12,6 +14,7 @@ const monacoEditorPluginFactory =
 export default defineConfig({
   main: {
     build: {
+      externalizeDeps: mainExternalizeDeps,
       outDir: '.build/out/main',
       lib: {
         entry: {

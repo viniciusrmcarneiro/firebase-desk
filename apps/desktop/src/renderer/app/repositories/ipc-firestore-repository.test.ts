@@ -49,6 +49,17 @@ describe('IpcFirestoreRepository', () => {
           updateTime: '2026-04-29T00:00:01.000Z',
         },
       }),
+      updateDocumentFields: vi.fn().mockResolvedValue({
+        status: 'saved',
+        document: {
+          id: 'ord_2',
+          path: 'orders/ord_2',
+          data: { status: 'shipped' },
+          hasSubcollections: false,
+          updateTime: '2026-04-29T00:00:02.000Z',
+        },
+        documentChanged: true,
+      }),
       deleteDocument: vi.fn().mockResolvedValue(undefined),
     } satisfies Partial<DesktopFirestoreApi>;
     Object.defineProperty(window, 'firebaseDesk', {
@@ -116,6 +127,25 @@ describe('IpcFirestoreRepository', () => {
         updateTime: '2026-04-29T00:00:01.000Z',
       },
     });
+    await expect(repository.updateDocumentFields('emu', 'orders/ord_2', [{
+      baseValue: 'draft',
+      fieldPath: ['status'],
+      type: 'set',
+      value: 'shipped',
+    }], {
+      lastUpdateTime: '2026-04-29T00:00:01.000Z',
+      staleBehavior: 'save-and-notify',
+    })).resolves.toEqual({
+      status: 'saved',
+      document: {
+        id: 'ord_2',
+        path: 'orders/ord_2',
+        data: { status: 'shipped' },
+        hasSubcollections: false,
+        updateTime: '2026-04-29T00:00:02.000Z',
+      },
+      documentChanged: true,
+    });
     await expect(repository.deleteDocument('emu', 'orders/ord_2', {
       deleteSubcollectionPaths: ['orders/ord_2/events'],
     })).resolves.toBeUndefined();
@@ -147,6 +177,20 @@ describe('IpcFirestoreRepository', () => {
       documentPath: 'orders/ord_2',
       data: { status: 'draft' },
       options: { lastUpdateTime: '2026-04-29T00:00:00.000Z' },
+    });
+    expect(firestore.updateDocumentFields).toHaveBeenCalledWith({
+      connectionId: 'emu',
+      documentPath: 'orders/ord_2',
+      operations: [{
+        baseValue: 'draft',
+        fieldPath: ['status'],
+        type: 'set',
+        value: 'shipped',
+      }],
+      options: {
+        lastUpdateTime: '2026-04-29T00:00:01.000Z',
+        staleBehavior: 'save-and-notify',
+      },
     });
     expect(firestore.deleteDocument).toHaveBeenCalledWith({
       connectionId: 'emu',

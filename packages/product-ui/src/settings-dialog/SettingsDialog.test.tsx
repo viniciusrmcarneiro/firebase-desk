@@ -1,3 +1,4 @@
+import type { SettingsRepository, SettingsSnapshot } from '@firebase-desk/repo-contracts';
 import { MockSettingsRepository } from '@firebase-desk/repo-mocks';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
@@ -88,6 +89,134 @@ describe('SettingsDialog', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'live data mode' }));
 
     await waitFor(async () => expect((await settings.load()).dataMode).toBe('live'));
+  });
+
+  it('updates activity settings and notifies saves', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    const onSettingsSaved = vi.fn();
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} onSettingsSaved={onSettingsSaved} />
+      </AppearanceProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Activity logging' }));
+    await waitFor(async () => expect((await settings.load()).activityLog.enabled).toBe(false));
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Activity retention MB' }), {
+      target: { value: '8' },
+    });
+    fireEvent.blur(screen.getByRole('spinbutton', { name: 'Activity retention MB' }));
+
+    await waitFor(async () =>
+      expect((await settings.load()).activityLog.maxBytes).toBe(
+        8 * 1024 * 1024,
+      )
+    );
+    expect(onSettingsSaved).toHaveBeenCalled();
+  });
+
+  it('updates Firestore stale field write behavior', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    const onSettingsSaved = vi.fn();
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} onSettingsSaved={onSettingsSaved} />
+      </AppearanceProvider>,
+    );
+
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Stale field edits' }), {
+      target: { value: 'block' },
+    });
+
+    await waitFor(async () =>
+      expect((await settings.load()).firestoreWrites.fieldStaleBehavior).toBe('block')
+    );
+    expect(onSettingsSaved).toHaveBeenCalled();
+  });
+
+  it('defaults Firestore write settings for older saved settings', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = createLegacySettingsRepository();
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    const select = await screen.findByRole('combobox', { name: 'Stale field edits' });
+    expect((select as HTMLSelectElement).value).toBe('save-and-notify');
+  });
+
+  it('keeps full payload detail when another activity setting saves before rerender', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    const { rerender } = render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Activity detail' }), {
+      target: { value: 'fullPayload' },
+    });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Activity retention MB' }), {
+      target: { value: '8' },
+    });
+    fireEvent.blur(screen.getByRole('spinbutton', { name: 'Activity retention MB' }));
+
+    await waitFor(async () =>
+      expect((await settings.load()).activityLog).toMatchObject({
+        detailMode: 'fullPayload',
+        maxBytes: 8 * 1024 * 1024,
+      })
+    );
+
+    rerender(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open={false} onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+    rerender(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    await waitFor(() =>
+      expect(
+        (screen.getByRole('combobox', { name: 'Activity detail' }) as HTMLSelectElement).value,
+      ).toBe('fullPayload')
+    );
   });
 
   it('shows settings save failures', async () => {
@@ -218,3 +347,16 @@ describe('SettingsDialog', () => {
     expect(screen.getByText('About')).toBeTruthy();
   });
 });
+
+function createLegacySettingsRepository(): SettingsRepository {
+  const delegate = new MockSettingsRepository();
+  return {
+    async load() {
+      const { firestoreWrites: _firestoreWrites, ...snapshot } = await delegate.load();
+      return snapshot as unknown as SettingsSnapshot;
+    },
+    save: (patch) => delegate.save(patch),
+    getHotkeyOverrides: () => delegate.getHotkeyOverrides(),
+    setHotkeyOverrides: (overrides) => delegate.setHotkeyOverrides(overrides),
+  };
+}

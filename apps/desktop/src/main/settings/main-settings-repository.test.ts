@@ -1,8 +1,13 @@
-import type { SettingsSnapshot } from '@firebase-desk/repo-contracts';
+import {
+  DEFAULT_ACTIVITY_LOG_SETTINGS,
+  DEFAULT_FIRESTORE_WRITE_SETTINGS,
+  type SettingsSnapshot,
+} from '@firebase-desk/repo-contracts';
 import { describe, expect, it } from 'vitest';
 import { MainSettingsRepository } from './main-settings-repository.ts';
 
 const initialSnapshot: SettingsSnapshot = {
+  activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
   sidebarWidth: 320,
   inspectorWidth: 360,
   theme: 'system',
@@ -10,6 +15,7 @@ const initialSnapshot: SettingsSnapshot = {
   hotkeyOverrides: { 'query.run': 'Meta+Enter' },
   resultTableLayouts: {},
   firestoreFieldCatalogs: {},
+  firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
 };
 
 describe('MainSettingsRepository', () => {

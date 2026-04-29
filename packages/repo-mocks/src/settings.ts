@@ -1,11 +1,18 @@
 import type {
+  ActivityLogSettings,
   HotkeyOverrides,
   SettingsPatch,
   SettingsRepository,
   SettingsSnapshot,
 } from '@firebase-desk/repo-contracts';
+import {
+  DEFAULT_ACTIVITY_LOG_SETTINGS,
+  DEFAULT_FIRESTORE_WRITE_SETTINGS,
+  normalizeFirestoreWriteSettings,
+} from '@firebase-desk/repo-contracts';
 
 const DEFAULT_SNAPSHOT: SettingsSnapshot = {
+  activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
   sidebarWidth: 320,
   inspectorWidth: 360,
   theme: 'system',
@@ -13,6 +20,7 @@ const DEFAULT_SNAPSHOT: SettingsSnapshot = {
   hotkeyOverrides: {},
   resultTableLayouts: {},
   firestoreFieldCatalogs: {},
+  firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
 };
 
 export class MockSettingsRepository implements SettingsRepository {
@@ -24,6 +32,9 @@ export class MockSettingsRepository implements SettingsRepository {
 
   async save(patch: SettingsPatch): Promise<SettingsSnapshot> {
     this.snapshot = {
+      activityLog: patch.activityLog ? cloneActivityLogSettings(patch.activityLog) : {
+        ...this.snapshot.activityLog,
+      },
       sidebarWidth: patch.sidebarWidth ?? this.snapshot.sidebarWidth,
       inspectorWidth: patch.inspectorWidth ?? this.snapshot.inspectorWidth,
       theme: patch.theme ?? this.snapshot.theme,
@@ -37,6 +48,9 @@ export class MockSettingsRepository implements SettingsRepository {
       firestoreFieldCatalogs: patch.firestoreFieldCatalogs
         ? cloneFirestoreFieldCatalogs(patch.firestoreFieldCatalogs)
         : cloneFirestoreFieldCatalogs(this.snapshot.firestoreFieldCatalogs),
+      firestoreWrites: normalizeFirestoreWriteSettings(
+        patch.firestoreWrites ?? this.snapshot.firestoreWrites,
+      ),
     };
     return this.load();
   }
@@ -53,10 +67,16 @@ export class MockSettingsRepository implements SettingsRepository {
 function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
   return {
     ...snapshot,
+    activityLog: cloneActivityLogSettings(snapshot.activityLog),
     hotkeyOverrides: { ...snapshot.hotkeyOverrides },
     resultTableLayouts: cloneResultTableLayouts(snapshot.resultTableLayouts),
     firestoreFieldCatalogs: cloneFirestoreFieldCatalogs(snapshot.firestoreFieldCatalogs),
+    firestoreWrites: normalizeFirestoreWriteSettings(snapshot.firestoreWrites),
   };
+}
+
+function cloneActivityLogSettings(settings: ActivityLogSettings): ActivityLogSettings {
+  return { ...settings };
 }
 
 function cloneResultTableLayouts(

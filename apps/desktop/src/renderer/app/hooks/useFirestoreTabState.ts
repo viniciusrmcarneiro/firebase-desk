@@ -30,8 +30,12 @@ interface UseFirestoreTabStateInput {
 }
 
 export interface FirestoreTabState {
+  readonly activeLoadedPageCount: number;
   readonly drafts: Readonly<Record<string, FirestoreQueryDraft>>;
   readonly activeDraft: FirestoreQueryDraft;
+  readonly activeQueryIsDocument: boolean;
+  readonly activeQueryPath: string | null;
+  readonly activeQueryRunId: number | null;
   readonly errorMessage: string | null;
   readonly hasMore: boolean;
   readonly isFetchingMore: boolean;
@@ -205,8 +209,14 @@ export function useFirestoreTabState(
   }
 
   return {
+    activeLoadedPageCount: queryRequestIsDocument
+      ? (queryDocumentResult.data ? 1 : 0)
+      : loadedPageCount,
     drafts,
     activeDraft,
+    activeQueryIsDocument: queryRequestIsDocument,
+    activeQueryPath: submittedQuery?.path ?? null,
+    activeQueryRunId: activeQueryRequest?.runId ?? null,
     errorMessage,
     hasMore: !queryRequestIsDocument && Boolean(queryResult.hasNextPage),
     isFetchingMore: !queryRequestIsDocument && queryResult.isFetchingNextPage,

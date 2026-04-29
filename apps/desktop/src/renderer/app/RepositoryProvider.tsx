@@ -1,4 +1,5 @@
 import type {
+  ActivityLogRepository,
   AuthRepository,
   DataMode,
   FirestoreRepository,
@@ -10,6 +11,7 @@ import type {
   SettingsSnapshot,
 } from '@firebase-desk/repo-contracts';
 import {
+  MockActivityLogRepository,
   MockAuthRepository,
   MockFirestoreRepository,
   MockProjectsRepository,
@@ -17,6 +19,7 @@ import {
   MockSettingsRepository,
 } from '@firebase-desk/repo-mocks';
 import { createContext, type ReactNode, useContext } from 'react';
+import { IpcActivityLogRepository } from './repositories/ipc-activity-log-repository.ts';
 import { IpcAuthRepository } from './repositories/ipc-auth-repository.ts';
 import { IpcFirestoreRepository } from './repositories/ipc-firestore-repository.ts';
 import { IpcProjectsRepository } from './repositories/ipc-projects-repository.ts';
@@ -24,6 +27,7 @@ import { IpcScriptRunnerRepository } from './repositories/ipc-script-runner-repo
 import { IpcSettingsRepository } from './repositories/ipc-settings-repository.ts';
 
 export interface RepositorySet {
+  readonly activity: ActivityLogRepository;
   readonly auth: AuthRepository;
   readonly firestore: FirestoreRepository;
   readonly projects: ProjectsRepository;
@@ -45,6 +49,7 @@ export interface CreateRepositoriesOptions {
 
 export function createMockRepositories(): RepositorySet {
   return {
+    activity: new MockActivityLogRepository(),
     auth: new MockAuthRepository(),
     firestore: new MockFirestoreRepository(),
     projects: new MockProjectsRepository(),
@@ -58,15 +63,19 @@ export function createRepositories(
 ): RepositorySet {
   const desktopApiAvailable = hasDesktopApi();
   const settings = desktopApiAvailable ? new IpcSettingsRepository() : new MockSettingsRepository();
+  const activity = desktopApiAvailable
+    ? new IpcActivityLogRepository()
+    : new MockActivityLogRepository();
   const repositories: RepositorySet = dataMode === 'live'
     ? {
+      activity,
       auth: new IpcAuthRepository(),
       firestore: new IpcFirestoreRepository(),
       projects: new IpcProjectsRepository(),
       scriptRunner: new IpcScriptRunnerRepository(),
       settings,
     }
-    : { ...createMockRepositories(), settings };
+    : { ...createMockRepositories(), activity, settings };
 
   return {
     ...repositories,

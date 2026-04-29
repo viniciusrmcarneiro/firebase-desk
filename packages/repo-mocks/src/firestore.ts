@@ -4,12 +4,15 @@ import type {
   FirestoreDeleteDocumentOptions,
   FirestoreDocumentNode,
   FirestoreDocumentResult,
+  FirestoreFieldPatchOperation,
   FirestoreFilter,
   FirestoreQuery,
   FirestoreRepository,
   FirestoreSaveDocumentOptions,
   FirestoreSaveDocumentResult,
   FirestoreSort,
+  FirestoreUpdateDocumentFieldsOptions,
+  FirestoreUpdateDocumentFieldsResult,
   Page,
   PageRequest,
 } from '@firebase-desk/repo-contracts';
@@ -155,6 +158,44 @@ export class MockFirestoreRepository implements FirestoreRepository {
     const saved = await this.getDocument(connectionId, documentPath);
     if (!saved) throw new MockFirebaseError('not-found', `Document ${documentPath} not found`);
     return { status: 'saved', document: saved };
+  }
+
+  async updateDocumentFields(
+    connectionId: string,
+    documentPath: string,
+    operations: ReadonlyArray<FirestoreFieldPatchOperation>,
+    options: FirestoreUpdateDocumentFieldsOptions,
+  ): Promise<FirestoreUpdateDocumentFieldsResult> {
+    assertConnectionAvailable(connectionId);
+    assertFieldPatchOperations(operations);
+    const { collectionPath, docId } = splitDocumentPath(documentPath);
+    const current = await this.getDocument(connectionId, documentPath);
+    if (!current) return { status: 'conflict', remoteDocument: null };
+    const documentChanged = Boolean(
+      options.lastUpdateTime && current.updateTime !== options.lastUpdateTime,
+    );
+
+    if (documentChanged) {
+      if (fieldPatchHasChangedRemoteValue(current.data, operations)) {
+        return { status: 'conflict', remoteDocument: current };
+      }
+      if (options.staleBehavior !== 'save-and-notify') {
+        return { status: 'document-changed', remoteDocument: current };
+      }
+    }
+
+    const nextData = operations.reduce(
+      (data, operation) => applyFieldPatchOperation(data, operation),
+      current.data,
+    );
+    this.writeDocument(collectionPath, docId, nextData);
+    const saved = await this.getDocument(connectionId, documentPath);
+    if (!saved) throw new MockFirebaseError('not-found', `Document ${documentPath} not found`);
+    return {
+      status: 'saved',
+      document: saved,
+      ...(documentChanged ? { documentChanged: true } : {}),
+    };
   }
 
   private writeDocument(
@@ -431,6 +472,22 @@ function assertDocumentId(documentId: string) {
   }
 }
 
+function assertFieldPatchOperations(operations: ReadonlyArray<FirestoreFieldPatchOperation>) {
+  if (!operations.length) {
+    throw new MockFirebaseError('invalid-argument', 'At least one field operation is required.');
+  }
+  for (const operation of operations) {
+    if (!operation.fieldPath.length) {
+      throw new MockFirebaseError('invalid-argument', 'Field path is required.');
+    }
+    for (const segment of operation.fieldPath) {
+      if (!segment || /^__.*__$/.test(segment) || utf8ByteLength(segment) > 1500) {
+        throw new MockFirebaseError('invalid-argument', `Invalid field path segment: ${segment}`);
+      }
+    }
+  }
+}
+
 function assertDirectSubcollectionPath(documentPath: string, collectionPath: string) {
   const documentParts = pathParts(documentPath);
   const collectionParts = pathParts(collectionPath);
@@ -461,8 +518,105 @@ function decodeDocumentData(data: Record<string, unknown>): Record<string, unkno
   return decoded;
 }
 
+function applyFieldPatchOperation(
+  data: Record<string, unknown>,
+  operation: FirestoreFieldPatchOperation,
+): Record<string, unknown> {
+  return operation.type === 'delete'
+    ? deleteNestedValue(data, operation.fieldPath)
+    : setNestedValue(data, operation.fieldPath, operation.value);
+}
+
+function setNestedValue(
+  data: Record<string, unknown>,
+  fieldPath: ReadonlyArray<string>,
+  value: unknown,
+): Record<string, unknown> {
+  const [head, ...rest] = fieldPath;
+  if (!head) return data;
+  const next = { ...data };
+  if (!rest.length) {
+    next[head] = value;
+    return next;
+  }
+  next[head] = setNestedValue(isPlainObject(next[head]) ? next[head] : {}, rest, value);
+  return next;
+}
+
+function deleteNestedValue(
+  data: Record<string, unknown>,
+  fieldPath: ReadonlyArray<string>,
+): Record<string, unknown> {
+  const [head, ...rest] = fieldPath;
+  if (!head) return data;
+  const next = { ...data };
+  if (!rest.length) {
+    delete next[head];
+    return next;
+  }
+  if (isPlainObject(next[head])) next[head] = deleteNestedValue(next[head], rest);
+  return next;
+}
+
+function fieldPatchHasChangedRemoteValue(
+  remoteData: Record<string, unknown>,
+  operations: ReadonlyArray<FirestoreFieldPatchOperation>,
+): boolean {
+  return operations.some((operation) =>
+    !deepEqual(getNestedValue(remoteData, operation.fieldPath), operation.baseValue)
+  );
+}
+
+function getNestedValue(
+  data: Record<string, unknown>,
+  fieldPath: ReadonlyArray<string>,
+): unknown {
+  let current: unknown = data;
+  for (const segment of fieldPath) {
+    if (!isPlainObject(current)) return undefined;
+    current = current[segment];
+  }
+  return current;
+}
+
+function deepEqual(left: unknown, right: unknown): boolean {
+  return JSON.stringify(sortJson(left)) === JSON.stringify(sortJson(right));
+}
+
+function sortJson(value: unknown): unknown {
+  if (Array.isArray(value)) return value.map(sortJson);
+  if (!isPlainObject(value)) return value;
+  return Object.fromEntries(
+    sortedEntriesByKey(value)
+      .map(([key, entry]) => [key, sortJson(entry)]),
+  );
+}
+
+function sortedEntriesByKey(value: Record<string, unknown>): ReadonlyArray<[string, unknown]> {
+  const sorted: Array<[string, unknown]> = [];
+  for (const entry of Object.entries(value)) {
+    const index = sorted.findIndex(([key]) => entry[0].localeCompare(key) < 0);
+    if (index < 0) sorted.push(entry);
+    else sorted.splice(index, 0, entry);
+  }
+  return sorted;
+}
+
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function utf8ByteLength(value: string): number {
+  let bytes = 0;
+  for (let index = 0; index < value.length; index += 1) {
+    const codePoint = value.codePointAt(index) ?? 0;
+    if (codePoint > 0xffff) index += 1;
+    if (codePoint <= 0x7f) bytes += 1;
+    else if (codePoint <= 0x7ff) bytes += 2;
+    else if (codePoint <= 0xffff) bytes += 3;
+    else bytes += 4;
+  }
+  return bytes;
 }
 
 function cloneCollections(

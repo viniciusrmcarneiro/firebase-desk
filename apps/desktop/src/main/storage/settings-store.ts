@@ -1,10 +1,17 @@
 import { SettingsFileSchema } from '@firebase-desk/ipc-schemas';
-import type { SettingsSnapshot } from '@firebase-desk/repo-contracts';
+import {
+  type ActivityLogSettings,
+  DEFAULT_ACTIVITY_LOG_SETTINGS,
+  DEFAULT_FIRESTORE_WRITE_SETTINGS,
+  normalizeFirestoreWriteSettings,
+  type SettingsSnapshot,
+} from '@firebase-desk/repo-contracts';
 import { readFile } from 'node:fs/promises';
 import { join } from 'node:path';
 import { writeJsonAtomic } from './atomic-write.ts';
 
 export const DEFAULT_SETTINGS_SNAPSHOT: SettingsSnapshot = {
+  activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
   sidebarWidth: 320,
   inspectorWidth: 360,
   theme: 'system',
@@ -12,6 +19,7 @@ export const DEFAULT_SETTINGS_SNAPSHOT: SettingsSnapshot = {
   hotkeyOverrides: {},
   resultTableLayouts: {},
   firestoreFieldCatalogs: {},
+  firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
 };
 
 export class SettingsStore {
@@ -51,6 +59,8 @@ export class SettingsStore {
 function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
   return {
     ...snapshot,
+    activityLog: cloneActivityLogSettings(snapshot.activityLog),
+    firestoreWrites: normalizeFirestoreWriteSettings(snapshot.firestoreWrites),
     hotkeyOverrides: { ...snapshot.hotkeyOverrides },
     firestoreFieldCatalogs: Object.fromEntries(
       Object.entries(snapshot.firestoreFieldCatalogs).map(([key, entries]) => [
@@ -72,6 +82,10 @@ function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
       ]),
     ),
   };
+}
+
+function cloneActivityLogSettings(settings: ActivityLogSettings): ActivityLogSettings {
+  return { ...settings };
 }
 
 function isNotFound(error: unknown): boolean {
