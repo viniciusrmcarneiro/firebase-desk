@@ -106,7 +106,7 @@ async function createAndEditDocument(page: Page, suffix: string): Promise<void> 
   const createdAt = new Date().toISOString();
 
   await runCollectionQuery(page, 'smokeUiCreates');
-  await page.getByRole('button', { name: 'New document' }).first().click();
+  await page.getByRole('button', { name: 'New document' }).click();
   const createDialog = page.getByRole('dialog', { name: 'New document' });
   await expect(createDialog).toBeVisible();
   await createDialog.getByLabel('Document ID').fill(documentId);
@@ -209,7 +209,9 @@ async function resolveConflict(page: Page, suffix: string): Promise<void> {
 
   const conflictDialog = page.getByRole('dialog', { name: 'Resolve save conflict' });
   await expect(conflictDialog).toBeVisible();
-  await expect(conflictDialog.getByText(/changed/)).toBeVisible();
+  await expect(conflictDialog.getByText('Remote document changed.')).toBeVisible();
+  await expect(conflictDialog.getByRole('button', { name: 'Discard my changes' })).toBeVisible();
+  await expect(conflictDialog.getByRole('button', { name: 'Refresh' })).toHaveCount(0);
   await replaceMonacoEditorValue(
     page,
     conflictDialog,
