@@ -122,44 +122,44 @@ Activity is the first extraction because it is self-contained and already expose
 
 Extract query lifecycle before write lifecycle.
 
-- [ ] Create `app-core/firestore/query`.
-- [ ] Model query state:
-  - [ ] draft
-  - [ ] active query
-  - [ ] loading/fetching-more
-  - [ ] pages and loaded page count
-  - [ ] has more
-  - [ ] selected document path
-  - [ ] results stale
-  - [ ] error
-- [ ] Add pure transitions:
-  - [ ] draft changed
-  - [ ] query started
-  - [ ] query succeeded
-  - [ ] query failed
-  - [ ] load more started/succeeded/failed
-  - [ ] refresh started/succeeded/failed
-  - [ ] result view changed
-  - [ ] document selected
-  - [ ] subcollections loaded
-  - [ ] results marked stale
-  - [ ] results refreshed
-- [ ] Add selectors:
-  - [ ] collection vs document query
-  - [ ] result rows
-  - [ ] selected document
-  - [ ] loaded page count
-  - [ ] query metadata for Activity
-- [ ] Add commands:
-  - [ ] run query
-  - [ ] load more
-  - [ ] refresh preserving loaded page count
-  - [ ] load subcollections
-  - [ ] open document in new tab intent
-- [ ] Move query completion Activity logging into command results.
-- [ ] Remove AppShell effects that infer Firestore query completion from `activeQueryRunId`/loading state.
-- [ ] Add pure tests for pagination, refresh, stale results, selection, and errors.
-- [ ] Keep e2e smoke coverage unchanged.
+- [x] Create `app-core/firestore/query`.
+- [x] Model query state:
+  - [x] draft
+  - [x] active query
+  - [x] loading/fetching-more
+  - [x] pages and loaded page count
+  - [x] has more
+  - [x] selected document path
+  - [x] results stale
+  - [x] error
+- [x] Add pure transitions:
+  - [x] draft changed
+  - [x] query started
+  - [x] query succeeded
+  - [x] query failed
+  - [x] load more started/succeeded/failed
+  - [x] refresh started/succeeded/failed
+  - [x] result view changed
+  - [x] document selected
+  - [x] subcollections loaded
+  - [x] results marked stale
+  - [x] results refreshed
+- [x] Add selectors:
+  - [x] collection vs document query
+  - [x] result rows
+  - [x] selected document
+  - [x] loaded page count
+  - [x] query metadata for Activity
+- [x] Add commands:
+  - [x] run query
+  - [x] load more
+  - [x] refresh preserving loaded page count
+  - [x] load subcollections
+  - [x] open document in new tab intent
+- [x] Move query completion Activity logging into command results.
+- [x] Remove AppShell effects that infer Firestore query completion from `activeQueryRunId`/loading state.
+- [x] Add pure tests for pagination, refresh, stale results, selection, and errors.
+- [x] Keep e2e smoke coverage unchanged.
 
 ## Phase 4: Firestore Write Core
 

@@ -1,31 +1,37 @@
 import type { FirestoreQueryDraft } from '@firebase-desk/product-ui';
 import type {
+  ActivityLogAppendInput,
   FirestoreDocumentResult,
-  FirestoreQuery,
   ProjectSummary,
 } from '@firebase-desk/repo-contracts';
 import { useEffect, useRef, useState } from 'react';
+import {
+  createInitialFirestoreQueryRuntimeState,
+  firestoreDocumentSelected,
+  firestoreDraftChanged,
+  firestorePendingPageReloadCleared,
+  firestoreQueryCompletionActivity,
+  firestoreTabCleared,
+  loadMoreFirestoreQueryCommand,
+  openFirestoreDocumentInNewTabCommand,
+  refreshFirestoreQueryCommand,
+  runFirestoreQueryCommand,
+  selectFirestoreActiveDraft,
+  selectFirestoreActiveQueryRequest,
+  selectFirestoreLoadedPageCount,
+  selectFirestoreResultRows,
+  selectFirestoreSelectedDocument,
+} from '../../app-core/firestore/query/index.ts';
 import { selectionActions } from '../stores/selectionStore.ts';
 import { activePath, tabActions, tabsStore, type WorkspaceTab } from '../stores/tabsStore.ts';
-import {
-  DEFAULT_FIRESTORE_DRAFT,
-  draftToQuery,
-  getDraft,
-  isDocumentPath,
-  omitKey,
-} from '../workspaceModel.ts';
+import { DEFAULT_FIRESTORE_DRAFT, draftToQuery, isDocumentPath } from '../workspaceModel.ts';
 import { useGetDocument, useRunQuery } from './useRepositoriesData.ts';
-
-interface SubmittedFirestoreQuery {
-  readonly limit: number;
-  readonly query: FirestoreQuery;
-  readonly runId: number;
-}
 
 interface UseFirestoreTabStateInput {
   readonly activeProject: ProjectSummary | null;
   readonly activeTab: WorkspaceTab | undefined;
   readonly initialDrafts?: Readonly<Record<string, FirestoreQueryDraft>> | undefined;
+  readonly onQueryActivity?: ((input: ActivityLogAppendInput) => void) | undefined;
   readonly selectedTreeItemId: string | null;
 }
 
@@ -55,29 +61,30 @@ export interface FirestoreTabState {
 }
 
 export function useFirestoreTabState(
-  { activeProject, activeTab, initialDrafts, selectedTreeItemId }: UseFirestoreTabStateInput,
+  {
+    activeProject,
+    activeTab,
+    initialDrafts,
+    onQueryActivity,
+    selectedTreeItemId,
+  }: UseFirestoreTabStateInput,
 ): FirestoreTabState {
-  const [drafts, setDrafts] = useState<Readonly<Record<string, FirestoreQueryDraft>>>(
-    () => initialDrafts ?? {},
+  const [queryState, setQueryState] = useState(() =>
+    createInitialFirestoreQueryRuntimeState({ drafts: initialDrafts })
   );
-  const [queryRequests, setQueryRequests] = useState<
-    Readonly<Record<string, SubmittedFirestoreQuery | null>>
-  >({});
-  const [selectedDocumentPaths, setSelectedDocumentPaths] = useState<
-    Readonly<Record<string, string>>
-  >({});
-  const [pendingPageReloads, setPendingPageReloads] = useState<Readonly<Record<string, number>>>(
-    {},
-  );
-  const nextRunId = useRef(1);
+  const loggedQueryRuns = useRef<Set<string>>(new Set());
 
-  const activeDraft = getDraft(activeTab, drafts);
-  const queryRequest = activeTab?.kind === 'firestore-query'
-    ? queryRequests[activeTab.id] ?? null
-    : null;
-  const activeQueryRequest = queryRequest?.query.connectionId === activeProject?.id
-    ? queryRequest
-    : null;
+  const activeDraft = selectFirestoreActiveDraft(
+    queryState,
+    activeTab,
+    DEFAULT_FIRESTORE_DRAFT,
+    activeTab ? activePath(activeTab) : '',
+  );
+  const activeQueryRequest = selectFirestoreActiveQueryRequest(
+    queryState,
+    activeTab,
+    activeProject?.id,
+  );
   const submittedQuery = activeQueryRequest?.query ?? null;
   const queryScopeId = activeTab?.kind === 'firestore-query' ? activeTab.id : 'inactive';
   const queryRequestIsDocument = submittedQuery ? isDocumentPath(submittedQuery.path) : false;
@@ -96,20 +103,24 @@ export function useFirestoreTabState(
   );
   const queryRows = queryRequestIsDocument
     ? queryDocumentResult.data ? [queryDocumentResult.data] : []
-    : queryResult.data?.pages.flatMap((page) => page.items) ?? [];
+    : selectFirestoreResultRows(queryResult.data?.pages ?? []);
   const activeSelectedDocumentPath = activeTab?.kind === 'firestore-query'
-    ? selectedDocumentPaths[activeTab.id] ?? null
+    ? queryState.selectedDocumentPaths[activeTab.id] ?? null
     : null;
-  const selectedDocument = queryRows.find((row) => row.path === activeSelectedDocumentPath) ?? null;
+  const selectedDocument = selectFirestoreSelectedDocument(queryRows, activeSelectedDocumentPath);
   const selectedDocumentPath = selectedDocument?.path ?? null;
   const errorMessage = queryRequestIsDocument
     ? messageFromError(queryDocumentResult.error)
     : messageFromError(queryResult.error);
-
-  const pendingPageReloadCount = activeTab?.kind === 'firestore-query'
-    ? pendingPageReloads[activeTab.id] ?? 0
-    : 0;
   const loadedPageCount = queryResult.data?.pages.length ?? 0;
+  const activeLoadedPageCount = selectFirestoreLoadedPageCount(
+    queryResult.data?.pages ?? [],
+    queryRequestIsDocument,
+    Boolean(queryDocumentResult.data),
+  );
+  const pendingPageReloadCount = activeTab?.kind === 'firestore-query'
+    ? queryState.pendingPageReloads[activeTab.id] ?? 0
+    : 0;
 
   useEffect(() => {
     if (
@@ -119,7 +130,7 @@ export function useFirestoreTabState(
       return;
     }
     if (loadedPageCount >= pendingPageReloadCount || !queryResult.hasNextPage) {
-      setPendingPageReloads((current) => omitKey(current, activeTab.id));
+      setQueryState((current) => firestorePendingPageReloadCleared(current, activeTab.id));
       return;
     }
     if (!queryResult.isFetchingNextPage) void queryResult.fetchNextPage();
@@ -131,88 +142,156 @@ export function useFirestoreTabState(
     queryResult,
   ]);
 
+  useEffect(() => {
+    if (
+      !onQueryActivity || !activeTab || activeTab.kind !== 'firestore-query'
+      || activeQueryRequest?.runId === undefined
+    ) {
+      return;
+    }
+    const isLoading = queryRequestIsDocument
+      ? queryDocumentResult.isLoading || queryDocumentResult.isFetching
+      : queryResult.isLoading || queryResult.isFetching;
+    if (isLoading) return;
+
+    const runErrorMessage = queryRequestIsDocument
+      ? messageFromError(queryDocumentResult.error)
+      : messageFromError(queryResult.error);
+    const key = [
+      activeTab.id,
+      activeQueryRequest.runId,
+      runErrorMessage ?? 'success',
+      queryRows.length,
+      activeLoadedPageCount,
+    ].join(':');
+    if (!rememberQueryActivity(loggedQueryRuns.current, key)) return;
+    onQueryActivity(firestoreQueryCompletionActivity({
+      connectionId: activeTab.connectionId,
+      draft: activeDraft,
+      errorMessage: runErrorMessage,
+      loadedPages: activeLoadedPageCount,
+      resultCount: queryRows.length,
+    }));
+  }, [
+    activeDraft,
+    activeLoadedPageCount,
+    activeQueryRequest,
+    activeTab,
+    onQueryActivity,
+    queryDocumentResult.error,
+    queryDocumentResult.isFetching,
+    queryDocumentResult.isLoading,
+    queryRequestIsDocument,
+    queryResult.error,
+    queryResult.isFetching,
+    queryResult.isLoading,
+    queryRows.length,
+  ]);
+
   function setDraft(draft: FirestoreQueryDraft) {
     if (!activeTab) return;
-    setDrafts((current) => ({ ...current, [activeTab.id]: draft }));
+    setQueryState((current) => firestoreDraftChanged(current, activeTab.id, draft));
   }
 
   function resetDraft() {
     if (!activeTab) return;
-    setDrafts((current) => ({
-      ...current,
-      [activeTab.id]: {
+    setQueryState((current) =>
+      firestoreDraftChanged(current, activeTab.id, {
         ...DEFAULT_FIRESTORE_DRAFT,
         path: activePath(activeTab) || DEFAULT_FIRESTORE_DRAFT.path,
-      },
-    }));
+      })
+    );
   }
 
   function runQuery(): string | null {
-    return submitQuery({ clearSelection: true });
+    return submitQuery({ clearSelection: true, pagesToReload: null });
   }
 
   function refreshQuery(): string | null {
-    const pagesToReload = Math.max(1, queryResult.data?.pages.length ?? 1);
-    const path = submitQuery({ clearSelection: false });
-    if (path && activeTab?.kind === 'firestore-query' && !queryRequestIsDocument) {
-      setPendingPageReloads((current) => ({ ...current, [activeTab.id]: pagesToReload }));
-    }
-    return path;
+    return submitQuery({
+      clearSelection: false,
+      pagesToReload: Math.max(1, queryResult.data?.pages.length ?? 1),
+    });
   }
 
-  function submitQuery({ clearSelection }: { readonly clearSelection: boolean; }): string | null {
+  function submitQuery(
+    {
+      clearSelection,
+      pagesToReload,
+    }: {
+      readonly clearSelection: boolean;
+      readonly pagesToReload: number | null;
+    },
+  ): string | null {
     if (!activeTab || activeTab.kind !== 'firestore-query' || !activeProject) return null;
     const nextQuery = draftToQuery(activeProject.id, activeDraft);
     if (clearSelection) selectDocument(activeTab.id, null);
-    setQueryRequests((current) => ({
-      ...current,
-      [activeTab.id]: { limit: activeDraft.limit, query: nextQuery, runId: nextRunId.current++ },
-    }));
-    setPendingPageReloads((current) => omitKey(current, activeTab.id));
+    const result = pagesToReload === null
+      ? runFirestoreQueryCommand(queryState, {
+        activeDraft,
+        clearSelection,
+        query: nextQuery,
+        selectedTreeItemId,
+        tab: activeTab,
+      })
+      : refreshFirestoreQueryCommand(queryState, {
+        activeDraft,
+        clearSelection,
+        pagesToReload,
+        query: nextQuery,
+        selectedTreeItemId,
+        tab: activeTab,
+      });
+    setQueryState(result.state);
     tabActions.pushHistory(activeTab.id, activeDraft.path);
-    tabActions.recordInteraction({
-      activeTabId: activeTab.id,
-      path: activeDraft.path,
-      selectedTreeItemId,
-    });
-    return activeDraft.path;
+    if (result.interaction) tabActions.recordInteraction(result.interaction);
+    return result.path;
   }
 
   function openTab(connectionId: string, path: string): string {
     const id = tabActions.openOrSelectTab({ kind: 'firestore-query', connectionId, path });
-    setDrafts((current) =>
-      current[id] ? current : { ...current, [id]: { ...DEFAULT_FIRESTORE_DRAFT, path } }
+    setQueryState((current) =>
+      current.drafts[id]
+        ? current
+        : firestoreDraftChanged(current, id, { ...DEFAULT_FIRESTORE_DRAFT, path })
     );
     return id;
   }
 
   function openTabInNewTab(connectionId: string, path: string): string {
-    const id = tabActions.openTab({ kind: 'firestore-query', connectionId, path });
-    setDrafts((current) => ({ ...current, [id]: { ...DEFAULT_FIRESTORE_DRAFT, path } }));
+    const intent = openFirestoreDocumentInNewTabCommand(connectionId, path);
+    const id = tabActions.openTab({
+      kind: 'firestore-query',
+      connectionId: intent.connectionId,
+      path: intent.path,
+    });
+    setQueryState((current) =>
+      firestoreDraftChanged(current, id, { ...DEFAULT_FIRESTORE_DRAFT, path: intent.path })
+    );
     return id;
   }
 
   function clearTab(tabId: string) {
-    setQueryRequests((current) => omitKey(current, tabId));
+    setQueryState((current) => firestoreTabCleared(current, tabId));
     selectDocument(tabId, null);
   }
 
   function selectDocument(tabId: string, path: string | null) {
-    setSelectedDocumentPaths((current) =>
-      path === null ? omitKey(current, tabId) : { ...current, [tabId]: path }
-    );
+    setQueryState((current) => firestoreDocumentSelected(current, tabId, path));
     if (tabId === tabsStore.state.activeTabId) selectionActions.selectDocument(path);
   }
 
   function loadMore() {
-    if (!queryRequestIsDocument) void queryResult.fetchNextPage();
+    const result = loadMoreFirestoreQueryCommand(queryState, {
+      isDocumentQuery: queryRequestIsDocument,
+    });
+    setQueryState(result.state);
+    if (result.shouldFetchNextPage) void queryResult.fetchNextPage();
   }
 
   return {
-    activeLoadedPageCount: queryRequestIsDocument
-      ? (queryDocumentResult.data ? 1 : 0)
-      : loadedPageCount,
-    drafts,
+    activeLoadedPageCount,
+    drafts: queryState.drafts,
     activeDraft,
     activeQueryIsDocument: queryRequestIsDocument,
     activeQueryPath: submittedQuery?.path ?? null,
@@ -242,4 +321,15 @@ function messageFromError(error: unknown): string | null {
   if (!error) return null;
   if (error instanceof Error) return error.message;
   return 'Could not load Firestore data.';
+}
+
+function rememberQueryActivity(keys: Set<string>, key: string): boolean {
+  if (keys.has(key)) return false;
+  keys.add(key);
+  while (keys.size > 500) {
+    const oldestKey = keys.keys().next().value as string | undefined;
+    if (!oldestKey) break;
+    keys.delete(oldestKey);
+  }
+  return true;
 }

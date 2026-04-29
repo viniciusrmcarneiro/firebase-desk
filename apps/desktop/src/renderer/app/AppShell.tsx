@@ -70,6 +70,7 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type ActivityStore, useActivityController } from '../app-core/activity/index.ts';
+import { firestoreQueryDraftMetadata } from '../app-core/firestore/query/index.ts';
 import appIconUrl from '../assets/app-icon.png';
 import { AddProjectDialog } from './dialogs/AddProjectDialog.tsx';
 import { EditProjectDialog } from './dialogs/EditProjectDialog.tsx';
@@ -167,7 +168,6 @@ export function AppShell(
     PendingCreateDocumentRequest | null
   >(null);
   const nextCreateDocumentRequestId = useRef(1);
-  const loggedFirestoreRuns = useRef<Set<string>>(new Set());
   const loggedScriptRuns = useRef<Set<string>>(new Set());
   const loggedAuthFailures = useRef<Set<string>>(new Set());
   const activity = useActivityController({
@@ -181,6 +181,7 @@ export function AppShell(
     activeProject,
     activeTab,
     initialDrafts: persistedWorkspace?.drafts,
+    onQueryActivity: recordActivity,
     selectedTreeItemId: selection.treeItemId,
   });
   const authTab = useAuthTabState({
@@ -242,52 +243,6 @@ export function AppShell(
       cancelled = true;
     };
   }, [settingsOpen]);
-
-  useEffect(() => {
-    if (!activeTab || activeTab.kind !== 'firestore-query') return;
-    const runId = firestoreTab.activeQueryRunId;
-    const path = firestoreTab.activeQueryPath;
-    if (!runId || !path || firestoreTab.isLoading) return;
-
-    const key = `${activeTab.id}:${runId}`;
-    if (!rememberActivityKey(loggedFirestoreRuns.current, key)) return;
-
-    const isDocument = firestoreTab.activeQueryIsDocument;
-    const errorMessage = firestoreTab.errorMessage;
-    recordActivity({
-      action: isDocument ? 'Read document' : 'Run query',
-      area: 'firestore',
-      ...(errorMessage ? { error: { message: errorMessage } } : {}),
-      metadata: {
-        loadedPages: firestoreTab.activeLoadedPageCount,
-        path,
-        resultCount: firestoreTab.queryRows.length,
-        ...queryDraftMetadata(firestoreTab.activeDraft),
-      },
-      status: errorMessage ? 'failure' : 'success',
-      summary: errorMessage
-        ? `Failed to load ${path}`
-        : `Loaded ${firestoreTab.queryRows.length} result${
-          firestoreTab.queryRows.length === 1 ? '' : 's'
-        } from ${path}`,
-      target: {
-        connectionId: activeTab.connectionId,
-        path,
-        type: isDocument ? 'firestore-document' : 'firestore-query',
-      },
-    });
-  }, [
-    activeTab,
-    firestoreTab.activeDraft,
-    firestoreTab.activeLoadedPageCount,
-    firestoreTab.activeQueryIsDocument,
-    firestoreTab.activeQueryPath,
-    firestoreTab.activeQueryRunId,
-    firestoreTab.errorMessage,
-    firestoreTab.isLoading,
-    firestoreTab.queryRows.length,
-    recordActivity,
-  ]);
 
   useEffect(() => {
     if (!activeTab || activeTab.kind !== 'auth-users' || !authTab.errorMessage) return;
@@ -709,7 +664,7 @@ export function AppShell(
       action: 'Load more results',
       area: 'firestore',
       durationMs: elapsedMs(startedAt),
-      metadata: queryDraftMetadata(firestoreTab.activeDraft),
+      metadata: firestoreQueryDraftMetadata(firestoreTab.activeDraft),
       status: 'success',
       summary: `Requested more results from ${firestoreTab.activeDraft.path}`,
       target: {
@@ -1991,21 +1946,6 @@ function rememberActivityKey(keys: Set<string>, key: string): boolean {
 
 function elapsedMs(startedAt: number): number {
   return Math.max(0, Date.now() - startedAt);
-}
-
-function queryDraftMetadata(draft: FirestoreQueryDraft): Record<string, unknown> {
-  return {
-    filters: (draft.filters ?? []).map((filter) => ({
-      field: filter.field,
-      op: filter.op,
-      valueType: valueKind(filter.value),
-    })),
-    limit: draft.limit,
-    path: draft.path,
-    sort: draft.sortField
-      ? { direction: draft.sortDirection, field: draft.sortField }
-      : null,
-  };
 }
 
 function documentDataMetadata(data: Record<string, unknown>): Record<string, unknown> {
