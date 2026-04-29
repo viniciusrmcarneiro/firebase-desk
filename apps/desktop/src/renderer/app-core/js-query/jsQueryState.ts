@@ -1,7 +1,9 @@
 import { JS_QUERY_SAMPLE_SOURCE } from '@firebase-desk/product-ui';
 import type { ScriptRunResult } from '@firebase-desk/repo-contracts';
+import type { AppCoreCommandOptions } from '../shared/index.ts';
 
 export interface ActiveScriptRun {
+  readonly commandOptions?: AppCoreCommandOptions | undefined;
   readonly connectionId: string;
   readonly runId: string;
   readonly source: string;

@@ -3,6 +3,7 @@ import type {
   ScriptRunEvent,
   ScriptRunResult,
 } from '@firebase-desk/repo-contracts';
+import type { AppCoreCommandOptions } from '../shared/index.ts';
 import type { ActiveScriptRun, JsQueryState } from './jsQueryState.ts';
 
 const MAX_LOGGED_RUN_IDS = 500;
@@ -18,6 +19,7 @@ export function jsQuerySourceChanged(
 export function jsQueryRunStarted(
   state: JsQueryState,
   input: {
+    readonly commandOptions?: AppCoreCommandOptions | undefined;
     readonly connectionId: string;
     readonly runId: string;
     readonly source: string;
@@ -30,6 +32,7 @@ export function jsQueryRunStarted(
     activeRuns: {
       ...state.activeRuns,
       [input.tabId]: {
+        commandOptions: input.commandOptions,
         connectionId: input.connectionId,
         runId: input.runId,
         source: input.source,

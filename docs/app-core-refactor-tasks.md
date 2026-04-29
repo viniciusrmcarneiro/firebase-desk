@@ -284,18 +284,18 @@ Move write flows after query extraction.
 
 Schedulers should call the same commands as UI actions.
 
-- [ ] Define `CommandSource = 'user' | 'scheduler'`.
-- [ ] Add command options:
-  - [ ] source
-  - [ ] visible
-  - [ ] notify policy
-  - [ ] cancellation policy
-  - [ ] serialization key
-- [ ] Ensure Firestore query commands can run without opening a visible tab.
-- [ ] Ensure mutation commands can choose whether to notify only on failure/conflict.
-- [ ] Ensure Activity logging is shared between UI and scheduler commands.
-- [ ] Add command tests for scheduler source.
-- [ ] Do not add scheduler-specific duplicate repository code.
+- [x] Define `CommandSource = 'user' | 'scheduler'`.
+- [x] Add command options:
+  - [x] source
+  - [x] visible
+  - [x] notify policy
+  - [x] cancellation policy
+  - [x] serialization key
+- [x] Ensure Firestore query commands can run without opening a visible tab.
+- [x] Ensure mutation commands can choose whether to notify only on failure/conflict.
+- [x] Ensure Activity logging is shared between UI and scheduler commands.
+- [x] Add command tests for scheduler source.
+- [x] Do not add scheduler-specific duplicate repository code.
 
 ## Phase 10: Cleanup
 

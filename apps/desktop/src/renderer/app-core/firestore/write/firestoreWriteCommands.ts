@@ -1,5 +1,6 @@
 import type {
   ActivityLogAppendInput,
+  ActivityLogStatus,
   DataMode,
   FirestoreFieldPatchOperation,
   FirestoreRepository,
@@ -8,7 +9,14 @@ import type {
   FirestoreUpdateDocumentFieldsOptions,
   FirestoreUpdateDocumentFieldsResult,
 } from '@firebase-desk/repo-contracts';
-import { type AppCoreStore, documentDataMetadata, fieldPatchMetadata } from '../../shared/index.ts';
+import {
+  type AppCoreCommandOptions,
+  type AppCoreStore,
+  commandActivityMetadata,
+  documentDataMetadata,
+  fieldPatchMetadata,
+  shouldNotifyForCommandStatus,
+} from '../../shared/index.ts';
 import { fieldPatchStatusLabel } from './firestoreWriteSelectors.ts';
 import type { FirestoreWriteState } from './firestoreWriteState.ts';
 import {
@@ -50,6 +58,7 @@ export type FirestoreWriteRepository = Pick<
 
 export interface FirestoreWriteCommandResult<T> {
   readonly lastAction: string;
+  readonly notification: string | null;
   readonly result: T;
 }
 
@@ -78,6 +87,7 @@ export async function createFirestoreDocumentCommand(
   env: FirestoreWriteCommandEnvironment,
   input: {
     readonly collectionPath: string;
+    readonly commandOptions?: AppCoreCommandOptions | undefined;
     readonly data: Record<string, unknown>;
     readonly documentId: string;
     readonly project: FirestoreWriteProjectContext | null;
@@ -107,6 +117,7 @@ export async function createFirestoreDocumentCommand(
       metadata: {
         collectionPath: input.collectionPath,
         documentId: input.documentId,
+        ...commandActivityMetadata(input.commandOptions),
         ...documentDataMetadata(input.data),
       },
       payload: { data: input.data },
@@ -114,7 +125,7 @@ export async function createFirestoreDocumentCommand(
       summary: `Created ${document.path}`,
       target: firestoreDocumentTarget(input.project, document.path),
     });
-    return { lastAction: `Created ${document.path}`, result: document };
+    return commandResult(`Created ${document.path}`, 'success', document, input.commandOptions);
   } catch (error) {
     const message = messageFromError(error, 'Could not create document.');
     store.update((state) => firestoreCreateFailed(state, documentPath, message));
@@ -126,6 +137,7 @@ export async function createFirestoreDocumentCommand(
       metadata: {
         collectionPath: input.collectionPath,
         documentId: input.documentId,
+        ...commandActivityMetadata(input.commandOptions),
         ...documentDataMetadata(input.data),
       },
       payload: { data: input.data },
@@ -141,6 +153,7 @@ export async function saveFirestoreDocumentCommand(
   store: AppCoreStore<FirestoreWriteState>,
   env: FirestoreWriteCommandEnvironment,
   input: {
+    readonly commandOptions?: AppCoreCommandOptions | undefined;
     readonly data: Record<string, unknown>;
     readonly documentPath: string;
     readonly options?: FirestoreSaveDocumentOptions | undefined;
@@ -166,6 +179,7 @@ export async function saveFirestoreDocumentCommand(
         metadata: {
           lastUpdateTime: input.options?.lastUpdateTime ?? null,
           remoteUpdateTime: result.remoteDocument?.updateTime ?? null,
+          ...commandActivityMetadata(input.commandOptions),
           ...documentDataMetadata(input.data),
         },
         payload: { data: input.data },
@@ -173,7 +187,12 @@ export async function saveFirestoreDocumentCommand(
         summary: `Save conflict on ${input.documentPath}`,
         target: firestoreDocumentTarget(input.project, input.documentPath),
       });
-      return { lastAction: `Save conflict: ${input.documentPath}`, result };
+      return commandResult(
+        `Save conflict: ${input.documentPath}`,
+        'conflict',
+        result,
+        input.commandOptions,
+      );
     }
     if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
     void env.recordActivity({
@@ -183,6 +202,7 @@ export async function saveFirestoreDocumentCommand(
       metadata: {
         lastUpdateTime: input.options?.lastUpdateTime ?? null,
         updateTime: result.document.updateTime ?? null,
+        ...commandActivityMetadata(input.commandOptions),
         ...documentDataMetadata(input.data),
       },
       payload: { data: input.data },
@@ -190,7 +210,7 @@ export async function saveFirestoreDocumentCommand(
       summary: `Saved ${result.document.path}`,
       target: firestoreDocumentTarget(input.project, result.document.path),
     });
-    return { lastAction: `Saved ${result.document.path}`, result };
+    return commandResult(`Saved ${result.document.path}`, 'success', result, input.commandOptions);
   } catch (error) {
     const message = messageFromError(error, 'Could not save document.');
     store.update((state) => firestoreSaveFailed(state, input.documentPath, message));
@@ -201,6 +221,7 @@ export async function saveFirestoreDocumentCommand(
       error: { message },
       metadata: {
         lastUpdateTime: input.options?.lastUpdateTime ?? null,
+        ...commandActivityMetadata(input.commandOptions),
         ...documentDataMetadata(input.data),
       },
       payload: { data: input.data },
@@ -216,6 +237,7 @@ export async function updateFirestoreDocumentFieldsCommand(
   store: AppCoreStore<FirestoreWriteState>,
   env: FirestoreWriteCommandEnvironment,
   input: {
+    readonly commandOptions?: AppCoreCommandOptions | undefined;
     readonly documentPath: string;
     readonly operations: ReadonlyArray<FirestoreFieldPatchOperation>;
     readonly options: FirestoreUpdateDocumentFieldsOptions;
@@ -245,6 +267,7 @@ export async function updateFirestoreDocumentFieldsCommand(
           lastUpdateTime: input.options.lastUpdateTime ?? null,
           remoteUpdateTime: result.remoteDocument?.updateTime ?? null,
           staleBehavior: input.options.staleBehavior,
+          ...commandActivityMetadata(input.commandOptions),
           ...fieldPatchMetadata(input.operations),
         },
         payload: { operations: input.operations },
@@ -252,7 +275,12 @@ export async function updateFirestoreDocumentFieldsCommand(
         summary: `${label} on ${input.documentPath}`,
         target: firestoreDocumentTarget(input.project, input.documentPath),
       });
-      return { lastAction: `${label}: ${input.documentPath}`, result };
+      return commandResult(
+        `${label}: ${input.documentPath}`,
+        status,
+        result,
+        input.commandOptions,
+      );
     }
     if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
     const lastAction = result.documentChanged
@@ -267,6 +295,7 @@ export async function updateFirestoreDocumentFieldsCommand(
         lastUpdateTime: input.options.lastUpdateTime ?? null,
         staleBehavior: input.options.staleBehavior,
         updateTime: result.document.updateTime ?? null,
+        ...commandActivityMetadata(input.commandOptions),
         ...fieldPatchMetadata(input.operations),
       },
       payload: { operations: input.operations },
@@ -274,7 +303,7 @@ export async function updateFirestoreDocumentFieldsCommand(
       summary: lastAction,
       target: firestoreDocumentTarget(input.project, result.document.path),
     });
-    return { lastAction, result };
+    return commandResult(lastAction, 'success', result, input.commandOptions);
   } catch (error) {
     const message = messageFromError(error, 'Could not update fields.');
     store.update((state) => firestoreFieldPatchFailed(state, input.documentPath, message));
@@ -286,6 +315,7 @@ export async function updateFirestoreDocumentFieldsCommand(
       metadata: {
         lastUpdateTime: input.options.lastUpdateTime ?? null,
         staleBehavior: input.options.staleBehavior,
+        ...commandActivityMetadata(input.commandOptions),
         ...fieldPatchMetadata(input.operations),
       },
       payload: { operations: input.operations },
@@ -301,6 +331,7 @@ export async function deleteFirestoreDocumentCommand(
   store: AppCoreStore<FirestoreWriteState>,
   env: FirestoreWriteCommandEnvironment,
   input: {
+    readonly commandOptions?: AppCoreCommandOptions | undefined;
     readonly deleteSubcollectionPaths: ReadonlyArray<string>;
     readonly documentPath: string;
     readonly project: FirestoreWriteProjectContext | null;
@@ -321,12 +352,18 @@ export async function deleteFirestoreDocumentCommand(
       durationMs: elapsedMs(startedAt, env.now()),
       metadata: {
         deleteSubcollectionPaths: input.deleteSubcollectionPaths,
+        ...commandActivityMetadata(input.commandOptions),
       },
       status: 'success',
       summary: `Deleted ${input.documentPath}`,
       target: firestoreDocumentTarget(input.project, input.documentPath),
     });
-    return { lastAction: `Deleted ${input.documentPath}`, result: undefined };
+    return commandResult(
+      `Deleted ${input.documentPath}`,
+      'success',
+      undefined,
+      input.commandOptions,
+    );
   } catch (error) {
     const message = messageFromError(error, 'Could not delete document.');
     store.update((state) => firestoreDeleteFailed(state, input.documentPath, message));
@@ -337,6 +374,7 @@ export async function deleteFirestoreDocumentCommand(
       error: { message },
       metadata: {
         deleteSubcollectionPaths: input.deleteSubcollectionPaths,
+        ...commandActivityMetadata(input.commandOptions),
       },
       status: 'failure',
       summary: message,
@@ -344,6 +382,19 @@ export async function deleteFirestoreDocumentCommand(
     });
     throw toError(error, message);
   }
+}
+
+function commandResult<T>(
+  lastAction: string,
+  status: ActivityLogStatus,
+  result: T,
+  options: AppCoreCommandOptions | undefined,
+): FirestoreWriteCommandResult<T> {
+  return {
+    lastAction,
+    notification: shouldNotifyForCommandStatus(options, status) ? lastAction : null,
+    result,
+  };
 }
 
 function firestoreDocumentTarget(

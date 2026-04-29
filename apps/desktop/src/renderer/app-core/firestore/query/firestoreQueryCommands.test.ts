@@ -43,6 +43,28 @@ describe('firestore query commands', () => {
     expect(result).toEqual({ interaction: null, path: null, state });
   });
 
+  it('can submit invisible scheduler queries without an open tab', () => {
+    const result = runFirestoreQueryCommand(createInitialFirestoreQueryRuntimeState(), {
+      activeDraft: draft('orders'),
+      clearSelection: false,
+      commandOptions: {
+        serializationKey: 'nightly-orders',
+        source: 'scheduler',
+        visible: false,
+      },
+      query: query('orders'),
+      selectedTreeItemId: null,
+      tab: undefined,
+    });
+
+    expect(result.interaction).toBeNull();
+    expect(result.path).toBe('orders');
+    expect(result.state.queryRequests['nightly-orders']).toMatchObject({
+      query: { path: 'orders' },
+      runId: 1,
+    });
+  });
+
   it('submits refreshes without clearing selection and stores pages to reload', () => {
     const result = refreshFirestoreQueryCommand(createInitialFirestoreQueryRuntimeState(), {
       activeDraft: draft('orders'),
@@ -110,6 +132,7 @@ describe('firestore query commands', () => {
 
   it('builds query completion activity for collection and document reads', () => {
     expect(firestoreQueryCompletionActivity({
+      commandOptions: { source: 'scheduler', visible: false },
       connectionId: 'emu',
       draft: draft('orders'),
       errorMessage: null,
@@ -117,7 +140,12 @@ describe('firestore query commands', () => {
       resultCount: 5,
     })).toMatchObject({
       action: 'Run query',
-      metadata: { isDocument: false, loadedPages: 2, resultCount: 5 },
+      metadata: {
+        command: expect.objectContaining({ source: 'scheduler', visible: false }),
+        isDocument: false,
+        loadedPages: 2,
+        resultCount: 5,
+      },
       status: 'success',
       target: { path: 'orders', type: 'firestore-query' },
     });

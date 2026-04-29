@@ -1,5 +1,10 @@
 import type { ActivityLogAppendInput, AuthUser } from '@firebase-desk/repo-contracts';
-import { type AppCoreStore, documentDataMetadata } from '../shared/index.ts';
+import {
+  type AppCoreCommandOptions,
+  type AppCoreStore,
+  commandActivityMetadata,
+  documentDataMetadata,
+} from '../shared/index.ts';
 import type { AuthRuntimeState } from './authState.ts';
 import {
   authCustomClaimsSaveFailed,
@@ -50,6 +55,7 @@ export function selectAuthUserCommand(uid: string | null): string | null {
 export function loadMoreAuthUsersCommand(
   env: Pick<AuthCommandEnvironment, 'now' | 'recordActivity'>,
   input: {
+    readonly commandOptions?: AppCoreCommandOptions | undefined;
     readonly connectionId: string | null | undefined;
     readonly filter: string;
     readonly fetchNextPage: () => void;
@@ -61,7 +67,10 @@ export function loadMoreAuthUsersCommand(
     action: 'Load more users',
     area: 'auth',
     durationMs: elapsedMs(startedAt, env.now()),
-    metadata: { filter: input.filter.trim() || null },
+    metadata: {
+      filter: input.filter.trim() || null,
+      ...commandActivityMetadata(input.commandOptions),
+    },
     status: 'success',
     summary: 'Requested more Authentication users',
     target: { connectionId: input.connectionId ?? undefined, type: 'auth-user' },
@@ -72,6 +81,7 @@ export function refreshAuthUsersCommand(
   store: AppCoreStore<AuthRuntimeState>,
   env: Pick<AuthCommandEnvironment, 'now' | 'recordActivity'>,
   input: {
+    readonly commandOptions?: AppCoreCommandOptions | undefined;
     readonly connectionId: string | null | undefined;
     readonly filter: string;
     readonly projectId: string | null;
@@ -83,7 +93,10 @@ export function refreshAuthUsersCommand(
     action: 'Refresh users',
     area: 'auth',
     durationMs: elapsedMs(startedAt, env.now()),
-    metadata: { filter: input.filter.trim() || null },
+    metadata: {
+      filter: input.filter.trim() || null,
+      ...commandActivityMetadata(input.commandOptions),
+    },
     status: 'success',
     summary: 'Requested Authentication refresh',
     target: { connectionId: input.connectionId ?? undefined, type: 'auth-user' },
@@ -95,6 +108,7 @@ export async function saveAuthCustomClaimsCommand(
   env: AuthCommandEnvironment,
   input: {
     readonly claims: Record<string, unknown>;
+    readonly commandOptions?: AppCoreCommandOptions | undefined;
     readonly project: AuthProjectContext | null;
     readonly uid: string;
   },
@@ -114,7 +128,10 @@ export async function saveAuthCustomClaimsCommand(
       action: 'Save custom claims',
       area: 'auth',
       durationMs: elapsedMs(startedAt, env.now()),
-      metadata: documentDataMetadata(input.claims),
+      metadata: {
+        ...commandActivityMetadata(input.commandOptions),
+        ...documentDataMetadata(input.claims),
+      },
       payload: { claims: input.claims },
       status: 'success',
       summary: `Saved custom claims for ${input.uid}`,
@@ -128,7 +145,10 @@ export async function saveAuthCustomClaimsCommand(
       area: 'auth',
       durationMs: elapsedMs(startedAt, env.now()),
       error: { message },
-      metadata: documentDataMetadata(input.claims),
+      metadata: {
+        ...commandActivityMetadata(input.commandOptions),
+        ...documentDataMetadata(input.claims),
+      },
       payload: { claims: input.claims },
       status: 'failure',
       summary: message,
@@ -141,6 +161,7 @@ export async function saveAuthCustomClaimsCommand(
 export function authUsersFailureActivityCommand(
   state: AuthRuntimeState,
   input: {
+    readonly commandOptions?: AppCoreCommandOptions | undefined;
     readonly errorMessage: string | null;
     readonly filter: string;
     readonly tab: AuthTabLike | undefined;
@@ -157,7 +178,10 @@ export function authUsersFailureActivityCommand(
       action: filter ? 'Search users' : 'Load users',
       area: 'auth',
       error: { message: input.errorMessage },
-      metadata: { filter: filter || null },
+      metadata: {
+        filter: filter || null,
+        ...commandActivityMetadata(input.commandOptions),
+      },
       status: 'failure',
       summary: input.errorMessage,
       target: { connectionId: input.tab.connectionId, type: 'auth-user' },

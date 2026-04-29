@@ -23,6 +23,7 @@ describe('jsQueryCommands', () => {
     const env = commandEnv({ runScript: vi.fn(async () => successResult) });
 
     const started = runJsQueryCommand(store, env, {
+      commandOptions: { source: 'scheduler', visible: false },
       interactionPath: 'scripts/default',
       selectedTreeItemId: 'script:emu',
       source: 'return 1;',
@@ -46,7 +47,12 @@ describe('jsQueryCommands', () => {
     expect(env.recordActivity).toHaveBeenCalledWith(
       expect.objectContaining({
         action: 'Run JavaScript query',
-        metadata: { errorCount: 0, logCount: 1, outputCount: 1 },
+        metadata: {
+          command: expect.objectContaining({ source: 'scheduler', visible: false }),
+          errorCount: 0,
+          logCount: 1,
+          outputCount: 1,
+        },
         payload: { source: 'return 1;' },
         status: 'success',
       }),

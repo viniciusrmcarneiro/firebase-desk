@@ -26,6 +26,7 @@ describe('auth commands', () => {
     const fetchNextPage = vi.fn();
 
     loadMoreAuthUsersCommand(context.env, {
+      commandOptions: { source: 'scheduler', visible: false },
       connectionId: 'emu',
       fetchNextPage,
       filter: '',
@@ -42,6 +43,9 @@ describe('auth commands', () => {
       'Load more users',
       'Refresh users',
     ]);
+    expect(context.activity[0]?.metadata).toMatchObject({
+      command: { source: 'scheduler', visible: false },
+    });
   });
 
   it('saves custom claims, updates users, and records Activity', async () => {

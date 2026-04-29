@@ -51,7 +51,38 @@ describe('firestore write commands', () => {
       target: { path: 'orders/ord_1' },
     });
     expect(result?.lastAction).toBe('Created orders/ord_1');
+    expect(result?.notification).toBe('Created orders/ord_1');
     expect(context.store.get().create.status).toBe('created');
+  });
+
+  it('keeps scheduler mutation activity while suppressing success notifications', async () => {
+    const context = commandContext();
+    const result = await createFirestoreDocumentCommand(context.store, context.env, {
+      collectionPath: 'orders',
+      commandOptions: {
+        notifyPolicy: 'issues-only',
+        serializationKey: 'nightly-create',
+        source: 'scheduler',
+        visible: false,
+      },
+      data: { status: 'new' },
+      documentId: 'ord_new',
+      project,
+    });
+
+    expect(result?.lastAction).toBe('Created orders/ord_1');
+    expect(result?.notification).toBeNull();
+    expect(context.activity.at(-1)).toMatchObject({
+      metadata: {
+        command: {
+          notifyPolicy: 'issues-only',
+          serializationKey: 'nightly-create',
+          source: 'scheduler',
+          visible: false,
+        },
+      },
+      status: 'success',
+    });
   });
 
   it('returns full save conflicts without invalidating', async () => {
@@ -73,6 +104,7 @@ describe('firestore write commands', () => {
     expect(context.invalidateFirestoreQueries).not.toHaveBeenCalled();
     expect(result?.result).toBe(conflict);
     expect(result?.lastAction).toBe('Save conflict: orders/ord_1');
+    expect(result?.notification).toBe('Save conflict: orders/ord_1');
     expect(context.activity.at(-1)).toMatchObject({
       action: 'Save document',
       metadata: { lastUpdateTime: 'old', remoteUpdateTime: null },
@@ -134,6 +166,7 @@ describe('firestore write commands', () => {
 
     const result = await updateFirestoreDocumentFieldsCommand(context.store, context.env, {
       documentPath: 'orders/ord_1',
+      commandOptions: { notifyPolicy: 'issues-only' },
       operations: [{
         baseValue: 'draft',
         fieldPath: ['status'],
@@ -146,6 +179,7 @@ describe('firestore write commands', () => {
 
     expect(context.invalidateFirestoreQueries).not.toHaveBeenCalled();
     expect(result?.lastAction).toBe('Field conflict: orders/ord_1');
+    expect(result?.notification).toBe('Field conflict: orders/ord_1');
     expect(context.activity.at(-1)).toMatchObject({
       metadata: { classification: 'conflict', staleBehavior: 'block' },
       status: 'conflict',

@@ -118,7 +118,7 @@ export function useFirestoreWriteController(
         documentId,
         project,
       });
-      if (result) input.onStatus(result.lastAction);
+      if (result?.notification) input.onStatus(result.notification);
     } catch (error) {
       input.onStatus(`Create failed: ${messageFromError(error, 'Could not create document.')}`);
       throw error;
@@ -137,7 +137,7 @@ export function useFirestoreWriteController(
         options,
         project,
       });
-      if (result) input.onStatus(result.lastAction);
+      if (result?.notification) input.onStatus(result.notification);
       return result?.result;
     } catch (error) {
       input.onStatus(`Save failed: ${messageFromError(error, 'Could not save document.')}`);
@@ -157,7 +157,7 @@ export function useFirestoreWriteController(
         options,
         project,
       });
-      if (result) input.onStatus(result.lastAction);
+      if (result?.notification) input.onStatus(result.notification);
       return result?.result;
     } catch (error) {
       input.onStatus(`Update failed: ${messageFromError(error, 'Could not update fields.')}`);
@@ -179,7 +179,7 @@ export function useFirestoreWriteController(
       if (input.activeTab?.kind === 'firestore-query') {
         input.clearSelectedDocument(input.activeTab.id);
       }
-      input.onStatus(result.lastAction);
+      if (result.notification) input.onStatus(result.notification);
     } catch (error) {
       input.onStatus(`Delete failed: ${messageFromError(error, 'Could not delete document.')}`);
       throw error;

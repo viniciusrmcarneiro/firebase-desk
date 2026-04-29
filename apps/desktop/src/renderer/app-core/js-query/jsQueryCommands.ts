@@ -5,7 +5,11 @@ import type {
   ScriptRunRequest,
   ScriptRunResult,
 } from '@firebase-desk/repo-contracts';
-import type { AppCoreStore } from '../shared/index.ts';
+import {
+  type AppCoreCommandOptions,
+  type AppCoreStore,
+  commandActivityMetadata,
+} from '../shared/index.ts';
 import { scriptResultCounts } from './jsQuerySelectors.ts';
 import type { JsQueryState } from './jsQueryState.ts';
 import {
@@ -52,6 +56,7 @@ export function runJsQueryCommand(
   store: AppCoreStore<JsQueryState>,
   env: JsQueryCommandEnvironment,
   input: {
+    readonly commandOptions?: AppCoreCommandOptions | undefined;
     readonly interactionPath: string;
     readonly selectedTreeItemId: string | null;
     readonly source: string;
@@ -66,6 +71,7 @@ export function runJsQueryCommand(
   store.update((state) =>
     jsQueryRunStarted(state, {
       connectionId: tab.connectionId,
+      commandOptions: input.commandOptions,
       runId,
       source: input.source,
       startedAt,
@@ -209,20 +215,28 @@ function recordScriptActivityOnce(
   store: AppCoreStore<JsQueryState>,
   env: Pick<JsQueryCommandEnvironment, 'recordActivity'>,
   tabId: string,
-  run: { readonly connectionId: string; readonly runId: string; readonly source: string; },
+  run: {
+    readonly commandOptions?: AppCoreCommandOptions | undefined;
+    readonly connectionId: string;
+    readonly runId: string;
+    readonly source: string;
+  },
 ): void {
   const state = store.get();
   if (state.loggedRunIds.includes(run.runId)) return;
   const result = state.results[tabId];
   if (!result) return;
   store.update((current) => jsQueryRunActivityRecorded(current, run.runId));
-  void env.recordActivity(scriptActivityInput(result, run.connectionId, run.source));
+  void env.recordActivity(
+    scriptActivityInput(result, run.connectionId, run.source, run.commandOptions),
+  );
 }
 
 function scriptActivityInput(
   result: ScriptRunResult,
   connectionId: string,
   source: string,
+  commandOptions: AppCoreCommandOptions | undefined,
 ): ActivityLogAppendInput {
   const status: ActivityLogStatus = result.cancelled
     ? 'cancelled'
@@ -234,7 +248,7 @@ function scriptActivityInput(
     area: 'js-query',
     ...(result.errors[0] ? { error: result.errors[0] } : {}),
     durationMs: result.durationMs,
-    metadata: { ...scriptResultCounts(result) },
+    metadata: { ...commandActivityMetadata(commandOptions), ...scriptResultCounts(result) },
     payload: { source },
     status,
     summary: result.cancelled

@@ -4,6 +4,11 @@ import type {
   FirestoreCollectionNode,
   FirestoreQuery,
 } from '@firebase-desk/repo-contracts';
+import {
+  type AppCoreCommandOptions,
+  commandActivityMetadata,
+  normalizeCommandOptions,
+} from '../../shared/index.ts';
 import { firestoreQueryDraftMetadata } from './firestoreQuerySelectors.ts';
 import type { FirestoreQueryRuntimeState } from './firestoreQueryState.ts';
 import {
@@ -21,6 +26,7 @@ interface FirestoreQueryTabLike {
 export interface FirestoreQuerySubmitCommandInput {
   readonly activeDraft: FirestoreQueryDraft;
   readonly clearSelection: boolean;
+  readonly commandOptions?: AppCoreCommandOptions | undefined;
   readonly query: FirestoreQuery;
   readonly selectedTreeItemId: string | null;
   readonly tab: FirestoreQueryTabLike | undefined;
@@ -37,6 +43,7 @@ export interface FirestoreQuerySubmitCommandResult {
 }
 
 export interface FirestoreQueryCompletionInput {
+  readonly commandOptions?: AppCoreCommandOptions | undefined;
   readonly connectionId: string;
   readonly draft: FirestoreQueryDraft;
   readonly errorMessage: string | null;
@@ -58,21 +65,24 @@ export function runFirestoreQueryCommand(
   state: FirestoreQueryRuntimeState,
   input: FirestoreQuerySubmitCommandInput,
 ): FirestoreQuerySubmitCommandResult {
-  if (!input.tab || input.tab.kind !== 'firestore-query') {
+  const target = queryCommandTarget(input);
+  if (!target) {
     return { interaction: null, path: null, state };
   }
   return {
-    interaction: {
-      activeTabId: input.tab.id,
-      path: input.activeDraft.path,
-      selectedTreeItemId: input.selectedTreeItemId,
-    },
+    interaction: target.visible
+      ? {
+        activeTabId: target.tabId,
+        path: input.activeDraft.path,
+        selectedTreeItemId: input.selectedTreeItemId,
+      }
+      : null,
     path: input.activeDraft.path,
     state: firestoreQueryStarted(state, {
       clearSelection: input.clearSelection,
       limit: input.activeDraft.limit,
       query: input.query,
-      tabId: input.tab.id,
+      tabId: target.tabId,
     }),
   };
 }
@@ -114,6 +124,7 @@ export function firestoreQueryCompletionActivity(
       isDocument,
       loadedPages: input.loadedPages,
       resultCount: input.resultCount,
+      ...commandActivityMetadata(input.commandOptions),
       ...firestoreQueryDraftMetadata(input.draft),
     },
     status: input.errorMessage ? 'failure' : 'success',
@@ -138,21 +149,41 @@ export function refreshFirestoreQueryCommand(
   state: FirestoreQueryRuntimeState,
   input: FirestoreQuerySubmitCommandInput & { readonly pagesToReload: number; },
 ): FirestoreQuerySubmitCommandResult {
-  if (!input.tab || input.tab.kind !== 'firestore-query') {
+  const target = queryCommandTarget(input);
+  if (!target) {
     return { interaction: null, path: null, state };
   }
   return {
-    interaction: {
-      activeTabId: input.tab.id,
-      path: input.activeDraft.path,
-      selectedTreeItemId: input.selectedTreeItemId,
-    },
+    interaction: target.visible
+      ? {
+        activeTabId: target.tabId,
+        path: input.activeDraft.path,
+        selectedTreeItemId: input.selectedTreeItemId,
+      }
+      : null,
     path: input.activeDraft.path,
     state: firestoreRefreshStarted(state, {
       limit: input.activeDraft.limit,
       pagesToReload: input.pagesToReload,
       query: input.query,
-      tabId: input.tab.id,
+      tabId: target.tabId,
     }),
   };
+}
+
+function queryCommandTarget(
+  input: FirestoreQuerySubmitCommandInput,
+): { readonly tabId: string; readonly visible: boolean; } | null {
+  const options = normalizeCommandOptions(input.commandOptions);
+  if (input.tab?.kind === 'firestore-query') {
+    return { tabId: input.tab.id, visible: options.visible };
+  }
+  if (!options.visible) {
+    return {
+      tabId: options.serializationKey
+        ?? `firestore-query:${input.query.connectionId}:${input.activeDraft.path}`,
+      visible: false,
+    };
+  }
+  return null;
 }
