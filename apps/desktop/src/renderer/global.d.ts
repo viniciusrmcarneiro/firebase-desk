@@ -54,6 +54,12 @@ declare global {
     readonly getDocument: (
       request: IpcRequest<'firestore.getDocument'>,
     ) => Promise<IpcResponse<'firestore.getDocument'>>;
+    readonly generateDocumentId: (
+      request: IpcRequest<'firestore.generateDocumentId'>,
+    ) => Promise<IpcResponse<'firestore.generateDocumentId'>>;
+    readonly createDocument: (
+      request: IpcRequest<'firestore.createDocument'>,
+    ) => Promise<IpcResponse<'firestore.createDocument'>>;
     readonly saveDocument: (
       request: IpcRequest<'firestore.saveDocument'>,
     ) => Promise<IpcResponse<'firestore.saveDocument'>>;

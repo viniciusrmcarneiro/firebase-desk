@@ -7,7 +7,10 @@ import { parseDocumentJson, validateFirestoreDocumentData } from './fieldEditMod
 export interface DocumentEditorModalProps {
   readonly document: FirestoreDocumentResult | null;
   readonly onSaveDocument?:
-    | ((documentPath: string, data: Record<string, unknown>) => Promise<void> | void)
+    | ((
+      documentPath: string,
+      data: Record<string, unknown>,
+    ) => Promise<boolean | void> | boolean | void)
     | undefined;
   readonly onOpenChange: (open: boolean) => void;
   readonly open: boolean;
@@ -38,6 +41,7 @@ export function DocumentEditorModal(
         <div className='grid max-h-[68vh] min-h-0 grid-rows-[minmax(280px,1fr)] gap-2'>
           <div className='overflow-hidden rounded-md border border-border-subtle'>
             <CodeEditor
+              ariaLabel='Document JSON'
               language='json'
               value={source}
               onChange={setSource}
@@ -59,8 +63,8 @@ export function DocumentEditorModal(
               try {
                 const data = parseDocumentJson(source);
                 validateFirestoreDocumentData(data);
-                await onSaveDocument?.(document.path, data);
-                onOpenChange(false);
+                const saved = await onSaveDocument?.(document.path, data);
+                if (saved !== false) onOpenChange(false);
               } catch (caught) {
                 setError(messageFromError(caught, 'Could not save document.'));
               } finally {

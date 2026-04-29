@@ -10,6 +10,7 @@ interface QueryBuilderProps {
   readonly draft: FirestoreQueryDraft;
   readonly fieldSuggestions?: ReadonlyArray<FirestoreFieldCatalogEntry>;
   readonly isLoading: boolean;
+  readonly onCreateDocument?: ((collectionPath: string) => void) | undefined;
   readonly onDraftChange: (draft: FirestoreQueryDraft) => void;
   readonly onReset: () => void;
   readonly onRun: () => void;
@@ -39,7 +40,15 @@ const selectClassName =
   'h-[var(--density-compact-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary disabled:cursor-not-allowed disabled:opacity-60';
 
 export function QueryBuilder(
-  { draft, fieldSuggestions = [], isLoading, onDraftChange, onReset, onRun }: QueryBuilderProps,
+  {
+    draft,
+    fieldSuggestions = [],
+    isLoading,
+    onCreateDocument,
+    onDraftChange,
+    onReset,
+    onRun,
+  }: QueryBuilderProps,
 ) {
   const supportsCollectionControls = isCollectionPath(draft.path);
   const filters = filtersForDraft(draft);
@@ -98,7 +107,7 @@ export function QueryBuilder(
         <PanelBody className='grid gap-2 overflow-visible'>
           <div
             className={supportsCollectionControls
-              ? 'grid grid-cols-[minmax(180px,1fr)_96px_auto] items-center gap-2'
+              ? 'grid grid-cols-[minmax(180px,1fr)_96px_auto_auto] items-center gap-2'
               : 'grid grid-cols-[minmax(180px,1fr)_auto] items-center gap-2'}
           >
             <Input
@@ -125,6 +134,18 @@ export function QueryBuilder(
                   onChange={(event) =>
                     onDraftChange({ ...draft, limit: Number(event.currentTarget.value) || 1 })}
                 />
+              )
+              : null}
+            {supportsCollectionControls && onCreateDocument
+              ? (
+                <Button
+                  disabled={isLoading}
+                  variant='secondary'
+                  onClick={() => onCreateDocument(draft.path)}
+                >
+                  <Plus size={14} aria-hidden='true' />
+                  New document
+                </Button>
               )
               : null}
             <Button disabled={isLoading} variant='primary' onClick={onRun}>

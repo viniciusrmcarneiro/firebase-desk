@@ -25,6 +25,7 @@ export interface FirestoreDocumentBrowserProps {
   readonly isFetchingMore?: boolean;
   readonly isLoading?: boolean;
   readonly actionErrorMessage?: string | null;
+  readonly onCreateDocument?: ((collectionPath: string) => void) | undefined;
   readonly onDeleteDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
   readonly onDeleteField?: ((target: FieldEditTarget) => void) | undefined;
   readonly onEditDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
@@ -59,6 +60,7 @@ export function FirestoreDocumentBrowser(
     actionErrorMessage = null,
     isFetchingMore = false,
     isLoading = false,
+    onCreateDocument,
     onDeleteDocument,
     onDeleteField,
     onEditDocument,
@@ -142,6 +144,7 @@ export function FirestoreDocumentBrowser(
         selectedDocumentPath={selectedDocumentPath}
         settings={settings}
         subcollectionStates={subcollectionStates}
+        onCreateDocument={onCreateDocument}
         onDeleteDocument={onDeleteDocument}
         onDeleteField={onDeleteField}
         onEditDocument={onEditDocument}

@@ -63,9 +63,19 @@ describe('repo-mocks contract conformance', () => {
     const document = await repo.getDocument('p', 'orders/ord_1024');
     expect(document?.path).toBe('orders/ord_1024');
 
-    const saved = await repo.saveDocument('p', 'orders/ord_saved', { status: 'draft' });
-    expect(saved.path).toBe('orders/ord_saved');
-    expect(await repo.getDocument('p', 'orders/ord_saved')).not.toBeNull();
+    const savedResult = await repo.saveDocument('p', 'orders/ord_saved', { status: 'draft' });
+    expect(savedResult.status).toBe('saved');
+    const saved = await repo.getDocument('p', 'orders/ord_saved');
+    expect(saved?.path).toBe('orders/ord_saved');
+    expect(saved?.updateTime).toBeDefined();
+
+    await expect(repo.generateDocumentId('p', 'orders')).resolves.toEqual({
+      documentId: 'mock_1',
+    });
+    const created = await repo.createDocument('p', 'orders', 'ord_created', { status: 'new' });
+    expect(created.path).toBe('orders/ord_created');
+    await expect(repo.createDocument('p', 'orders', 'ord_created', { status: 'again' }))
+      .rejects.toThrow('already exists');
 
     await repo.saveDocument('p', 'orders/ord_fields', {
       id: 'data-id',
@@ -95,6 +105,22 @@ describe('repo-mocks contract conformance', () => {
         payload: { __type__: 'bytes', base64: 'aGVsbG8=' },
         place: { __type__: 'geoPoint', latitude: -36.8485, longitude: 174.7633 },
       },
+    });
+
+    const conflictBase = await repo.getDocument('p', 'orders/ord_encoded');
+    expect(conflictBase?.updateTime).toBeDefined();
+    await repo.saveDocument('p', 'orders/ord_encoded', { status: 'remote' });
+    await expect(repo.saveDocument(
+      'p',
+      'orders/ord_encoded',
+      { status: 'local' },
+      { lastUpdateTime: conflictBase!.updateTime! },
+    )).resolves.toMatchObject({
+      status: 'conflict',
+      remoteDocument: { data: { status: 'remote' } },
+    });
+    await expect(repo.getDocument('p', 'orders/ord_encoded')).resolves.toMatchObject({
+      data: { status: 'remote' },
     });
 
     await repo.saveDocument('p', 'objects/a', { value: { score: 2, toJSON: 'not callable' } });

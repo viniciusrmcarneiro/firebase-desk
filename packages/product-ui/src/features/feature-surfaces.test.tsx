@@ -402,6 +402,36 @@ describe('feature surfaces', () => {
     expect(onToggleItem).toHaveBeenCalledWith('firestore:emu');
   });
 
+  it('AccountTree exposes new document action on collection context menu', async () => {
+    const onCreateDocument = vi.fn();
+    render(
+      <AccountTree
+        filterValue=''
+        items={[{
+          id: 'collection:emu:orders',
+          kind: 'collection',
+          label: 'orders',
+          depth: 0,
+          hasChildren: false,
+          expanded: false,
+        }]}
+        onAddProject={() => {}}
+        onCreateDocument={onCreateDocument}
+        onFilterChange={() => {}}
+        onOpenItem={() => {}}
+        onRefreshItem={() => {}}
+        onRemoveItem={() => {}}
+        onSelectItem={() => {}}
+        onToggleItem={() => {}}
+      />,
+    );
+
+    fireEvent.contextMenu(screen.getByText('orders'));
+    fireEvent.click(await screen.findByText('New document'));
+
+    expect(onCreateDocument).toHaveBeenCalledWith('collection:emu:orders');
+  });
+
   it('WorkspaceTabStrip switches and closes tabs', () => {
     const onSelectTab = vi.fn();
     const onCloseTab = vi.fn();
@@ -661,6 +691,7 @@ describe('feature surfaces', () => {
     expect(onSaveDocument).toHaveBeenCalledWith(
       'orders/ord_1024',
       expect.objectContaining({ status: 'paid' }),
+      undefined,
     );
   });
 

@@ -4,6 +4,8 @@ import type {
   FirestoreDocumentNode,
   FirestoreDocumentResult,
   FirestoreRepository,
+  FirestoreSaveDocumentOptions,
+  FirestoreSaveDocumentResult,
   Page,
   PageRequest,
 } from '@firebase-desk/repo-contracts';
@@ -115,17 +117,58 @@ export class FirebaseFirestoreRepository implements FirestoreRepository {
     });
   }
 
+  async generateDocumentId(
+    connectionId: string,
+    collectionPath: string,
+  ): Promise<{ readonly documentId: string; }> {
+    assertCollectionPath(collectionPath);
+    return await this.withConnection(connectionId, async (db) => ({
+      documentId: db.collection(collectionPath).doc().id,
+    }));
+  }
+
+  async createDocument(
+    connectionId: string,
+    collectionPath: string,
+    documentId: string,
+    data: Record<string, unknown>,
+  ): Promise<FirestoreDocumentResult> {
+    assertCollectionPath(collectionPath);
+    assertDocumentId(documentId);
+    return await this.withConnection(connectionId, async (db) => {
+      const ref = db.collection(collectionPath).doc(documentId);
+      await ref.create(decodeAdminData(db, data));
+      return await documentResult(await ref.get());
+    });
+  }
+
   async saveDocument(
     connectionId: string,
     documentPath: string,
     data: Record<string, unknown>,
-  ): Promise<FirestoreDocumentResult> {
+    options?: FirestoreSaveDocumentOptions,
+  ): Promise<FirestoreSaveDocumentResult> {
     assertDocumentPath(documentPath);
     return await this.withConnection(connectionId, async (db) => {
       const ref = db.doc(documentPath);
-      await ref.set(decodeAdminData(db, data));
+      const decodedData = decodeAdminData(db, data);
+      if (options?.lastUpdateTime) {
+        const conflictDocument = await db.runTransaction(async (transaction) => {
+          const current = await transaction.get(ref);
+          if (snapshotUpdateTime(current) !== options.lastUpdateTime) {
+            return current.exists ? await documentResult(current) : null;
+          }
+          transaction.set(ref, decodedData);
+          return undefined;
+        });
+        if (conflictDocument !== undefined) {
+          return { status: 'conflict', remoteDocument: conflictDocument };
+        }
+      } else {
+        await ref.set(decodedData);
+      }
       const snapshot = await ref.get();
-      return await documentResult(snapshot);
+      return { status: 'saved', document: await documentResult(snapshot) };
     });
   }
 
@@ -179,7 +222,12 @@ async function documentResult(snapshot: DocumentSnapshot): Promise<FirestoreDocu
     data: encodeAdminData(snapshot.data() ?? {}),
     hasSubcollections: collectionNodes.length > 0,
     subcollections: collectionNodes,
+    ...(snapshotUpdateTime(snapshot) ? { updateTime: snapshotUpdateTime(snapshot)! } : {}),
   };
+}
+
+function snapshotUpdateTime(snapshot: DocumentSnapshot): string | null {
+  return snapshot.updateTime ? snapshot.updateTime.toDate().toISOString() : null;
 }
 
 async function pageFromSnapshots<T>(
@@ -227,6 +275,12 @@ function assertDocumentPath(path: string): void {
   const parts = pathParts(path);
   if (parts.length === 0 || parts.length % 2 !== 0) {
     throw new Error(`Invalid Firestore document path: ${path}`);
+  }
+}
+
+function assertDocumentId(id: string): void {
+  if (!id.trim() || id.includes('/')) {
+    throw new Error(`Invalid Firestore document ID: ${id}`);
   }
 }
 

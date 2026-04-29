@@ -48,6 +48,7 @@ export interface AccountTreeProps {
   readonly filterValue: string;
   readonly items: ReadonlyArray<AccountTreeItem>;
   readonly onAddProject: () => void;
+  readonly onCreateDocument?: (id: string) => void;
   readonly onFilterChange: (value: string) => void;
   readonly onEditItem?: (id: string) => void;
   readonly onOpenItem: (id: string) => void;
@@ -62,6 +63,7 @@ export function AccountTree(
     filterValue,
     items,
     onAddProject,
+    onCreateDocument,
     onEditItem,
     onFilterChange,
     onOpenItem,
@@ -97,6 +99,7 @@ export function AccountTree(
           renderNode={(node) => (
             <AccountTreeRow
               item={node as AccountTreeItem}
+              {...(onCreateDocument ? { onCreateDocument } : {})}
               {...(onEditItem ? { onEditItem } : {})}
               onRefreshItem={onRefreshItem}
               onRemoveItem={onRemoveItem}
@@ -113,12 +116,15 @@ export function AccountTree(
 
 interface AccountTreeRowProps {
   readonly item: AccountTreeItem;
+  readonly onCreateDocument?: (id: string) => void;
   readonly onEditItem?: (id: string) => void;
   readonly onRefreshItem: (id: string) => void;
   readonly onRemoveItem: (id: string) => void;
 }
 
-function AccountTreeRow({ item, onEditItem, onRefreshItem, onRemoveItem }: AccountTreeRowProps) {
+function AccountTreeRow(
+  { item, onCreateDocument, onEditItem, onRefreshItem, onRemoveItem }: AccountTreeRowProps,
+) {
   const icon = iconForKind(item.kind);
   const row = (
     <div
@@ -205,13 +211,25 @@ function AccountTreeRow({ item, onEditItem, onRefreshItem, onRemoveItem }: Accou
     </div>
   );
 
-  if (item.kind !== 'project' || !onEditItem) return row;
+  const hasProjectMenu = item.kind === 'project' && onEditItem;
+  const hasCollectionMenu = item.kind === 'collection' && onCreateDocument;
+
+  if (!hasProjectMenu && !hasCollectionMenu) return row;
 
   return (
     <ContextMenu>
       <ContextMenuTrigger asChild>{row}</ContextMenuTrigger>
       <ContextMenuContent>
-        <ContextMenuItem onSelect={() => onEditItem(item.id)}>Edit account</ContextMenuItem>
+        {hasProjectMenu
+          ? <ContextMenuItem onSelect={() => onEditItem(item.id)}>Edit account</ContextMenuItem>
+          : null}
+        {hasCollectionMenu
+          ? (
+            <ContextMenuItem onSelect={() => onCreateDocument(item.id)}>
+              New document
+            </ContextMenuItem>
+          )
+          : null}
         {item.canRefresh
           ? <ContextMenuItem onSelect={() => onRefreshItem(item.id)}>Refresh</ContextMenuItem>
           : null}

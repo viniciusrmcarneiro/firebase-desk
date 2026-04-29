@@ -1,4 +1,7 @@
-import type { FirestoreDocumentResult } from '@firebase-desk/repo-contracts';
+import type {
+  FirestoreDocumentResult,
+  FirestoreSaveDocumentResult,
+} from '@firebase-desk/repo-contracts';
 import { MockSettingsRepository } from '@firebase-desk/repo-mocks';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { ReactNode } from 'react';
@@ -45,6 +48,26 @@ vi.mock('../../code-editor/CodeEditor.tsx', () => ({
       value={value}
       onChange={(event) => onChange?.(event.currentTarget.value)}
     />
+  ),
+  DiffCodeEditor: (
+    {
+      modified,
+      onModifiedChange,
+      original,
+    }: {
+      readonly modified: string;
+      readonly onModifiedChange?: (value: string) => void;
+      readonly original: string;
+    },
+  ) => (
+    <div>
+      <pre>{original}</pre>
+      <textarea
+        aria-label='Merge draft'
+        value={modified}
+        onChange={(event) => onModifiedChange?.(event.currentTarget.value)}
+      />
+    </div>
   ),
 }));
 
@@ -130,6 +153,7 @@ const document: FirestoreDocumentResult = {
   path: 'orders/ord_1',
   data: { active: true, meta: { count: 2 }, 'a.b': 'literal' },
   hasSubcollections: false,
+  updateTime: '2026-04-29T00:00:00.000Z',
 };
 
 const documentWithSubcollections: FirestoreDocumentResult = {
@@ -160,7 +184,7 @@ describe('FirestoreQuerySurface editing UX', () => {
         active: false,
         meta: { count: 2 },
         'a.b': 'literal',
-      })
+      }, { lastUpdateTime: document.updateTime })
     );
   });
 
@@ -175,7 +199,7 @@ describe('FirestoreQuerySurface editing UX', () => {
         active: null,
         meta: { count: 2 },
         'a.b': 'literal',
-      })
+      }, { lastUpdateTime: document.updateTime })
     );
     expect(await screen.findByText('Results changed.')).toBeTruthy();
   });
@@ -192,7 +216,7 @@ describe('FirestoreQuerySurface editing UX', () => {
       expect(onSaveDocument).toHaveBeenCalledWith('orders/ord_1', {
         meta: { count: 2 },
         'a.b': 'literal',
-      })
+      }, { lastUpdateTime: document.updateTime })
     );
   });
 
@@ -209,7 +233,59 @@ describe('FirestoreQuerySurface editing UX', () => {
         active: true,
         meta: { count: 2 },
         'a.b': 'changed',
-      })
+      }, { lastUpdateTime: document.updateTime })
+    );
+  });
+
+  it('creates a document with a generated ID that can be overwritten', async () => {
+    const onCreateDocument = vi.fn<CreateDocument>();
+    const onGenerateDocumentId = vi.fn(async () => 'generated_id');
+    renderSurface({
+      onCreateDocument,
+      onGenerateDocumentId,
+      onSaveDocument: vi.fn<SaveDocument>(),
+    });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'New document' })[0]!);
+    expect(await screen.findByDisplayValue('generated_id')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Document ID'), { target: { value: 'manual_id' } });
+    fireEvent.change(screen.getByLabelText('JSON value'), {
+      target: { value: '{"status":"draft"}' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() =>
+      expect(onCreateDocument).toHaveBeenCalledWith('orders', 'manual_id', { status: 'draft' })
+    );
+    expect(await screen.findByText('Results changed.')).toBeTruthy();
+  });
+
+  it('opens editable conflict merge and saves merged JSON with remote update time', async () => {
+    const remoteDocument: FirestoreDocumentResult = {
+      ...document,
+      data: { active: false, meta: { count: 3 }, 'a.b': 'remote' },
+      updateTime: '2026-04-29T00:01:00.000Z',
+    };
+    const onSaveDocument = vi.fn<SaveDocument>()
+      .mockResolvedValueOnce({ status: 'conflict', remoteDocument })
+      .mockResolvedValueOnce({ status: 'saved', document: remoteDocument });
+    renderSurface({ onSaveDocument });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'set null active' })[0]!);
+    expect(await screen.findByRole('dialog', { name: 'Resolve save conflict' })).toBeTruthy();
+    expect(screen.getByText(/"a.b": "remote"/)).toBeTruthy();
+
+    fireEvent.change(screen.getByLabelText('Merge draft'), {
+      target: { value: '{"active":"merged"}' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Save merged' }));
+
+    await waitFor(() =>
+      expect(onSaveDocument).toHaveBeenLastCalledWith(
+        'orders/ord_1',
+        { active: 'merged' },
+        { lastUpdateTime: remoteDocument.updateTime },
+      )
     );
   });
   it('confirms document delete and includes selected subcollections', async () => {
@@ -257,10 +333,14 @@ function renderSurface(
   {
     document: inputDocument = document,
     onDeleteDocument,
+    onCreateDocument,
+    onGenerateDocumentId,
     onSaveDocument,
   }: {
     readonly document?: FirestoreDocumentResult;
+    readonly onCreateDocument?: CreateDocument;
     readonly onDeleteDocument?: DeleteDocument;
+    readonly onGenerateDocumentId?: (collectionPath: string) => Promise<string> | string;
     readonly onSaveDocument: SaveDocument;
   },
 ) {
@@ -272,7 +352,9 @@ function renderSurface(
         rows={[inputDocument]}
         selectedDocument={inputDocument}
         selectedDocumentPath={inputDocument.path}
+        {...(onCreateDocument ? { onCreateDocument } : {})}
         {...(onDeleteDocument ? { onDeleteDocument } : {})}
+        {...(onGenerateDocumentId ? { onGenerateDocumentId } : {})}
         onDraftChange={() => {}}
         onLoadMore={() => {}}
         onOpenDocumentInNewTab={() => {}}
@@ -285,7 +367,16 @@ function renderSurface(
   );
 }
 
-type SaveDocument = (documentPath: string, data: Record<string, unknown>) => void;
+type SaveDocument = (
+  documentPath: string,
+  data: Record<string, unknown>,
+  options?: { readonly lastUpdateTime?: string; },
+) => FirestoreSaveDocumentResult | void | Promise<FirestoreSaveDocumentResult | void>;
+type CreateDocument = (
+  collectionPath: string,
+  documentId: string,
+  data: Record<string, unknown>,
+) => void;
 type DeleteDocument = (documentPath: string, options: DeleteDocumentOptions) => void;
 type CollectionWithDocuments = NonNullable<FirestoreDocumentResult['subcollections']>[number] & {
   readonly documents: ReadonlyArray<FirestoreDocumentResult>;

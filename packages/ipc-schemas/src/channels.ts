@@ -7,11 +7,15 @@ import {
   SetCustomClaimsRequestSchema,
 } from './auth.ts';
 import {
+  CreateDocumentRequestSchema,
   DeleteDocumentRequestSchema,
   FirestoreCollectionNodeSchema,
   FirestoreDocumentResultSchema,
   FirestoreDocumentsPageSchema,
+  FirestoreGeneratedDocumentIdSchema,
   FirestoreResultsPageSchema,
+  FirestoreSaveDocumentResultSchema,
+  GenerateDocumentIdRequestSchema,
   ListDocumentsRequestSchema,
   RunQueryRequestSchema,
   SaveDocumentRequestSchema,
@@ -98,9 +102,17 @@ export const IPC_CHANNELS = {
     request: z.object({ connectionId: z.string(), documentPath: z.string() }),
     response: FirestoreDocumentResultSchema.nullable(),
   },
+  'firestore.generateDocumentId': {
+    request: GenerateDocumentIdRequestSchema,
+    response: FirestoreGeneratedDocumentIdSchema,
+  },
+  'firestore.createDocument': {
+    request: CreateDocumentRequestSchema,
+    response: FirestoreDocumentResultSchema,
+  },
   'firestore.saveDocument': {
     request: SaveDocumentRequestSchema,
-    response: FirestoreDocumentResultSchema,
+    response: FirestoreSaveDocumentResultSchema,
   },
   'firestore.deleteDocument': {
     request: DeleteDocumentRequestSchema,

@@ -70,6 +70,50 @@ describe('ResultPanel', () => {
     expect(screen.getByTestId('table').textContent).toBe('0 rows');
   });
 
+  it('renders create document CTA in result header for collection paths', () => {
+    const onCreateDocument = vi.fn();
+    render(
+      <ResultPanel
+        errorMessage={null}
+        hasMore={false}
+        isFetchingMore={false}
+        isLoading={false}
+        queryPath='orders'
+        resultView='table'
+        rows={[]}
+        selectedDocumentPath={null}
+        subcollectionStates={{}}
+        onCreateDocument={onCreateDocument}
+        onLoadMore={() => {}}
+        onResultViewChange={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'New document' }));
+    expect(onCreateDocument).toHaveBeenCalledWith('orders');
+  });
+
+  it('hides create document CTA in result header for document paths', () => {
+    render(
+      <ResultPanel
+        errorMessage={null}
+        hasMore={false}
+        isFetchingMore={false}
+        isLoading={false}
+        queryPath='orders/ord_1'
+        resultView='table'
+        rows={[]}
+        selectedDocumentPath={null}
+        subcollectionStates={{}}
+        onCreateDocument={() => {}}
+        onLoadMore={() => {}}
+        onResultViewChange={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'New document' })).toBeNull();
+  });
+
   it('loads subcollections when expanding tree document', () => {
     const onLoadSubcollections = vi.fn();
     const onSelectDocument = vi.fn();

@@ -76,11 +76,17 @@ export function normalizeStreamItem(
   if (!normalized) return null;
   return {
     id: `yield-${index}`,
-    label: `yield ${index}`,
+    label: streamItemLabel(value, index),
     badge: normalized.badge,
     view: normalized.view,
     value: normalized.value,
   };
+}
+
+function streamItemLabel(value: unknown, index: number): string {
+  if (isDocumentSnapshot(value)) return 'yield DocumentSnapshot';
+  if (isQuerySnapshot(value)) return 'yield QuerySnapshot';
+  return `yield ${index}`;
 }
 
 function normalizeArray(value: ReadonlyArray<unknown>): NormalizedValue {

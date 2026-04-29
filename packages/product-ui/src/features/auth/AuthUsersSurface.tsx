@@ -367,7 +367,12 @@ function ClaimsEditorModal(
         title='Custom claims'
       >
         <div className='h-[min(360px,55vh)] overflow-hidden rounded-md border border-border-subtle'>
-          <CodeEditor language='json' value={source} onChange={setSource} />
+          <CodeEditor
+            ariaLabel='Custom claims JSON'
+            language='json'
+            value={source}
+            onChange={setSource}
+          />
         </div>
         {error ? <InlineAlert variant='danger'>{error}</InlineAlert> : null}
         <div className='flex justify-end gap-2'>

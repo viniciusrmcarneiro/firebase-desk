@@ -1,0 +1,71 @@
+import { type ElectronApplication, expect, type Page } from '@playwright/test';
+import { mkdtemp, rm } from 'node:fs/promises';
+import { tmpdir } from 'node:os';
+import { join } from 'node:path';
+import { launchDesktop } from './launch.ts';
+
+export const EMULATOR_ACCOUNT_NAME = 'Local Emulator E2E';
+export const FIRESTORE_PROJECT_ID = 'demo-local';
+
+export interface LiveApp {
+  readonly app: ElectronApplication;
+  readonly page: Page;
+  readonly close: () => Promise<void>;
+}
+
+export async function openLiveApp(): Promise<LiveApp> {
+  const userDataDir = await mkdtemp(join(tmpdir(), 'firebase-desk-e2e-'));
+  const app = await launchDesktop({ args: ['--data-mode=live'], userDataDir });
+  const page = await app.firstWindow();
+  await expect(page).toHaveTitle(/Firebase Desk/);
+  return {
+    app,
+    page,
+    close: async () => {
+      await app.close();
+      await rm(userDataDir, { force: true, recursive: true });
+    },
+  };
+}
+
+export async function addLocalEmulatorAccount(page: Page): Promise<void> {
+  await page.getByRole('button', { name: 'Add account' }).click();
+  const dialog = page.getByRole('dialog', { name: 'Add Firebase Account' });
+  await expect(dialog).toBeVisible();
+  await dialog.getByRole('tab', { name: 'Local emulator' }).click();
+  await dialog.getByLabel('Display name').fill(EMULATOR_ACCOUNT_NAME);
+  await dialog.getByRole('button', { name: 'Add account' }).click();
+  await expect(dialog).toBeHidden();
+}
+
+export async function expandEmulatorAccount(page: Page): Promise<void> {
+  const tree = page.getByRole('tree', { name: 'Account tree' });
+  const account = tree.getByRole('treeitem', { name: new RegExp(EMULATOR_ACCOUNT_NAME) });
+  await expect(account).toBeVisible();
+  await account.click();
+}
+
+export async function openFirestore(page: Page): Promise<void> {
+  await expandEmulatorAccount(page);
+  const tree = page.getByRole('tree', { name: 'Account tree' });
+  await expect(tree.getByRole('treeitem', { name: /Firestore/ })).toBeVisible();
+  await tree.getByRole('treeitem', { name: /Firestore/ }).click();
+}
+
+export async function openAuthentication(page: Page): Promise<void> {
+  await expandEmulatorAccount(page);
+  const tree = page.getByRole('tree', { name: 'Account tree' });
+  await expect(tree.getByRole('treeitem', { name: /Authentication/ })).toBeVisible();
+  await tree.getByRole('treeitem', { name: /Authentication/ }).click();
+}
+
+export async function openJavaScriptQuery(page: Page): Promise<void> {
+  await expandEmulatorAccount(page);
+  const tree = page.getByRole('tree', { name: 'Account tree' });
+  await expect(tree.getByRole('treeitem', { name: /JavaScript Query/ })).toBeVisible();
+  await tree.getByRole('treeitem', { name: /JavaScript Query/ }).click();
+}
+
+export function uniqueSmokeId(prefix: string): string {
+  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}

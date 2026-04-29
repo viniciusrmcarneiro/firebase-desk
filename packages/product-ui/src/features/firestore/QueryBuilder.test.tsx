@@ -66,6 +66,23 @@ describe('QueryBuilder', () => {
     expect(screen.queryByLabelText('Filter 1 field')).toBeNull();
   });
 
+  it('renders create document CTA for collection paths', () => {
+    const onCreateDocument = vi.fn();
+    render(
+      <QueryBuilder
+        draft={draft}
+        isLoading={false}
+        onCreateDocument={onCreateDocument}
+        onDraftChange={() => {}}
+        onReset={() => {}}
+        onRun={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'New document' }));
+    expect(onCreateDocument).toHaveBeenCalledWith('orders');
+  });
+
   it('uses generic placeholders for filter fields and values', () => {
     render(
       <QueryBuilder
@@ -192,6 +209,7 @@ describe('QueryBuilder', () => {
     expect(screen.queryByLabelText('Result limit')).toBeNull();
     expect(screen.queryByLabelText('Filter 1 field')).toBeNull();
     expect(screen.queryByLabelText('Sort field')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'New document' })).toBeNull();
     expect(screen.getByText(/Filters, sorting, limits, and pagination are hidden/)).toBeTruthy();
   });
 });

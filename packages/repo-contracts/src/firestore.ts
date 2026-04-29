@@ -48,11 +48,30 @@ export interface FirestoreDocumentResult {
   readonly data: Record<string, unknown>;
   readonly hasSubcollections: boolean;
   readonly subcollections?: ReadonlyArray<FirestoreCollectionNode>;
+  readonly updateTime?: string;
 }
 
 export interface FirestoreDeleteDocumentOptions {
   readonly deleteSubcollectionPaths: ReadonlyArray<string>;
 }
+
+export interface FirestoreGeneratedDocumentId {
+  readonly documentId: string;
+}
+
+export interface FirestoreSaveDocumentOptions {
+  readonly lastUpdateTime?: string;
+}
+
+export type FirestoreSaveDocumentResult =
+  | {
+    readonly status: 'saved';
+    readonly document: FirestoreDocumentResult;
+  }
+  | {
+    readonly status: 'conflict';
+    readonly remoteDocument: FirestoreDocumentResult | null;
+  };
 
 export interface FirestoreRepository {
   listRootCollections(connectionId: string): Promise<ReadonlyArray<FirestoreCollectionNode>>;
@@ -70,11 +89,22 @@ export interface FirestoreRepository {
     request?: PageRequest,
   ): Promise<Page<FirestoreDocumentResult>>;
   getDocument(connectionId: string, documentPath: string): Promise<FirestoreDocumentResult | null>;
+  generateDocumentId(
+    connectionId: string,
+    collectionPath: string,
+  ): Promise<FirestoreGeneratedDocumentId>;
+  createDocument(
+    connectionId: string,
+    collectionPath: string,
+    documentId: string,
+    data: Record<string, unknown>,
+  ): Promise<FirestoreDocumentResult>;
   saveDocument(
     connectionId: string,
     documentPath: string,
     data: Record<string, unknown>,
-  ): Promise<FirestoreDocumentResult>;
+    options?: FirestoreSaveDocumentOptions,
+  ): Promise<FirestoreSaveDocumentResult>;
   deleteDocument(
     connectionId: string,
     documentPath: string,

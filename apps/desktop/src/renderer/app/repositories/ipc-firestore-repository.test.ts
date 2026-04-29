@@ -20,6 +20,7 @@ describe('IpcFirestoreRepository', () => {
           data: { status: 'paid' },
           hasSubcollections: true,
           subcollections: [{ id: 'events', path: 'orders/ord_1/events' }],
+          updateTime: '2026-04-29T00:00:00.000Z',
         }],
         nextCursor: null,
       }),
@@ -28,12 +29,25 @@ describe('IpcFirestoreRepository', () => {
         path: 'orders/ord_1',
         data: { status: 'paid' },
         hasSubcollections: false,
+        updateTime: '2026-04-29T00:00:00.000Z',
       }),
-      saveDocument: vi.fn().mockResolvedValue({
+      generateDocumentId: vi.fn().mockResolvedValue({ documentId: 'generated_id' }),
+      createDocument: vi.fn().mockResolvedValue({
         id: 'ord_2',
         path: 'orders/ord_2',
         data: { status: 'draft' },
         hasSubcollections: false,
+        updateTime: '2026-04-29T00:00:01.000Z',
+      }),
+      saveDocument: vi.fn().mockResolvedValue({
+        status: 'saved',
+        document: {
+          id: 'ord_2',
+          path: 'orders/ord_2',
+          data: { status: 'draft' },
+          hasSubcollections: false,
+          updateTime: '2026-04-29T00:00:01.000Z',
+        },
       }),
       deleteDocument: vi.fn().mockResolvedValue(undefined),
     } satisfies Partial<DesktopFirestoreApi>;
@@ -65,6 +79,7 @@ describe('IpcFirestoreRepository', () => {
         data: { status: 'paid' },
         hasSubcollections: true,
         subcollections: [{ id: 'events', path: 'orders/ord_1/events' }],
+        updateTime: '2026-04-29T00:00:00.000Z',
       }],
       nextCursor: null,
     });
@@ -73,14 +88,33 @@ describe('IpcFirestoreRepository', () => {
       path: 'orders/ord_1',
       data: { status: 'paid' },
       hasSubcollections: false,
+      updateTime: '2026-04-29T00:00:00.000Z',
     });
-    await expect(repository.saveDocument('emu', 'orders/ord_2', {
+    await expect(repository.generateDocumentId('emu', 'orders')).resolves.toEqual({
+      documentId: 'generated_id',
+    });
+    await expect(repository.createDocument('emu', 'orders', 'ord_2', {
       status: 'draft',
     })).resolves.toEqual({
       id: 'ord_2',
       path: 'orders/ord_2',
       data: { status: 'draft' },
       hasSubcollections: false,
+      updateTime: '2026-04-29T00:00:01.000Z',
+    });
+    await expect(repository.saveDocument('emu', 'orders/ord_2', {
+      status: 'draft',
+    }, {
+      lastUpdateTime: '2026-04-29T00:00:00.000Z',
+    })).resolves.toEqual({
+      status: 'saved',
+      document: {
+        id: 'ord_2',
+        path: 'orders/ord_2',
+        data: { status: 'draft' },
+        hasSubcollections: false,
+        updateTime: '2026-04-29T00:00:01.000Z',
+      },
     });
     await expect(repository.deleteDocument('emu', 'orders/ord_2', {
       deleteSubcollectionPaths: ['orders/ord_2/events'],
@@ -98,10 +132,21 @@ describe('IpcFirestoreRepository', () => {
         filters: [{ field: 'status', op: '==', value: 'paid' }],
       },
     });
+    expect(firestore.generateDocumentId).toHaveBeenCalledWith({
+      collectionPath: 'orders',
+      connectionId: 'emu',
+    });
+    expect(firestore.createDocument).toHaveBeenCalledWith({
+      collectionPath: 'orders',
+      connectionId: 'emu',
+      data: { status: 'draft' },
+      documentId: 'ord_2',
+    });
     expect(firestore.saveDocument).toHaveBeenCalledWith({
       connectionId: 'emu',
       documentPath: 'orders/ord_2',
       data: { status: 'draft' },
+      options: { lastUpdateTime: '2026-04-29T00:00:00.000Z' },
     });
     expect(firestore.deleteDocument).toHaveBeenCalledWith({
       connectionId: 'emu',

@@ -1,5 +1,10 @@
 import { describe, expect, it } from 'vitest';
-import { DeleteDocumentRequestSchema, SaveDocumentRequestSchema } from './firestore.ts';
+import {
+  CreateDocumentRequestSchema,
+  DeleteDocumentRequestSchema,
+  GenerateDocumentIdRequestSchema,
+  SaveDocumentRequestSchema,
+} from './firestore.ts';
 
 describe('Firestore IPC schemas', () => {
   it('accepts encoded Firestore values for document saves', () => {
@@ -7,6 +12,7 @@ describe('Firestore IPC schemas', () => {
       SaveDocumentRequestSchema.parse({
         connectionId: 'emu',
         documentPath: 'orders/ord_1',
+        options: { lastUpdateTime: '2026-04-29T00:00:00.000Z' },
         data: {
           createdAt: { __type__: 'timestamp', value: '2026-04-29T00:00:00.000Z' },
           location: { __type__: 'geoPoint', latitude: -37.8136, longitude: 144.9631 },
@@ -17,6 +23,33 @@ describe('Firestore IPC schemas', () => {
         },
       })
     ).not.toThrow();
+  });
+
+  it('validates generated ID and create document requests', () => {
+    expect(() =>
+      GenerateDocumentIdRequestSchema.parse({
+        connectionId: 'emu',
+        collectionPath: 'orders',
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      CreateDocumentRequestSchema.parse({
+        connectionId: 'emu',
+        collectionPath: 'orders',
+        documentId: 'ord_new',
+        data: { status: 'draft' },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      CreateDocumentRequestSchema.parse({
+        connectionId: 'emu',
+        collectionPath: 'orders',
+        documentId: 'bad/id',
+        data: { status: 'draft' },
+      })
+    ).toThrow();
   });
 
   it('rejects invalid write paths and encoded values', () => {

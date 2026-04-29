@@ -8,6 +8,12 @@ const DocumentPathSchema = z.string().refine((path) => isDocumentPath(path), {
 const CollectionPathSchema = z.string().refine((path) => isCollectionPath(path), {
   message: 'Collection path must have an odd number of path segments.',
 });
+const DocumentIdSchema = z.string().refine(
+  (value) => value.trim().length > 0 && !value.includes('/'),
+  {
+    message: 'Document ID must be one non-empty path segment.',
+  },
+);
 const Base64Schema = z.string().refine((value) => isBase64(value), {
   message: 'Bytes value must be base64.',
 });
@@ -92,11 +98,31 @@ export const FirestoreDocumentResultSchema = z.object({
   data: FirestoreDocumentDataSchema,
   hasSubcollections: z.boolean(),
   subcollections: z.array(FirestoreCollectionNodeSchema).optional(),
+  updateTime: z.string().optional(),
 });
 
 export const FirestoreDeleteDocumentOptionsSchema = z.object({
   deleteSubcollectionPaths: z.array(CollectionPathSchema),
 });
+
+export const FirestoreSaveDocumentOptionsSchema = z.object({
+  lastUpdateTime: z.string().min(1).optional(),
+});
+
+export const FirestoreGeneratedDocumentIdSchema = z.object({
+  documentId: DocumentIdSchema,
+});
+
+export const FirestoreSaveDocumentResultSchema = z.discriminatedUnion('status', [
+  z.object({
+    status: z.literal('saved'),
+    document: FirestoreDocumentResultSchema,
+  }),
+  z.object({
+    status: z.literal('conflict'),
+    remoteDocument: FirestoreDocumentResultSchema.nullable(),
+  }),
+]);
 
 export const ListDocumentsRequestSchema = z.object({
   connectionId: z.string(),
@@ -112,6 +138,19 @@ export const RunQueryRequestSchema = z.object({
 export const SaveDocumentRequestSchema = z.object({
   connectionId: z.string(),
   documentPath: DocumentPathSchema,
+  data: FirestoreDocumentDataSchema,
+  options: FirestoreSaveDocumentOptionsSchema.optional(),
+});
+
+export const GenerateDocumentIdRequestSchema = z.object({
+  connectionId: z.string(),
+  collectionPath: CollectionPathSchema,
+});
+
+export const CreateDocumentRequestSchema = z.object({
+  connectionId: z.string(),
+  collectionPath: CollectionPathSchema,
+  documentId: DocumentIdSchema,
   data: FirestoreDocumentDataSchema,
 });
 

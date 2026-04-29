@@ -21,7 +21,7 @@ export interface FieldEditModalProps {
   readonly onSaveField?: (
     target: FieldEditTarget,
     value: unknown,
-  ) => Promise<void> | void;
+  ) => Promise<boolean | void> | boolean | void;
 }
 
 const selectClassName =
@@ -94,7 +94,12 @@ export function FieldEditModal(
               <div className='grid gap-1'>
                 <div className='text-xs font-semibold text-text-secondary'>JSON value</div>
                 <div className='h-48 overflow-hidden rounded-md border border-border-subtle'>
-                  <CodeEditor language='json' value={source} onChange={setSource} />
+                  <CodeEditor
+                    ariaLabel='Field JSON value'
+                    language='json'
+                    value={source}
+                    onChange={setSource}
+                  />
                 </div>
               </div>
             )
@@ -122,8 +127,8 @@ export function FieldEditModal(
               try {
                 const value = parseJsonValue(source);
                 validateFirestoreValue(value, target.fieldPath);
-                await onSaveField?.(target, value);
-                onOpenChange(false);
+                const saved = await onSaveField?.(target, value);
+                if (saved !== false) onOpenChange(false);
               } catch (caught) {
                 setError(messageFromError(caught, 'Could not save field.'));
               } finally {

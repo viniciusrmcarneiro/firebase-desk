@@ -4,8 +4,11 @@ import type {
   FirestoreDeleteDocumentOptions,
   FirestoreDocumentNode,
   FirestoreDocumentResult,
+  FirestoreGeneratedDocumentId,
   FirestoreQuery,
   FirestoreRepository,
+  FirestoreSaveDocumentOptions,
+  FirestoreSaveDocumentResult,
   Page,
   PageRequest,
 } from '@firebase-desk/repo-contracts';
@@ -76,13 +79,46 @@ export class IpcFirestoreRepository implements FirestoreRepository {
     connectionId: string,
     documentPath: string,
     data: Record<string, unknown>,
-  ): Promise<FirestoreDocumentResult> {
-    const document = await window.firebaseDesk.firestore.saveDocument({
+    options?: FirestoreSaveDocumentOptions,
+  ): Promise<FirestoreSaveDocumentResult> {
+    const result = await window.firebaseDesk.firestore.saveDocument({
       connectionId,
       data,
       documentPath,
+      ...(options ? { options: toIpcSaveOptions(options) } : {}),
     });
-    return toDocumentResult(document);
+    return result.status === 'conflict'
+      ? {
+        status: 'conflict',
+        remoteDocument: result.remoteDocument ? toDocumentResult(result.remoteDocument) : null,
+      }
+      : { status: 'saved', document: toDocumentResult(result.document) };
+  }
+
+  async generateDocumentId(
+    connectionId: string,
+    collectionPath: string,
+  ): Promise<FirestoreGeneratedDocumentId> {
+    return await window.firebaseDesk.firestore.generateDocumentId({
+      collectionPath,
+      connectionId,
+    });
+  }
+
+  async createDocument(
+    connectionId: string,
+    collectionPath: string,
+    documentId: string,
+    data: Record<string, unknown>,
+  ): Promise<FirestoreDocumentResult> {
+    return toDocumentResult(
+      await window.firebaseDesk.firestore.createDocument({
+        collectionPath,
+        connectionId,
+        data,
+        documentId,
+      }),
+    );
   }
 
   async deleteDocument(
@@ -124,6 +160,12 @@ function toIpcDeleteOptions(
   };
 }
 
+function toIpcSaveOptions(
+  options: FirestoreSaveDocumentOptions,
+): NonNullable<IpcRequest<'firestore.saveDocument'>['options']> {
+  return options.lastUpdateTime ? { lastUpdateTime: options.lastUpdateTime } : {};
+}
+
 function toCollectionNode(
   collection: IpcResponse<'firestore.listRootCollections'>[number],
 ): FirestoreCollectionNode {
@@ -145,5 +187,6 @@ function toDocumentResult(
     ...(document.subcollections
       ? { subcollections: document.subcollections.map(toCollectionNode) }
       : {}),
+    ...(document.updateTime ? { updateTime: document.updateTime } : {}),
   };
 }

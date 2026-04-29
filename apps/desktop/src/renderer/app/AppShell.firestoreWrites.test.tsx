@@ -13,9 +13,14 @@ import {
 import { selectionActions, selectionStore } from './stores/selectionStore.ts';
 import { tabActions } from './stores/tabsStore.ts';
 
-type MockSurfaceAction = 'delete' | 'save';
+type MockSurfaceAction = 'create' | 'delete' | 'save';
 
 interface MockSurfaceProps {
+  readonly onCreateDocument?: (
+    collectionPath: string,
+    documentId: string,
+    data: Record<string, unknown>,
+  ) => Promise<void> | void;
   readonly onDeleteDocument?: (
     documentPath: string,
     options: {
@@ -26,7 +31,8 @@ interface MockSurfaceProps {
   readonly onSaveDocument?: (
     documentPath: string,
     data: Record<string, unknown>,
-  ) => Promise<void> | void;
+    options?: { readonly lastUpdateTime?: string; },
+  ) => Promise<unknown> | unknown;
 }
 
 const surfaceState = vi.hoisted(() => ({
@@ -45,7 +51,11 @@ vi.mock('@firebase-desk/product-ui', async (importOriginal) => {
         'button',
         {
           type: 'button',
-          onClick: () => {
+          onClick: async () => {
+            if (surfaceState.action === 'create') {
+              await props.onCreateDocument?.('orders', 'ord_created', { status: 'new' });
+              return;
+            }
             if (surfaceState.action === 'delete') {
               void props.onDeleteDocument?.('orders/ord_1024', {
                 deleteDescendantDocumentPaths: ['orders/ord_1024/events/event_1'],
@@ -164,7 +174,32 @@ describe('desktop AppShell Firestore writes', () => {
     fireEvent.click(await screen.findByRole('button', { name: 'Trigger Firestore write' }));
 
     await waitFor(() =>
-      expect(saveDocument).toHaveBeenCalledWith('emu', 'orders/ord_1024', { status: 'paid' })
+      expect(saveDocument).toHaveBeenCalledWith(
+        'emu',
+        'orders/ord_1024',
+        { status: 'paid' },
+        undefined,
+      )
+    );
+    await waitFor(() =>
+      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['firestore'] })
+    );
+  });
+
+  it('creates a Firestore document and invalidates live Firestore queries', async () => {
+    surfaceState.action = 'create';
+    const repositories = createMockRepositories();
+    const createDocument = vi.spyOn(repositories.firestore, 'createDocument');
+    const { queryClient } = renderShell({ dataMode: 'live', repositories });
+    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+
+    await waitFor(() => expect(screen.getAllByText('Local Emulator').length).toBeGreaterThan(0));
+    fireEvent.click(await screen.findByRole('button', { name: 'Trigger Firestore write' }));
+
+    await waitFor(() =>
+      expect(createDocument).toHaveBeenCalledWith('emu', 'orders', 'ord_created', {
+        status: 'new',
+      })
     );
     await waitFor(() =>
       expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['firestore'] })

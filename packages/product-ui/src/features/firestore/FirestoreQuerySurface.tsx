@@ -1,10 +1,14 @@
 import type {
   FirestoreCollectionNode,
   FirestoreDocumentResult,
+  FirestoreSaveDocumentOptions,
+  FirestoreSaveDocumentResult,
   SettingsRepository,
 } from '@firebase-desk/repo-contracts';
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
+import { ConflictMergeModal } from './ConflictMergeModal.tsx';
+import { CreateDocumentModal } from './CreateDocumentModal.tsx';
 import { DeleteDocumentDialog } from './DeleteDocumentDialog.tsx';
 import type { DeleteDocumentOptions } from './deleteDocumentModel.ts';
 import { DocumentEditorModal } from './DocumentEditorModal.tsx';
@@ -21,7 +25,7 @@ import {
 } from './fieldEditModel.ts';
 import { FirestoreDocumentBrowser } from './FirestoreDocumentBrowser.tsx';
 import { QueryBuilder } from './QueryBuilder.tsx';
-import { findDocumentByPath } from './resultModel.tsx';
+import { findDocumentByPath, isCollectionPath } from './resultModel.tsx';
 import type { FirestoreQueryDraft, FirestoreResultView } from './types.ts';
 
 export type {
@@ -31,16 +35,26 @@ export type {
 } from './types.ts';
 
 export interface FirestoreQuerySurfaceProps {
+  readonly createDocumentRequest?: FirestoreCreateDocumentRequest | null | undefined;
   readonly draft: FirestoreQueryDraft;
   readonly errorMessage?: string | null;
   readonly hasMore: boolean;
   readonly isFetchingMore?: boolean;
   readonly isLoading?: boolean;
+  readonly onCreateDocument?: (
+    collectionPath: string,
+    documentId: string,
+    data: Record<string, unknown>,
+  ) => Promise<void> | void;
+  readonly onCreateDocumentRequestHandled?: ((requestId: number) => void) | undefined;
   readonly onDeleteDocument?: (
     documentPath: string,
     options: DeleteDocumentOptions,
   ) => Promise<void> | void;
   readonly onDraftChange: (draft: FirestoreQueryDraft) => void;
+  readonly onGenerateDocumentId?: (
+    collectionPath: string,
+  ) => Promise<string> | string;
   readonly onLoadMore: () => void;
   readonly onLoadSubcollections?: (
     documentPath: string,
@@ -52,7 +66,8 @@ export interface FirestoreQuerySurfaceProps {
   readonly onSaveDocument?: (
     documentPath: string,
     data: Record<string, unknown>,
-  ) => Promise<void> | void;
+    options?: FirestoreSaveDocumentOptions,
+  ) => Promise<FirestoreSaveDocumentResult | void> | FirestoreSaveDocumentResult | void;
   readonly onSelectDocument: (documentPath: string) => void;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocument?: FirestoreDocumentResult | null;
@@ -60,15 +75,37 @@ export interface FirestoreQuerySurfaceProps {
   readonly settings?: SettingsRepository | undefined;
 }
 
+export interface FirestoreCreateDocumentRequest {
+  readonly collectionPath: string;
+  readonly requestId: number;
+}
+
+interface SaveConflictContext {
+  readonly baseDocument: FirestoreDocumentResult | null;
+  readonly onResolve?: (() => void) | undefined;
+}
+
+interface ConflictMergeState {
+  readonly baseDocument: FirestoreDocumentResult | null;
+  readonly documentPath: string;
+  readonly localData: Record<string, unknown>;
+  readonly onResolve?: (() => void) | undefined;
+  readonly remoteDocument: FirestoreDocumentResult | null;
+}
+
 export function FirestoreQuerySurface(
   {
     draft,
+    createDocumentRequest = null,
     errorMessage = null,
     hasMore,
     isFetchingMore = false,
     isLoading = false,
+    onCreateDocument,
+    onCreateDocumentRequestHandled,
     onDeleteDocument,
     onDraftChange,
+    onGenerateDocumentId,
     onLoadMore,
     onLoadSubcollections,
     onOpenDocumentInNewTab,
@@ -90,6 +127,11 @@ export function FirestoreQuerySurface(
     null,
   );
   const [deleteFieldTarget, setDeleteFieldTarget] = useState<FieldEditTarget | null>(null);
+  const [createDocumentCollectionPath, setCreateDocumentCollectionPath] = useState<string | null>(
+    null,
+  );
+  const [handledCreateRequestId, setHandledCreateRequestId] = useState<number | null>(null);
+  const [conflictMerge, setConflictMerge] = useState<ConflictMergeState | null>(null);
   const [resultsStale, setResultsStale] = useState(false);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const fieldSuggestions = useFirestoreFieldCatalog({
@@ -98,21 +140,60 @@ export function FirestoreQuerySurface(
     settings,
   });
 
-  async function saveDocument(documentPath: string, data: Record<string, unknown>) {
+  useEffect(() => {
+    if (!createDocumentRequest || createDocumentRequest.requestId === handledCreateRequestId) {
+      return;
+    }
+    setHandledCreateRequestId(createDocumentRequest.requestId);
+    setCreateDocumentCollectionPath(createDocumentRequest.collectionPath);
+    onCreateDocumentRequestHandled?.(createDocumentRequest.requestId);
+  }, [createDocumentRequest, handledCreateRequestId, onCreateDocumentRequestHandled]);
+
+  async function createDocument(
+    collectionPath: string,
+    documentId: string,
+    data: Record<string, unknown>,
+  ) {
     validateFirestoreDocumentData(data);
-    await onSaveDocument?.(documentPath, data);
+    await onCreateDocument?.(collectionPath, documentId, data);
     setResultsStale(true);
     setActionErrorMessage(null);
   }
 
-  async function saveField(target: FieldEditTarget, value: unknown) {
+  async function saveDocument(
+    documentPath: string,
+    data: Record<string, unknown>,
+    options?: FirestoreSaveDocumentOptions,
+    conflictContext?: SaveConflictContext,
+  ): Promise<boolean> {
+    validateFirestoreDocumentData(data);
+    const result = await onSaveDocument?.(documentPath, data, options);
+    if (result?.status === 'conflict') {
+      setConflictMerge({
+        baseDocument: conflictContext?.baseDocument ?? null,
+        documentPath,
+        localData: data,
+        onResolve: conflictContext?.onResolve,
+        remoteDocument: result.remoteDocument,
+      });
+      setActionErrorMessage(null);
+      return false;
+    }
+    setResultsStale(true);
+    setActionErrorMessage(null);
+    conflictContext?.onResolve?.();
+    return true;
+  }
+
+  async function saveField(target: FieldEditTarget, value: unknown): Promise<boolean> {
     const document = documentForTarget(target, rows, selectedDocument);
     if (!document) throw new Error(`Document ${target.documentPath} is not loaded.`);
     validateFirestoreValue(value, target.fieldPath);
-    await saveDocument(
-      target.documentPath,
-      setNestedFieldValue(document.data, target.fieldPath, value),
-    );
+    const data = setNestedFieldValue(document.data, target.fieldPath, value);
+    return await saveDocument(target.documentPath, data, saveOptionsFor(document), {
+      baseDocument: document,
+      onResolve: () => setFieldEditor(null),
+    });
   }
 
   async function setFieldNull(target: FieldEditTarget) {
@@ -135,11 +216,13 @@ export function FirestoreQuerySurface(
     try {
       const document = documentForTarget(target, rows, selectedDocument);
       if (!document) throw new Error(`Document ${target.documentPath} is not loaded.`);
-      await saveDocument(
+      const saved = await saveDocument(
         target.documentPath,
         deleteNestedFieldValue(document.data, target.fieldPath),
+        saveOptionsFor(document),
+        { baseDocument: document },
       );
-      setDeleteFieldTarget(null);
+      if (saved) setDeleteFieldTarget(null);
     } catch (caught) {
       setActionErrorMessage(messageFromError(caught, 'Could not delete field.'));
     }
@@ -161,6 +244,35 @@ export function FirestoreQuerySurface(
     (onRefreshResults ?? onRun)();
   }
 
+  function openCreateDocument(collectionPath: string) {
+    if (!isCollectionPath(collectionPath)) return;
+    setCreateDocumentCollectionPath(collectionPath);
+  }
+
+  async function saveMergedConflict(data: Record<string, unknown>) {
+    if (!conflictMerge?.remoteDocument?.updateTime) {
+      throw new Error('Remote update time is unavailable. Refresh the document before saving.');
+    }
+    const saved = await saveDocument(
+      conflictMerge.documentPath,
+      data,
+      { lastUpdateTime: conflictMerge.remoteDocument.updateTime },
+      {
+        baseDocument: conflictMerge.remoteDocument,
+        onResolve: conflictMerge.onResolve,
+      },
+    );
+    if (saved) setConflictMerge(null);
+  }
+
+  function refreshAfterConflict() {
+    setConflictMerge(null);
+    setEditorDocument(null);
+    setFieldEditor(null);
+    setDeleteFieldTarget(null);
+    refreshResults();
+  }
+
   return (
     <div className='h-full min-h-0 p-2'>
       <FirestoreDocumentBrowser
@@ -171,6 +283,9 @@ export function FirestoreQuerySurface(
             draft={draft}
             fieldSuggestions={fieldSuggestions}
             isLoading={isLoading}
+            onCreateDocument={onCreateDocument && onGenerateDocumentId
+              ? openCreateDocument
+              : undefined}
             onDraftChange={onDraftChange}
             onReset={onReset}
             onRun={onRun}
@@ -205,6 +320,9 @@ export function FirestoreQuerySurface(
         onOpenDocumentInNewTab={onOpenDocumentInNewTab}
         onResultViewChange={setResultView}
         onRefreshResults={refreshResults}
+        onCreateDocument={onCreateDocument && onGenerateDocumentId
+          ? openCreateDocument
+          : undefined}
         onSelectDocument={onSelectDocument}
         onSetFieldValue={onSaveDocument ? setFieldValue : undefined}
         onSetFieldNull={onSaveDocument ? setFieldNull : undefined}
@@ -212,7 +330,11 @@ export function FirestoreQuerySurface(
       <DocumentEditorModal
         document={editorDocument}
         open={Boolean(editorDocument)}
-        onSaveDocument={saveDocument}
+        onSaveDocument={(documentPath, data) =>
+          saveDocument(documentPath, data, saveOptionsFor(editorDocument), {
+            baseDocument: editorDocument,
+            onResolve: () => setEditorDocument(null),
+          })}
         onOpenChange={(open) => {
           if (!open) setEditorDocument(null);
         }}
@@ -247,8 +369,37 @@ export function FirestoreQuerySurface(
           if (!open) setDeleteFieldTarget(null);
         }}
       />
+      <CreateDocumentModal
+        collectionPath={createDocumentCollectionPath}
+        open={Boolean(createDocumentCollectionPath)}
+        onCreateDocument={createDocument}
+        onGenerateDocumentId={async (collectionPath) =>
+          await Promise.resolve(onGenerateDocumentId?.(collectionPath) ?? '')}
+        onOpenChange={(open) => {
+          if (!open) setCreateDocumentCollectionPath(null);
+        }}
+      />
+      {conflictMerge
+        ? (
+          <ConflictMergeModal
+            documentPath={conflictMerge.documentPath}
+            localData={conflictMerge.localData}
+            open
+            remoteDocument={conflictMerge.remoteDocument}
+            onCancel={() => setConflictMerge(null)}
+            onRefresh={refreshAfterConflict}
+            onSaveMerged={saveMergedConflict}
+          />
+        )
+        : null}
     </div>
   );
+}
+
+function saveOptionsFor(
+  document: FirestoreDocumentResult | null,
+): FirestoreSaveDocumentOptions | undefined {
+  return document?.updateTime ? { lastUpdateTime: document.updateTime } : undefined;
 }
 
 function documentForTarget(

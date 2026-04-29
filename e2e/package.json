@@ -5,15 +5,12 @@
   "license": "MIT",
   "type": "module",
   "scripts": {
-    "lint": "oxlint --config ../packages/config-oxlint/oxlintrc.base.json specs",
+    "lint": "oxlint --config ../packages/config-oxlint/oxlintrc.base.json fixtures specs",
     "typecheck": "tsc --noEmit",
     "test": "echo 'e2e tests run via test:e2e (requires emulators)'",
     "test:e2e": "playwright test",
     "test:packaged": "node scripts/packaged-smoke.mjs",
     "test:withEmulators": "pnpm dlx firebase-tools@15.15.0 --project demo-local emulators:exec --only auth,firestore --config ../firebase/emulator/firebase.json 'pnpm --filter @firebase-desk/emulator-tools seed && pnpm --filter @firebase-desk/e2e test:e2e'"
-  },
-  "dependencies": {
-    "@firebase-desk/ipc-schemas": "workspace:*"
   },
   "devDependencies": {
     "@firebase-desk/config-oxlint": "workspace:*",

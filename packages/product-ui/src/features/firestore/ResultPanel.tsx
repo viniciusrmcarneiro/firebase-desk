@@ -12,7 +12,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@firebase-desk/ui';
-import { Braces, GitBranch, Table2 } from 'lucide-react';
+import { Braces, GitBranch, Plus, Table2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { JsonPreview } from '../../json-preview/index.ts';
 import { type FieldEditTarget } from './fieldEditModel.ts';
@@ -33,6 +33,7 @@ export interface ResultPanelProps {
   readonly isLoading: boolean;
   readonly actionErrorMessage?: string | null;
   readonly resultsStale?: boolean;
+  readonly onCreateDocument?: ((collectionPath: string) => void) | undefined;
   readonly onDeleteDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
   readonly onDeleteField?: ((target: FieldEditTarget) => void) | undefined;
   readonly onEditDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
@@ -60,6 +61,7 @@ export function ResultPanel(
     isFetchingMore,
     isLoading,
     resultsStale = false,
+    onCreateDocument,
     onDeleteDocument,
     onDeleteField,
     onEditDocument,
@@ -125,6 +127,14 @@ export function ResultPanel(
           actions={
             <div className='flex items-center gap-2'>
               <Badge>{isLoading ? 'loading' : `${rows.length} docs`}</Badge>
+              {isCollectionPath(queryPath) && onCreateDocument
+                ? (
+                  <Button size='xs' variant='secondary' onClick={() => onCreateDocument(queryPath)}>
+                    <Plus size={13} aria-hidden='true' />
+                    New document
+                  </Button>
+                )
+                : null}
               <TabsList className='rounded-md border border-border-subtle bg-bg-subtle p-0.5'>
                 <TabsTrigger className='h-7 gap-1 rounded-sm border-b-0 px-2' value='table'>
                   <Table2 size={13} aria-hidden='true' /> Table

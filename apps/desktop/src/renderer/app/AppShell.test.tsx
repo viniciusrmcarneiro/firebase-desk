@@ -171,7 +171,7 @@ describe('desktop AppShell', () => {
       target: { value: 'grace' },
     });
 
-    await waitFor(() => expect(searchUsers).toHaveBeenCalledWith('demo-local', 'grace'));
+    await waitFor(() => expect(searchUsers).toHaveBeenCalledWith('emu', 'grace'));
   });
 
   it('runs JS Query through the script runner repository', async () => {

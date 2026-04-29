@@ -237,10 +237,6 @@ importers:
         version: link:../../packages/ui
 
   e2e:
-    dependencies:
-      '@firebase-desk/ipc-schemas':
-        specifier: workspace:*
-        version: link:../packages/ipc-schemas
     devDependencies:
       '@firebase-desk/config-oxlint':
         specifier: workspace:*

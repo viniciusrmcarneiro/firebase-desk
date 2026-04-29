@@ -275,8 +275,11 @@ Move this ahead of real Firebase integration so packaging, artifacts, and instal
 - [x] Add unit tests close to field helpers, UI flows, IPC, mock repo, live repo, preload, and AppShell.
 - [x] Add emulator-backed smoke test for typed writes and selected subcollection deletes.
 - [x] Validate smoke writes by directly querying Firestore emulator state.
-- [ ] Add create document CTA.
-- [ ] Add conflict/version handling for concurrent edits.
+- [x] Add create document CTA for collection queries, results, and sidebar collection nodes.
+- [x] Add generated-ID create flow with editable ID and JSON object validation.
+- [x] Add optimistic save conflict detection with document `updateTime`.
+- [x] Add editable conflict merge modal using Monaco diff editor.
+- [x] Add emulator-backed smoke tests for create and conflict merge with direct REST verification.
 
 ## Phase 9: JavaScript Query
 
