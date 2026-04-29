@@ -122,7 +122,7 @@ export function ResultPanel(
       value={resultView}
       onValueChange={(value) => onResultViewChange(value as FirestoreResultView)}
     >
-      <Panel className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]'>
+      <Panel aria-label='Results' className='grid h-full min-h-0 grid-rows-[auto_minmax(0,1fr)]'>
         <PanelHeader
           actions={
             <div className='flex items-center gap-2'>

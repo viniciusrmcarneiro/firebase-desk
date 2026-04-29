@@ -64,8 +64,12 @@ export function DiffCodeEditor(
 ) {
   const { resolvedTheme } = useAppearance();
   const contentSubscription = useRef<{ dispose(): void; } | null>(null);
+  const onModifiedChangeRef = useRef(onModifiedChange);
 
   useEffect(() => () => contentSubscription.current?.dispose(), []);
+  useEffect(() => {
+    onModifiedChangeRef.current = onModifiedChange;
+  }, [onModifiedChange]);
 
   return (
     <Suspense fallback={<div role='status'>Loading editor</div>}>
@@ -85,7 +89,7 @@ export function DiffCodeEditor(
           contentSubscription.current?.dispose();
           const modifiedEditor = editor.getModifiedEditor();
           contentSubscription.current = modifiedEditor.onDidChangeModelContent(() => {
-            onModifiedChange?.(modifiedEditor.getValue());
+            onModifiedChangeRef.current?.(modifiedEditor.getValue());
           });
         }}
       />

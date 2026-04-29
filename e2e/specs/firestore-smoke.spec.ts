@@ -143,7 +143,7 @@ async function createCollectionFromSidebar(page: Page, suffix: string): Promise<
   });
 
   await runCollectionQuery(page, collectionPath);
-  await expect(page.getByText(documentId)).toBeVisible();
+  await expectResultDocumentId(page, documentId);
 }
 
 async function createAndEditDocument(page: Page, suffix: string): Promise<void> {
@@ -175,7 +175,7 @@ async function createAndEditDocument(page: Page, suffix: string): Promise<void> 
   await createDialog.getByRole('button', { name: 'Create' }).click();
   await expectDialogHidden(createDialog, 'Create dialog stayed open');
   await refreshChangedResults(page);
-  await expect(page.getByText(documentId)).toBeVisible();
+  await expectResultDocumentId(page, documentId);
 
   const created = await getFirestoreEmulatorDocument(path);
   expect(created?.fields).toMatchObject({
@@ -321,6 +321,18 @@ async function runCollectionQuery(page: Page, path: string): Promise<void> {
   await expect(page.getByText('Document ID')).toBeVisible();
 }
 
+async function expectResultDocumentId(page: Page, documentId: string): Promise<void> {
+  await expect(resultDocumentIdCell(page, documentId)).toBeVisible();
+}
+
+function resultsPanel(page: Page) {
+  return page.locator('section[aria-label="Results"]');
+}
+
+function resultDocumentIdCell(page: Page, documentId: string) {
+  return resultsPanel(page).locator(`code[title="${documentId}"]`).first();
+}
+
 async function clearFiltersAndSort(page: Page): Promise<void> {
   await queryField(page, 'Sort field').fill('');
   if (await queryField(page, 'Filter 1 field').count()) {
@@ -340,7 +352,7 @@ function queryField(page: Page, name: string) {
 }
 
 async function selectDocument(page: Page, documentId: string): Promise<void> {
-  await page.getByText(documentId, { exact: true }).first().click();
+  await resultDocumentIdCell(page, documentId).click();
   await expect(page.getByText(new RegExp(`/${escapeRegExp(documentId)}$`)).first()).toBeVisible();
 }
 

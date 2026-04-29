@@ -1,5 +1,5 @@
 import type { FirestoreDocumentResult } from '@firebase-desk/repo-contracts';
-import { Button, Dialog, DialogContent } from '@firebase-desk/ui';
+import { Button, Dialog, DialogContent, InlineAlert } from '@firebase-desk/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { buildDeleteDocumentOptions, type DeleteDocumentOptions } from './deleteDocumentModel.ts';
 
@@ -19,6 +19,7 @@ export function DeleteDocumentDialog(
   const [selectedSubcollectionPaths, setSelectedSubcollectionPaths] = useState<ReadonlySet<string>>(
     () => new Set(),
   );
+  const [error, setError] = useState<string | null>(null);
   const [isDeleting, setIsDeleting] = useState(false);
   const subcollections = document?.subcollections ?? [];
   const options = useMemo(
@@ -32,6 +33,7 @@ export function DeleteDocumentDialog(
   useEffect(() => {
     if (!open) {
       setSelectedSubcollectionPaths(new Set());
+      setError(null);
       setIsDeleting(false);
     }
   }, [open]);
@@ -83,6 +85,7 @@ export function DeleteDocumentDialog(
               </div>
             )
             : null}
+          {error ? <InlineAlert variant='danger'>{error}</InlineAlert> : null}
         </div>
         <div className='flex justify-end gap-2'>
           <Button disabled={isDeleting} variant='ghost' onClick={() => onOpenChange(false)}>
@@ -93,10 +96,13 @@ export function DeleteDocumentDialog(
             variant='danger'
             onClick={async () => {
               if (!document) return;
+              setError(null);
               setIsDeleting(true);
               try {
                 await onConfirm(document.path, options);
                 onOpenChange(false);
+              } catch (caught) {
+                setError(messageFromError(caught, 'Could not delete document.'));
               } finally {
                 setIsDeleting(false);
               }
@@ -108,4 +114,8 @@ export function DeleteDocumentDialog(
       </DialogContent>
     </Dialog>
   );
+}
+
+function messageFromError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }

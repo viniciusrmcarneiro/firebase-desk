@@ -45,9 +45,56 @@ describe('DeleteDocumentDialog', () => {
       })
     );
   });
+
+  it('shows delete errors and keeps the dialog open', async () => {
+    const onOpenChange = vi.fn();
+    const onConfirm = vi.fn<ConfirmDelete>(async () => {
+      throw new Error('recursive delete failed');
+    });
+    render(
+      <DeleteDocumentDialog
+        document={document}
+        open
+        onConfirm={onConfirm}
+        onOpenChange={onOpenChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    expect(await screen.findByText('recursive delete failed')).toBeTruthy();
+    expect(screen.getByRole('dialog', { name: 'Delete document' })).toBeTruthy();
+    expect(onOpenChange).not.toHaveBeenCalled();
+  });
+
+  it('clears delete errors on retry', async () => {
+    const onOpenChange = vi.fn();
+    const onConfirm = vi.fn<ConfirmDelete>()
+      .mockRejectedValueOnce(new Error('first delete failed'))
+      .mockResolvedValueOnce(undefined);
+    render(
+      <DeleteDocumentDialog
+        document={document}
+        open
+        onConfirm={onConfirm}
+        onOpenChange={onOpenChange}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    expect(await screen.findByText('first delete failed')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(onOpenChange).toHaveBeenCalledWith(false));
+    expect(screen.queryByText('first delete failed')).toBeNull();
+  });
 });
 
-type ConfirmDelete = (documentPath: string, options: DeleteDocumentOptions) => void;
+type ConfirmDelete = (
+  documentPath: string,
+  options: DeleteDocumentOptions,
+) => Promise<void> | void;
 type CollectionWithDocuments = NonNullable<FirestoreDocumentResult['subcollections']>[number] & {
   readonly documents: ReadonlyArray<FirestoreDocumentResult>;
 };

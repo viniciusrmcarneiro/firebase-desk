@@ -68,7 +68,14 @@ export function ResultTable(
         header: 'Document ID',
         width: 180,
         minWidth: 120,
-        cell: ({ row }) => <code>{row.original.document.id}</code>,
+        cell: ({ row }) => (
+          <code
+            aria-label={`Document ID ${row.original.document.id}`}
+            title={row.original.document.id}
+          >
+            {row.original.document.id}
+          </code>
+        ),
       },
       ...fieldColumns.map((field) => ({
         id: field,
