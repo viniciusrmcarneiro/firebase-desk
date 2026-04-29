@@ -1,10 +1,14 @@
-import type { FirestoreFieldCatalogEntry, FirestoreFilterOp } from '@firebase-desk/repo-contracts';
+import type {
+  FirestoreFieldCatalogEntry,
+  FirestoreFilterOp,
+  FirestoreQueryDraft,
+  FirestoreQueryFilterDraft,
+} from '@firebase-desk/repo-contracts';
 import { Badge, Button, IconButton, Input, Panel, PanelBody, PanelHeader } from '@firebase-desk/ui';
 import { Folder, Loader2, Play, Plus, RotateCcw, X } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
 import { FieldAutocompleteInput } from './FieldAutocompleteInput.tsx';
-import type { FirestoreQueryDraft, FirestoreQueryFilterDraft } from './types.ts';
 
 interface QueryBuilderProps {
   readonly draft: FirestoreQueryDraft;

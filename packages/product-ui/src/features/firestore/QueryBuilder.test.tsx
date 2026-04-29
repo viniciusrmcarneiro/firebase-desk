@@ -1,7 +1,7 @@
+import type { FirestoreQueryDraft } from '@firebase-desk/repo-contracts';
 import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { QueryBuilder } from './QueryBuilder.tsx';
-import type { FirestoreQueryDraft } from './types.ts';
 
 const draft: FirestoreQueryDraft = {
   path: 'orders',

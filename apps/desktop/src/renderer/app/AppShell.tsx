@@ -75,7 +75,7 @@ import {
   addProjectCommand,
   removeProjectCommand,
   updateProjectCommand,
-} from '../app-core/workspace/index.ts';
+} from '../app-core/workspace/projectCommands.ts';
 import appIconUrl from '../assets/app-icon.png';
 import { AddProjectDialog } from './dialogs/AddProjectDialog.tsx';
 import { EditProjectDialog } from './dialogs/EditProjectDialog.tsx';

@@ -1,5 +1,6 @@
 import type {
   FirestoreDocumentResult,
+  FirestoreQueryDraft,
   FirestoreSaveDocumentResult,
   FirestoreUpdateDocumentFieldsResult,
   SettingsRepository,
@@ -12,7 +13,6 @@ import { describe, expect, it, vi } from 'vitest';
 import { AppearanceProvider } from '../../appearance/AppearanceProvider.tsx';
 import type { DeleteDocumentOptions } from './deleteDocumentModel.ts';
 import { FirestoreQuerySurface } from './FirestoreQuerySurface.tsx';
-import type { FirestoreQueryDraft } from './types.ts';
 
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: (

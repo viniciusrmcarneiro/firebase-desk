@@ -3,6 +3,7 @@ import type {
   FirestoreDocumentResult,
   FirestoreFieldPatchOperation,
   FirestoreFieldStaleBehavior,
+  FirestoreQueryDraft,
   FirestoreSaveDocumentOptions,
   FirestoreSaveDocumentResult,
   FirestoreUpdateDocumentFieldsOptions,
@@ -31,13 +32,7 @@ import {
 import { FirestoreDocumentBrowser } from './FirestoreDocumentBrowser.tsx';
 import { QueryBuilder } from './QueryBuilder.tsx';
 import { findDocumentByPath, isCollectionPath } from './resultModel.tsx';
-import type { FirestoreQueryDraft, FirestoreResultView } from './types.ts';
-
-export type {
-  FirestoreQueryDraft,
-  FirestoreQueryFilterDraft,
-  FirestoreResultView,
-} from './types.ts';
+import type { FirestoreResultView } from './types.ts';
 
 export interface FirestoreQuerySurfaceProps {
   readonly createDocumentRequest?: FirestoreCreateDocumentRequest | null | undefined;
