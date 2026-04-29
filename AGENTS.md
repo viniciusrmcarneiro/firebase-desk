@@ -28,6 +28,8 @@
 - Validate process boundaries with schemas; do not trust renderer input.
 - Use shared encoders/decoders for Firebase values instead of ad hoc object handling.
 - Store durable user preferences in app settings, not browser storage.
+- For renderer workflows, follow `docs/app-core-pattern.md`: pure app-core transitions, explicit commands, thin React adapters. Do not add AppShell `useEffect` watchers for workflow events when a command can model the behavior.
+- Use React 19 hooks deliberately in adapters/components (`useActionState`, `useOptimistic`, `useTransition`, `useEffectEvent`, `useSyncExternalStore`, `use`) when they simplify UI state, pending states, or subscriptions. Keep workflow rules in app-core.
 
 ## Implementation
 

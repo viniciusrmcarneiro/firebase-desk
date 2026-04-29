@@ -36,6 +36,8 @@ Safety note: binaries are published as unsigned development builds with SHA-256 
 - [docs/live-wireframe.md](docs/live-wireframe.md)
 - [docs/design-system.md](docs/design-system.md)
 - [docs/architecture.md](docs/architecture.md)
+- [docs/app-core-pattern.md](docs/app-core-pattern.md)
+- [docs/app-core-refactor-tasks.md](docs/app-core-refactor-tasks.md)
 - [docs/data-format.md](docs/data-format.md)
 - [docs/project-structure.md](docs/project-structure.md)
 - [docs/testing-ci.md](docs/testing-ci.md)
