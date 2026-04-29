@@ -54,6 +54,46 @@ describe('CreateDocumentModal', () => {
     );
     expect(onCreateDocument).not.toHaveBeenCalled();
   });
+
+  it('creates the first document for an editable collection path with a Firestore hint', async () => {
+    const onCreateDocument = vi.fn<CreateDocument>();
+    render(
+      <AppearanceProvider settings={new MockSettingsRepository()}>
+        <CreateDocumentModal
+          collectionPath=''
+          collectionPathEditable
+          hint='Firestore creates a collection when the first document is written.'
+          open
+          title='New collection'
+          onCreateDocument={onCreateDocument}
+          onGenerateDocumentId={() => 'generated_id'}
+          onOpenChange={() => {}}
+        />
+      </AppearanceProvider>,
+    );
+
+    expect(screen.getByRole('dialog', { name: 'New collection' })).toBeTruthy();
+    expect(screen.getByText('Firestore creates a collection when the first document is written.'))
+      .toBeTruthy();
+    expect(screen.getByRole('alert').textContent).toContain(
+      'Firestore creates a collection when the first document is written.',
+    );
+    fireEvent.change(screen.getByLabelText('Collection path'), {
+      target: { value: ' newOrders ' },
+    });
+    expect(await screen.findByDisplayValue('generated_id')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Document ID'), { target: { value: 'first' } });
+    fireEvent.change(screen.getByLabelText('Document JSON'), {
+      target: { value: '{"status":"created"}' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() =>
+      expect(onCreateDocument).toHaveBeenCalledWith('newOrders', 'first', {
+        status: 'created',
+      })
+    );
+  });
 });
 
 function renderModal(

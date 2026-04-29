@@ -81,6 +81,7 @@ import {
 } from './stores/tabsStore.ts';
 import {
   clampSidebarWidth,
+  DEFAULT_FIRESTORE_DRAFT,
   DEFAULT_SIDEBAR_WIDTH,
   MAX_SIDEBAR_WIDTH,
   MIN_SIDEBAR_WIDTH,
@@ -446,6 +447,23 @@ export function AppShell(
       selectedTreeItemId: id,
     });
     setLastAction(`Creating document in ${parsed.path}`);
+  }
+
+  function handleCreateCollectionFromTree(id: string) {
+    const parsed = parseTreeId(id);
+    if (parsed.kind !== 'firestore' || !parsed.connectionId) return;
+    const tabId = openFirestoreTab(parsed.connectionId, DEFAULT_FIRESTORE_DRAFT.path);
+    setPendingCreateDocumentRequest({
+      collectionPath: '',
+      collectionPathEditable: true,
+      requestId: nextCreateDocumentRequestId.current++,
+      tabId,
+    });
+    tabActions.recordInteraction({
+      activeTabId: tabId,
+      selectedTreeItemId: id,
+    });
+    setLastAction('Creating collection');
   }
 
   async function handleAddProject(input: ProjectAddInput): Promise<ProjectSummary> {
@@ -817,6 +835,7 @@ export function AppShell(
                   filterValue={workspaceTree.treeFilter}
                   items={workspaceTree.treeItems}
                   onAddProject={() => setAddProjectOpen(true)}
+                  onCreateCollection={handleCreateCollectionFromTree}
                   onCreateDocument={handleCreateDocumentFromTree}
                   onEditItem={handleEditTreeItem}
                   onFilterChange={workspaceTree.setTreeFilter}

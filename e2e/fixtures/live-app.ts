@@ -49,7 +49,7 @@ export async function openFirestore(page: Page): Promise<void> {
   await expandEmulatorAccount(page);
   const tree = page.getByRole('tree', { name: 'Account tree' });
   await expect(tree.getByRole('treeitem', { name: /Firestore/ })).toBeVisible();
-  await tree.getByRole('treeitem', { name: /Firestore/ }).click();
+  await tree.getByText('Firestore', { exact: true }).click();
 }
 
 export async function openAuthentication(page: Page): Promise<void> {

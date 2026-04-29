@@ -91,6 +91,7 @@ export function buildTreeItems(
       expanded: expandedIds.has(firestoreId),
       secondary: rootState.status === 'success' ? String(rootState.items.length) : 'load',
       selected: selectedId === firestoreId,
+      canCreateCollection: rootState.status === 'success',
       canRefresh: true,
     });
     if (expandedIds.has(firestoreId)) {

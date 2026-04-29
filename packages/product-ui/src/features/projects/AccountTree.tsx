@@ -40,6 +40,7 @@ export interface AccountTreeItem extends VirtualTreeNode {
   readonly secondary?: string;
   readonly selected?: boolean;
   readonly status?: AccountTreeItemStatus;
+  readonly canCreateCollection?: boolean;
   readonly canRefresh?: boolean;
   readonly canRemove?: boolean;
 }
@@ -48,6 +49,7 @@ export interface AccountTreeProps {
   readonly filterValue: string;
   readonly items: ReadonlyArray<AccountTreeItem>;
   readonly onAddProject: () => void;
+  readonly onCreateCollection?: (id: string) => void;
   readonly onCreateDocument?: (id: string) => void;
   readonly onFilterChange: (value: string) => void;
   readonly onEditItem?: (id: string) => void;
@@ -63,6 +65,7 @@ export function AccountTree(
     filterValue,
     items,
     onAddProject,
+    onCreateCollection,
     onCreateDocument,
     onEditItem,
     onFilterChange,
@@ -99,6 +102,7 @@ export function AccountTree(
           renderNode={(node) => (
             <AccountTreeRow
               item={node as AccountTreeItem}
+              {...(onCreateCollection ? { onCreateCollection } : {})}
               {...(onCreateDocument ? { onCreateDocument } : {})}
               {...(onEditItem ? { onEditItem } : {})}
               onRefreshItem={onRefreshItem}
@@ -116,6 +120,7 @@ export function AccountTree(
 
 interface AccountTreeRowProps {
   readonly item: AccountTreeItem;
+  readonly onCreateCollection?: (id: string) => void;
   readonly onCreateDocument?: (id: string) => void;
   readonly onEditItem?: (id: string) => void;
   readonly onRefreshItem: (id: string) => void;
@@ -123,7 +128,14 @@ interface AccountTreeRowProps {
 }
 
 function AccountTreeRow(
-  { item, onCreateDocument, onEditItem, onRefreshItem, onRemoveItem }: AccountTreeRowProps,
+  {
+    item,
+    onCreateCollection,
+    onCreateDocument,
+    onEditItem,
+    onRefreshItem,
+    onRemoveItem,
+  }: AccountTreeRowProps,
 ) {
   const icon = iconForKind(item.kind);
   const row = (
@@ -162,6 +174,20 @@ function AccountTreeRow(
         : null}
       {item.projectTarget === 'emulator'
         ? <Badge variant={item.projectTarget}>{item.projectTarget}</Badge>
+        : null}
+      {item.kind === 'firestore' && item.canCreateCollection && onCreateCollection
+        ? (
+          <IconButton
+            icon={<Plus size={13} aria-hidden='true' />}
+            label={`New collection in ${item.label}`}
+            size='xs'
+            variant='ghost'
+            onClick={(event) => {
+              event.stopPropagation();
+              onCreateCollection(item.id);
+            }}
+          />
+        )
         : null}
       {item.canRefresh
         ? (
@@ -212,9 +238,11 @@ function AccountTreeRow(
   );
 
   const hasProjectMenu = item.kind === 'project' && onEditItem;
+  const hasFirestoreMenu = item.kind === 'firestore' && item.canCreateCollection
+    && onCreateCollection;
   const hasCollectionMenu = item.kind === 'collection' && onCreateDocument;
 
-  if (!hasProjectMenu && !hasCollectionMenu) return row;
+  if (!hasProjectMenu && !hasFirestoreMenu && !hasCollectionMenu) return row;
 
   return (
     <ContextMenu>
@@ -222,6 +250,13 @@ function AccountTreeRow(
       <ContextMenuContent>
         {hasProjectMenu
           ? <ContextMenuItem onSelect={() => onEditItem(item.id)}>Edit account</ContextMenuItem>
+          : null}
+        {hasFirestoreMenu
+          ? (
+            <ContextMenuItem onSelect={() => onCreateCollection(item.id)}>
+              New collection
+            </ContextMenuItem>
+          )
           : null}
         {hasCollectionMenu
           ? (

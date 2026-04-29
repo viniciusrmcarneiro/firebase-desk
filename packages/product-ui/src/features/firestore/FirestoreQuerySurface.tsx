@@ -77,7 +77,13 @@ export interface FirestoreQuerySurfaceProps {
 
 export interface FirestoreCreateDocumentRequest {
   readonly collectionPath: string;
+  readonly collectionPathEditable?: boolean;
   readonly requestId: number;
+}
+
+interface CreateDocumentState {
+  readonly collectionPath: string;
+  readonly collectionPathEditable: boolean;
 }
 
 interface SaveConflictContext {
@@ -127,9 +133,7 @@ export function FirestoreQuerySurface(
     null,
   );
   const [deleteFieldTarget, setDeleteFieldTarget] = useState<FieldEditTarget | null>(null);
-  const [createDocumentCollectionPath, setCreateDocumentCollectionPath] = useState<string | null>(
-    null,
-  );
+  const [createDocumentState, setCreateDocumentState] = useState<CreateDocumentState | null>(null);
   const [handledCreateRequestId, setHandledCreateRequestId] = useState<number | null>(null);
   const [conflictMerge, setConflictMerge] = useState<ConflictMergeState | null>(null);
   const [resultsStale, setResultsStale] = useState(false);
@@ -145,7 +149,10 @@ export function FirestoreQuerySurface(
       return;
     }
     setHandledCreateRequestId(createDocumentRequest.requestId);
-    setCreateDocumentCollectionPath(createDocumentRequest.collectionPath);
+    setCreateDocumentState({
+      collectionPath: createDocumentRequest.collectionPath,
+      collectionPathEditable: createDocumentRequest.collectionPathEditable ?? false,
+    });
     onCreateDocumentRequestHandled?.(createDocumentRequest.requestId);
   }, [createDocumentRequest, handledCreateRequestId, onCreateDocumentRequestHandled]);
 
@@ -246,7 +253,7 @@ export function FirestoreQuerySurface(
 
   function openCreateDocument(collectionPath: string) {
     if (!isCollectionPath(collectionPath)) return;
-    setCreateDocumentCollectionPath(collectionPath);
+    setCreateDocumentState({ collectionPath, collectionPathEditable: false });
   }
 
   async function saveMergedConflict(data: Record<string, unknown>) {
@@ -367,13 +374,18 @@ export function FirestoreQuerySurface(
         }}
       />
       <CreateDocumentModal
-        collectionPath={createDocumentCollectionPath}
-        open={Boolean(createDocumentCollectionPath)}
+        collectionPath={createDocumentState?.collectionPath ?? null}
+        collectionPathEditable={createDocumentState?.collectionPathEditable}
+        hint={createDocumentState?.collectionPathEditable
+          ? 'Firestore creates a collection when the first document is written. Enter the collection path and first document data.'
+          : null}
+        open={Boolean(createDocumentState)}
+        title={createDocumentState?.collectionPathEditable ? 'New collection' : 'New document'}
         onCreateDocument={createDocument}
         onGenerateDocumentId={async (collectionPath) =>
           await Promise.resolve(onGenerateDocumentId?.(collectionPath) ?? '')}
         onOpenChange={(open) => {
-          if (!open) setCreateDocumentCollectionPath(null);
+          if (!open) setCreateDocumentState(null);
         }}
       />
       {conflictMerge

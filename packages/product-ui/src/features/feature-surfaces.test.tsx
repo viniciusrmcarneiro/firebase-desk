@@ -432,6 +432,67 @@ describe('feature surfaces', () => {
     expect(onCreateDocument).toHaveBeenCalledWith('collection:emu:orders');
   });
 
+  it('AccountTree exposes new collection action on Firestore rows', async () => {
+    const onCreateCollection = vi.fn();
+    render(
+      <AccountTree
+        filterValue=''
+        items={[{
+          id: 'firestore:emu',
+          kind: 'firestore',
+          label: 'Firestore',
+          depth: 0,
+          hasChildren: true,
+          expanded: false,
+          canCreateCollection: true,
+        }]}
+        onAddProject={() => {}}
+        onCreateCollection={onCreateCollection}
+        onFilterChange={() => {}}
+        onOpenItem={() => {}}
+        onRefreshItem={() => {}}
+        onRemoveItem={() => {}}
+        onSelectItem={() => {}}
+        onToggleItem={() => {}}
+      />,
+    );
+
+    expect(screen.queryByText('New collection')).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'New collection in Firestore' }));
+    expect(onCreateCollection).toHaveBeenCalledWith('firestore:emu');
+
+    fireEvent.contextMenu(screen.getByText('Firestore'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'New collection' }));
+
+    expect(onCreateCollection).toHaveBeenCalledTimes(2);
+  });
+
+  it('AccountTree hides new collection action until Firestore roots load', () => {
+    render(
+      <AccountTree
+        filterValue=''
+        items={[{
+          id: 'firestore:emu',
+          kind: 'firestore',
+          label: 'Firestore',
+          depth: 0,
+          hasChildren: true,
+          expanded: false,
+        }]}
+        onAddProject={() => {}}
+        onCreateCollection={() => {}}
+        onFilterChange={() => {}}
+        onOpenItem={() => {}}
+        onRefreshItem={() => {}}
+        onRemoveItem={() => {}}
+        onSelectItem={() => {}}
+        onToggleItem={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'New collection in Firestore' })).toBeNull();
+  });
+
   it('WorkspaceTabStrip switches and closes tabs', () => {
     const onSelectTab = vi.fn();
     const onCloseTab = vi.fn();

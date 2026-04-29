@@ -5,6 +5,8 @@ import { parseDocumentJson, validateFirestoreDocumentData } from './fieldEditMod
 
 export interface CreateDocumentModalProps {
   readonly collectionPath: string | null;
+  readonly collectionPathEditable?: boolean | undefined;
+  readonly hint?: string | null | undefined;
   readonly onCreateDocument: (
     collectionPath: string,
     documentId: string,
@@ -13,17 +15,22 @@ export interface CreateDocumentModalProps {
   readonly onGenerateDocumentId: (collectionPath: string) => Promise<string> | string;
   readonly onOpenChange: (open: boolean) => void;
   readonly open: boolean;
+  readonly title?: string | undefined;
 }
 
 export function CreateDocumentModal(
   {
     collectionPath,
+    collectionPathEditable = false,
+    hint = null,
     onCreateDocument,
     onGenerateDocumentId,
     onOpenChange,
     open,
+    title = 'New document',
   }: CreateDocumentModalProps,
 ) {
+  const [draftCollectionPath, setDraftCollectionPath] = useState('');
   const [documentId, setDocumentId] = useState('');
   const [source, setSource] = useState('{}');
   const [error, setError] = useState<string | null>(null);
@@ -32,15 +39,26 @@ export function CreateDocumentModal(
   const idTouched = useRef(false);
 
   useEffect(() => {
-    if (!open || !collectionPath) return;
-    let cancelled = false;
+    if (!open) return;
+    setDraftCollectionPath(collectionPath ?? '');
     idTouched.current = false;
     setDocumentId('');
     setSource('{}');
     setError(null);
     setIsSaving(false);
+    setIsGeneratingId(false);
+  }, [collectionPath, open]);
+
+  useEffect(() => {
+    if (!open) return;
+    const normalizedCollectionPath = normalizePath(draftCollectionPath);
+    if (!isValidCollectionPath(normalizedCollectionPath)) {
+      setIsGeneratingId(false);
+      return;
+    }
+    let cancelled = false;
     setIsGeneratingId(true);
-    Promise.resolve(onGenerateDocumentId(collectionPath))
+    Promise.resolve(onGenerateDocumentId(normalizedCollectionPath))
       .then((generatedId) => {
         if (!cancelled && !idTouched.current) setDocumentId(generatedId);
       })
@@ -53,16 +71,35 @@ export function CreateDocumentModal(
     return () => {
       cancelled = true;
     };
-  }, [collectionPath, onGenerateDocumentId, open]);
+  }, [draftCollectionPath, onGenerateDocumentId, open]);
 
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         className='w-[min(760px,calc(100vw-32px))]'
-        description={collectionPath}
-        title='New document'
+        description={collectionPathEditable ? 'Create the first document' : collectionPath}
+        title={title}
       >
         <div className='grid gap-3'>
+          {hint ? <InlineAlert variant='warning'>{hint}</InlineAlert> : null}
+          {collectionPathEditable
+            ? (
+              <label className='grid gap-1 text-sm font-medium text-text-secondary'>
+                Collection path
+                <Input
+                  aria-label='Collection path'
+                  className='font-mono'
+                  disabled={isSaving}
+                  placeholder='collection or collection/doc/subcollection'
+                  value={draftCollectionPath}
+                  onChange={(event) => {
+                    setDraftCollectionPath(event.currentTarget.value);
+                    setError(null);
+                  }}
+                />
+              </label>
+            )
+            : null}
           <label className='grid gap-1 text-sm font-medium text-text-secondary'>
             Document ID
             <Input
@@ -99,15 +136,16 @@ export function CreateDocumentModal(
             disabled={isSaving || isGeneratingId}
             variant='primary'
             onClick={async () => {
-              if (!collectionPath) return;
               setIsSaving(true);
               setError(null);
               try {
+                const normalizedCollectionPath = normalizePath(draftCollectionPath);
+                validateCollectionPath(normalizedCollectionPath);
                 const trimmedId = documentId.trim();
                 validateDocumentId(trimmedId);
                 const data = parseDocumentJson(source);
                 validateFirestoreDocumentData(data);
-                await onCreateDocument(collectionPath, trimmedId, data);
+                await onCreateDocument(normalizedCollectionPath, trimmedId, data);
                 onOpenChange(false);
               } catch (caught) {
                 setError(messageFromError(caught, 'Could not create document.'));
@@ -122,6 +160,22 @@ export function CreateDocumentModal(
       </DialogContent>
     </Dialog>
   );
+}
+
+function normalizePath(path: string): string {
+  return path.trim().split('/').filter(Boolean).join('/');
+}
+
+function validateCollectionPath(collectionPath: string): void {
+  if (!collectionPath) throw new Error('Collection path is required.');
+  if (!isValidCollectionPath(collectionPath)) {
+    throw new Error('Collection path must point to a collection.');
+  }
+}
+
+function isValidCollectionPath(collectionPath: string): boolean {
+  const parts = collectionPath.split('/').filter(Boolean);
+  return parts.length > 0 && parts.length % 2 === 1;
 }
 
 function validateDocumentId(documentId: string): void {

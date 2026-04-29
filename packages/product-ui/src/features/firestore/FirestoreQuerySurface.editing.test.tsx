@@ -260,6 +260,36 @@ describe('FirestoreQuerySurface editing UX', () => {
     expect(await screen.findByText('Results changed.')).toBeTruthy();
   });
 
+  it('opens new collection requests with editable collection path and hint', async () => {
+    const onCreateDocument = vi.fn<CreateDocument>();
+    renderSurface({
+      createDocumentRequest: {
+        collectionPath: '',
+        collectionPathEditable: true,
+        requestId: 1,
+      },
+      onCreateDocument,
+      onGenerateDocumentId: () => 'generated_id',
+      onSaveDocument: vi.fn<SaveDocument>(),
+    });
+
+    expect(await screen.findByRole('dialog', { name: 'New collection' })).toBeTruthy();
+    expect(screen.getByText(/Firestore creates a collection/)).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Collection path'), {
+      target: { value: 'invoices' },
+    });
+    expect(await screen.findByDisplayValue('generated_id')).toBeTruthy();
+    fireEvent.change(screen.getByLabelText('Document ID'), { target: { value: 'first' } });
+    fireEvent.change(screen.getByLabelText('JSON value'), {
+      target: { value: '{"status":"new"}' },
+    });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() =>
+      expect(onCreateDocument).toHaveBeenCalledWith('invoices', 'first', { status: 'new' })
+    );
+  });
+
   it('opens editable conflict merge and saves merged JSON with remote update time', async () => {
     const remoteDocument: FirestoreDocumentResult = {
       ...document,
@@ -331,12 +361,18 @@ describe('FirestoreQuerySurface editing UX', () => {
 
 function renderSurface(
   {
+    createDocumentRequest,
     document: inputDocument = document,
     onDeleteDocument,
     onCreateDocument,
     onGenerateDocumentId,
     onSaveDocument,
   }: {
+    readonly createDocumentRequest?: {
+      readonly collectionPath: string;
+      readonly collectionPathEditable?: boolean;
+      readonly requestId: number;
+    };
     readonly document?: FirestoreDocumentResult;
     readonly onCreateDocument?: CreateDocument;
     readonly onDeleteDocument?: DeleteDocument;
@@ -347,6 +383,7 @@ function renderSurface(
   render(
     <AppearanceProvider settings={new MockSettingsRepository()}>
       <FirestoreQuerySurface
+        createDocumentRequest={createDocumentRequest}
         draft={draft}
         hasMore={false}
         rows={[inputDocument]}

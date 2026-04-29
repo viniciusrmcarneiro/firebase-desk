@@ -25,6 +25,10 @@ test('Firestore query, create, edit, conflict, and delete flows use emulator UI'
       await querySeededOrders(page);
     });
 
+    await test.step('create first document for a new collection from sidebar', async () => {
+      await createCollectionFromSidebar(page, suffix);
+    });
+
     await test.step('create and edit document through UI', async () => {
       await createAndEditDocument(page, suffix);
     });
@@ -98,6 +102,48 @@ async function querySeededOrders(page: Page): Promise<void> {
   await page.getByLabel('Sort direction').selectOption('desc');
   await page.getByRole('button', { name: 'Run' }).click();
   await expect(page.getByText('ord_1123')).toBeVisible();
+}
+
+async function createCollectionFromSidebar(page: Page, suffix: string): Promise<void> {
+  const collectionPath = `smokeUiSidebarCollections_${suffix}`;
+  const documentId = `first-${suffix}`;
+  const path = `${collectionPath}/${documentId}`;
+  const tree = page.getByRole('tree', { name: 'Account tree' });
+
+  await tree.getByText('Firestore', { exact: true }).click({ button: 'right' });
+  await page.getByRole('menuitem', { name: 'New collection' }).click();
+
+  const createDialog = page.getByRole('dialog', { name: 'New collection' });
+  await expect(createDialog).toBeVisible();
+  await expect(
+    createDialog.getByText(/Firestore creates a collection when the first document is written/),
+  ).toBeVisible();
+  await createDialog.getByLabel('Collection path').fill(collectionPath);
+  await createDialog.getByLabel('Document ID').fill(documentId);
+  await replaceMonacoEditorValue(
+    page,
+    createDialog,
+    JSON.stringify(
+      {
+        nested: { ok: true },
+        source: 'sidebar-new-collection',
+      },
+      null,
+      2,
+    ),
+  );
+  await expect(createDialog.getByRole('button', { name: 'Create' })).toBeEnabled();
+  await createDialog.getByRole('button', { name: 'Create' }).click();
+  await expectDialogHidden(createDialog, 'New collection dialog stayed open');
+
+  const created = await getFirestoreEmulatorDocument(path);
+  expect(created?.fields).toMatchObject({
+    nested: { mapValue: { fields: { ok: { booleanValue: true } } } },
+    source: { stringValue: 'sidebar-new-collection' },
+  });
+
+  await runCollectionQuery(page, collectionPath);
+  await expect(page.getByText(documentId)).toBeVisible();
 }
 
 async function createAndEditDocument(page: Page, suffix: string): Promise<void> {
