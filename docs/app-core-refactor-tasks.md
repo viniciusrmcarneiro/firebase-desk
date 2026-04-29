@@ -165,47 +165,47 @@ Extract query lifecycle before write lifecycle.
 
 Move write flows after query extraction.
 
-- [ ] Create `app-core/firestore/write`.
-- [ ] Model create document state:
-  - [ ] idle
-  - [ ] generating ID
-  - [ ] editing
-  - [ ] creating
-  - [ ] failed
-- [ ] Model full document save state:
-  - [ ] idle
-  - [ ] editing
-  - [ ] saving
-  - [ ] conflict
-  - [ ] failed
-- [ ] Model field patch state:
-  - [ ] idle
-  - [ ] editing
-  - [ ] saving
-  - [ ] stale document changed
-  - [ ] field conflict
-  - [ ] failed
-- [ ] Model delete document state:
-  - [ ] idle
-  - [ ] confirming
-  - [ ] deleting
-  - [ ] failed
-- [ ] Add pure transitions for each write state.
-- [ ] Add selectors for modal props and command availability.
-- [ ] Add commands:
-  - [ ] generate document ID
-  - [ ] create document
-  - [ ] save full document
-  - [ ] save merged conflict
-  - [ ] update field patch
-  - [ ] delete field
-  - [ ] delete document with selected subcollections
-- [ ] Keep field patch writes patch-only; do not fall back to full document saves.
-- [ ] Keep conflict behavior explicit and unit-tested.
-- [ ] Move write Activity logging into write commands.
-- [ ] Remove write handlers from AppShell except adapter wiring.
-- [ ] Add pure tests for conflict, stale field behavior, set null, delete field, full save, create, and delete.
-- [ ] Keep smoke tests for emulator create/edit/conflict/delete.
+- [x] Create `app-core/firestore/write`.
+- [x] Model create document state:
+  - [x] idle
+  - [x] generating ID
+  - [x] editing
+  - [x] creating
+  - [x] failed
+- [x] Model full document save state:
+  - [x] idle
+  - [x] editing
+  - [x] saving
+  - [x] conflict
+  - [x] failed
+- [x] Model field patch state:
+  - [x] idle
+  - [x] editing
+  - [x] saving
+  - [x] stale document changed
+  - [x] field conflict
+  - [x] failed
+- [x] Model delete document state:
+  - [x] idle
+  - [x] confirming
+  - [x] deleting
+  - [x] failed
+- [x] Add pure transitions for each write state.
+- [x] Add selectors for modal props and command availability.
+- [x] Add commands:
+  - [x] generate document ID
+  - [x] create document
+  - [x] save full document
+  - [x] save merged conflict
+  - [x] update field patch
+  - [x] delete field
+  - [x] delete document with selected subcollections
+- [x] Keep field patch writes patch-only; do not fall back to full document saves.
+- [x] Keep conflict behavior explicit and unit-tested.
+- [x] Move write Activity logging into write commands.
+- [x] Remove write handlers from AppShell except adapter wiring.
+- [x] Add pure tests for conflict, stale field behavior, set null, delete field, full save, create, and delete.
+- [x] Keep smoke tests for emulator create/edit/conflict/delete.
 
 ## Phase 5: Auth Core
 

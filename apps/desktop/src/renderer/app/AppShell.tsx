@@ -71,6 +71,8 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type ActivityStore, useActivityController } from '../app-core/activity/index.ts';
 import { firestoreQueryDraftMetadata } from '../app-core/firestore/query/index.ts';
+import { useFirestoreWriteController } from '../app-core/firestore/write/index.ts';
+import { documentDataMetadata } from '../app-core/shared/index.ts';
 import appIconUrl from '../assets/app-icon.png';
 import { AddProjectDialog } from './dialogs/AddProjectDialog.tsx';
 import { EditProjectDialog } from './dialogs/EditProjectDialog.tsx';
@@ -110,10 +112,6 @@ interface DestructiveAction {
   readonly description: string;
   readonly onConfirm: () => void;
   readonly title: string;
-}
-
-interface PendingCreateDocumentRequest extends FirestoreCreateDocumentRequest {
-  readonly tabId: string;
 }
 
 const MAX_ACTIVITY_DEDUPE_KEYS = 500;
@@ -164,9 +162,6 @@ export function AppShell(
   const [pendingDestructiveAction, setPendingDestructiveAction] = useState<
     DestructiveAction | null
   >(null);
-  const [pendingCreateDocumentRequest, setPendingCreateDocumentRequest] = useState<
-    PendingCreateDocumentRequest | null
-  >(null);
   const nextCreateDocumentRequestId = useRef(1);
   const loggedScriptRuns = useRef<Set<string>>(new Set());
   const loggedAuthFailures = useRef<Set<string>>(new Set());
@@ -183,6 +178,18 @@ export function AppShell(
     initialDrafts: persistedWorkspace?.drafts,
     onQueryActivity: recordActivity,
     selectedTreeItemId: selection.treeItemId,
+  });
+  const firestoreWrite = useFirestoreWriteController({
+    activeProject,
+    activeTab,
+    clearSelectedDocument: (tabId) => firestoreTab.selectDocument(tabId, null),
+    dataMode,
+    firestore: repositories.firestore,
+    invalidateFirestoreQueries: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['firestore'] });
+    },
+    onStatus: setLastAction,
+    recordActivity,
   });
   const authTab = useAuthTabState({
     activeTab,
@@ -536,7 +543,7 @@ export function AppShell(
     const parsed = parseTreeId(id);
     if (parsed.kind !== 'collection' || !parsed.connectionId || !parsed.path) return;
     const tabId = openFirestoreTab(parsed.connectionId, parsed.path);
-    setPendingCreateDocumentRequest({
+    firestoreWrite.requestCreateDocument({
       collectionPath: parsed.path,
       requestId: nextCreateDocumentRequestId.current++,
       tabId,
@@ -553,7 +560,7 @@ export function AppShell(
     const parsed = parseTreeId(id);
     if (parsed.kind !== 'firestore' || !parsed.connectionId) return;
     const tabId = openFirestoreTab(parsed.connectionId, DEFAULT_FIRESTORE_DRAFT.path);
-    setPendingCreateDocumentRequest({
+    firestoreWrite.requestCreateDocument({
       collectionPath: '',
       collectionPathEditable: true,
       requestId: nextCreateDocumentRequestId.current++,
@@ -761,21 +768,14 @@ export function AppShell(
         usersHasMore={authTab.usersHasMore}
         usersIsFetchingMore={authTab.usersIsFetchingMore}
         usersIsLoading={authTab.usersIsLoading}
-        createDocumentRequest={activeTab.kind === 'firestore-query'
-            && pendingCreateDocumentRequest?.tabId === activeTab.id
-          ? pendingCreateDocumentRequest
-          : null}
+        createDocumentRequest={firestoreWrite.createDocumentRequest}
         onAuthFilterChange={authTab.setAuthFilter}
         onCancelScript={handleCancelScript}
-        onCreateDocument={handleCreateDocument}
-        onCreateDocumentRequestHandled={(requestId) => {
-          setPendingCreateDocumentRequest((current) =>
-            current?.requestId === requestId ? null : current
-          );
-        }}
-        onDeleteDocument={(path, options) => handleDeleteDocument(path, options)}
+        onCreateDocument={firestoreWrite.createDocument}
+        onCreateDocumentRequestHandled={firestoreWrite.handleCreateDocumentRequestHandled}
+        onDeleteDocument={firestoreWrite.deleteDocument}
         onDraftChange={firestoreTab.setDraft}
-        onGenerateDocumentId={handleGenerateDocumentId}
+        onGenerateDocumentId={firestoreWrite.generateDocumentId}
         onLoadMore={handleLoadMoreFirestore}
         onLoadMoreUsers={handleLoadMoreUsers}
         onLoadSubcollections={handleLoadSubcollections}
@@ -792,9 +792,8 @@ export function AppShell(
         onRefreshResults={handleRefreshResults}
         onRunQuery={handleRunQuery}
         onRunScript={handleRunScript}
-        onSaveDocument={(path, data, options) => handleSaveDocument(path, data, options)}
-        onUpdateDocumentFields={(path, operations, options) =>
-          handleUpdateDocumentFields(path, operations, options)}
+        onSaveDocument={firestoreWrite.saveDocument}
+        onUpdateDocumentFields={firestoreWrite.updateDocumentFields}
         onSaveUserCustomClaims={handleSaveUserCustomClaims}
         onScriptChange={jsTab.setScriptSource}
         onSelectDocument={(path) => firestoreTab.selectDocument(activeTab.id, path)}
@@ -911,313 +910,6 @@ export function AppShell(
     }
     if (activeTab.kind === 'js-query') handleRunScript();
     setLastAction(`Refreshed ${activeTab.title}`);
-  }
-
-  async function handleGenerateDocumentId(collectionPath: string): Promise<string> {
-    if (!activeProject) throw new Error('Choose a project before creating a document.');
-    const generated = await repositories.firestore.generateDocumentId(
-      activeProject.id,
-      collectionPath,
-    );
-    return generated.documentId;
-  }
-
-  async function handleCreateDocument(
-    collectionPath: string,
-    documentId: string,
-    data: Record<string, unknown>,
-  ) {
-    if (!activeProject) return;
-    const startedAt = Date.now();
-    const documentPath = collectionPath ? `${collectionPath}/${documentId}` : documentId;
-    try {
-      const document = await repositories.firestore.createDocument(
-        activeProject.id,
-        collectionPath,
-        documentId,
-        data,
-      );
-      if (dataMode !== 'mock') await queryClient.invalidateQueries({ queryKey: ['firestore'] });
-      setLastAction(`Created ${document.path}`);
-      recordActivity({
-        action: 'Create document',
-        area: 'firestore',
-        durationMs: elapsedMs(startedAt),
-        metadata: {
-          collectionPath,
-          documentId,
-          ...documentDataMetadata(data),
-        },
-        payload: { data },
-        status: 'success',
-        summary: `Created ${document.path}`,
-        target: {
-          connectionId: activeProject.id,
-          path: document.path,
-          projectId: activeProject.projectId,
-          type: 'firestore-document',
-        },
-      });
-    } catch (error) {
-      const message = messageFromError(error, 'Could not create document.');
-      setLastAction(`Create failed: ${message}`);
-      recordActivity({
-        action: 'Create document',
-        area: 'firestore',
-        durationMs: elapsedMs(startedAt),
-        error: { message },
-        metadata: {
-          collectionPath,
-          documentId,
-          ...documentDataMetadata(data),
-        },
-        payload: { data },
-        status: 'failure',
-        summary: message,
-        target: {
-          connectionId: activeProject.id,
-          path: documentPath,
-          projectId: activeProject.projectId,
-          type: 'firestore-document',
-        },
-      });
-      throw error instanceof Error ? error : new Error(message);
-    }
-  }
-
-  async function handleSaveDocument(
-    documentPath: string,
-    data: Record<string, unknown>,
-    options?: FirestoreSaveDocumentOptions,
-  ): Promise<FirestoreSaveDocumentResult | void> {
-    if (!activeProject) return;
-    const startedAt = Date.now();
-    try {
-      const result = await repositories.firestore.saveDocument(
-        activeProject.id,
-        documentPath,
-        data,
-        options,
-      );
-      if (result.status === 'conflict') {
-        setLastAction(`Save conflict: ${documentPath}`);
-        recordActivity({
-          action: 'Save document',
-          area: 'firestore',
-          durationMs: elapsedMs(startedAt),
-          metadata: {
-            lastUpdateTime: options?.lastUpdateTime ?? null,
-            remoteUpdateTime: result.remoteDocument?.updateTime ?? null,
-            ...documentDataMetadata(data),
-          },
-          payload: { data },
-          status: 'conflict',
-          summary: `Save conflict on ${documentPath}`,
-          target: {
-            connectionId: activeProject.id,
-            path: documentPath,
-            projectId: activeProject.projectId,
-            type: 'firestore-document',
-          },
-        });
-        return result;
-      }
-      if (dataMode !== 'mock') await queryClient.invalidateQueries({ queryKey: ['firestore'] });
-      setLastAction(`Saved ${result.document.path}`);
-      recordActivity({
-        action: 'Save document',
-        area: 'firestore',
-        durationMs: elapsedMs(startedAt),
-        metadata: {
-          lastUpdateTime: options?.lastUpdateTime ?? null,
-          updateTime: result.document.updateTime ?? null,
-          ...documentDataMetadata(data),
-        },
-        payload: { data },
-        status: 'success',
-        summary: `Saved ${result.document.path}`,
-        target: {
-          connectionId: activeProject.id,
-          path: result.document.path,
-          projectId: activeProject.projectId,
-          type: 'firestore-document',
-        },
-      });
-      return result;
-    } catch (error) {
-      const message = messageFromError(error, 'Could not save document.');
-      setLastAction(`Save failed: ${message}`);
-      recordActivity({
-        action: 'Save document',
-        area: 'firestore',
-        durationMs: elapsedMs(startedAt),
-        error: { message },
-        metadata: {
-          lastUpdateTime: options?.lastUpdateTime ?? null,
-          ...documentDataMetadata(data),
-        },
-        payload: { data },
-        status: 'failure',
-        summary: message,
-        target: {
-          connectionId: activeProject.id,
-          path: documentPath,
-          projectId: activeProject.projectId,
-          type: 'firestore-document',
-        },
-      });
-      throw error instanceof Error ? error : new Error(message);
-    }
-  }
-
-  async function handleUpdateDocumentFields(
-    documentPath: string,
-    operations: ReadonlyArray<FirestoreFieldPatchOperation>,
-    options: FirestoreUpdateDocumentFieldsOptions,
-  ): Promise<FirestoreUpdateDocumentFieldsResult | void> {
-    if (!activeProject) return;
-    const startedAt = Date.now();
-    try {
-      const result = await repositories.firestore.updateDocumentFields(
-        activeProject.id,
-        documentPath,
-        operations,
-        options,
-      );
-      if (result.status === 'conflict' || result.status === 'document-changed') {
-        const status = result.status === 'conflict' ? 'conflict' : 'success';
-        setLastAction(`${fieldPatchStatusLabel(result.status)}: ${documentPath}`);
-        recordActivity({
-          action: 'Update fields',
-          area: 'firestore',
-          durationMs: elapsedMs(startedAt),
-          metadata: {
-            classification: result.status,
-            lastUpdateTime: options.lastUpdateTime ?? null,
-            remoteUpdateTime: result.remoteDocument?.updateTime ?? null,
-            staleBehavior: options.staleBehavior,
-            ...fieldPatchMetadata(operations),
-          },
-          payload: { operations },
-          status,
-          summary: `${fieldPatchStatusLabel(result.status)} on ${documentPath}`,
-          target: {
-            connectionId: activeProject.id,
-            path: documentPath,
-            projectId: activeProject.projectId,
-            type: 'firestore-document',
-          },
-        });
-        return result;
-      }
-      if (dataMode !== 'mock') await queryClient.invalidateQueries({ queryKey: ['firestore'] });
-      setLastAction(
-        result.documentChanged
-          ? `Saved ${result.document.path}; document changed elsewhere`
-          : `Saved ${result.document.path}`,
-      );
-      recordActivity({
-        action: 'Update fields',
-        area: 'firestore',
-        durationMs: elapsedMs(startedAt),
-        metadata: {
-          classification: result.documentChanged ? 'document-changed-saved' : 'saved',
-          lastUpdateTime: options.lastUpdateTime ?? null,
-          staleBehavior: options.staleBehavior,
-          updateTime: result.document.updateTime ?? null,
-          ...fieldPatchMetadata(operations),
-        },
-        payload: { operations },
-        status: 'success',
-        summary: result.documentChanged
-          ? `Saved ${result.document.path}; document changed elsewhere`
-          : `Saved ${result.document.path}`,
-        target: {
-          connectionId: activeProject.id,
-          path: result.document.path,
-          projectId: activeProject.projectId,
-          type: 'firestore-document',
-        },
-      });
-      return result;
-    } catch (error) {
-      const message = messageFromError(error, 'Could not update fields.');
-      setLastAction(`Field update failed: ${message}`);
-      recordActivity({
-        action: 'Update fields',
-        area: 'firestore',
-        durationMs: elapsedMs(startedAt),
-        error: { message },
-        metadata: {
-          lastUpdateTime: options.lastUpdateTime ?? null,
-          staleBehavior: options.staleBehavior,
-          ...fieldPatchMetadata(operations),
-        },
-        payload: { operations },
-        status: 'failure',
-        summary: message,
-        target: {
-          connectionId: activeProject.id,
-          path: documentPath,
-          projectId: activeProject.projectId,
-          type: 'firestore-document',
-        },
-      });
-      throw error instanceof Error ? error : new Error(message);
-    }
-  }
-
-  async function handleDeleteDocument(
-    documentPath: string,
-    options: DeleteDocumentOptions,
-  ) {
-    if (!activeProject || !activeTab) return;
-    const startedAt = Date.now();
-    try {
-      await repositories.firestore.deleteDocument(activeProject.id, documentPath, {
-        deleteSubcollectionPaths: options.deleteSubcollectionPaths,
-      });
-      if (dataMode !== 'mock') await queryClient.invalidateQueries({ queryKey: ['firestore'] });
-      firestoreTab.selectDocument(activeTab.id, null);
-      setLastAction(`Deleted ${documentPath}`);
-      recordActivity({
-        action: 'Delete document',
-        area: 'firestore',
-        durationMs: elapsedMs(startedAt),
-        metadata: {
-          deleteSubcollectionPaths: options.deleteSubcollectionPaths,
-        },
-        status: 'success',
-        summary: `Deleted ${documentPath}`,
-        target: {
-          connectionId: activeProject.id,
-          path: documentPath,
-          projectId: activeProject.projectId,
-          type: 'firestore-document',
-        },
-      });
-    } catch (error) {
-      const message = messageFromError(error, 'Could not delete document.');
-      setLastAction(`Delete failed: ${message}`);
-      recordActivity({
-        action: 'Delete document',
-        area: 'firestore',
-        durationMs: elapsedMs(startedAt),
-        error: { message },
-        metadata: {
-          deleteSubcollectionPaths: options.deleteSubcollectionPaths,
-        },
-        status: 'failure',
-        summary: message,
-        target: {
-          connectionId: activeProject.id,
-          path: documentPath,
-          projectId: activeProject.projectId,
-          type: 'firestore-document',
-        },
-      });
-      throw error instanceof Error ? error : new Error(message);
-    }
   }
 
   async function handleSaveUserCustomClaims(
@@ -1946,45 +1638,6 @@ function rememberActivityKey(keys: Set<string>, key: string): boolean {
 
 function elapsedMs(startedAt: number): number {
   return Math.max(0, Date.now() - startedAt);
-}
-
-function documentDataMetadata(data: Record<string, unknown>): Record<string, unknown> {
-  return {
-    fieldCount: Object.keys(data).length,
-    fields: Object.fromEntries(
-      Object.entries(data).map(([field, value]) => [field, valueKind(value)]),
-    ),
-  };
-}
-
-function fieldPatchMetadata(
-  operations: ReadonlyArray<FirestoreFieldPatchOperation>,
-): Record<string, unknown> {
-  return {
-    operationCount: operations.length,
-    operations: operations.map((operation) => ({
-      fieldPath: operation.fieldPath,
-      type: operation.type,
-      ...(operation.type === 'set' ? { valueType: valueKind(operation.value) } : {}),
-    })),
-    writeMode: 'field-patch',
-  };
-}
-
-function fieldPatchStatusLabel(
-  status: 'conflict' | 'document-changed',
-): string {
-  return status === 'conflict' ? 'Field conflict' : 'Document changed elsewhere';
-}
-
-function valueKind(value: unknown): string {
-  if (value === null) return 'null';
-  if (Array.isArray(value)) return 'array';
-  if (typeof value === 'object') {
-    const type = (value as { readonly __type__?: unknown; }).__type__;
-    return typeof type === 'string' ? type : 'map';
-  }
-  return typeof value;
 }
 
 function projectTarget(project: ProjectSummary | null): ActivityLogEntry['target'] {
