@@ -142,7 +142,8 @@ export function firestoreQueryCompletionActivity(
 }
 
 function isFirestoreDocumentPath(path: string): boolean {
-  return path.split('/').filter(Boolean).length % 2 === 0;
+  const parts = path.split('/').filter(Boolean);
+  return parts.length > 0 && parts.length % 2 === 0;
 }
 
 export function refreshFirestoreQueryCommand(
@@ -175,15 +176,6 @@ function queryCommandTarget(
   input: FirestoreQuerySubmitCommandInput,
 ): { readonly tabId: string; readonly visible: boolean; } | null {
   const options = normalizeCommandOptions(input.commandOptions);
-  if (input.tab?.kind === 'firestore-query') {
-    return { tabId: input.tab.id, visible: options.visible };
-  }
-  if (!options.visible) {
-    return {
-      tabId: options.serializationKey
-        ?? `firestore-query:${input.query.connectionId}:${input.activeDraft.path}`,
-      visible: false,
-    };
-  }
-  return null;
+  if (!options.visible) return null;
+  return input.tab?.kind === 'firestore-query' ? { tabId: input.tab.id, visible: true } : null;
 }

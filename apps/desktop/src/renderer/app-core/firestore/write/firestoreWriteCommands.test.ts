@@ -50,8 +50,8 @@ describe('firestore write commands', () => {
       status: 'success',
       target: { path: 'orders/ord_1' },
     });
-    expect(result?.lastAction).toBe('Created orders/ord_1');
-    expect(result?.notification).toBe('Created orders/ord_1');
+    expect(result.lastAction).toBe('Created orders/ord_1');
+    expect(result.notification).toBe('Created orders/ord_1');
     expect(context.store.get().create.status).toBe('created');
   });
 
@@ -70,8 +70,8 @@ describe('firestore write commands', () => {
       project,
     });
 
-    expect(result?.lastAction).toBe('Created orders/ord_1');
-    expect(result?.notification).toBeNull();
+    expect(result.lastAction).toBe('Created orders/ord_1');
+    expect(result.notification).toBeNull();
     expect(context.activity.at(-1)).toMatchObject({
       metadata: {
         command: {
@@ -83,6 +83,44 @@ describe('firestore write commands', () => {
       },
       status: 'success',
     });
+  });
+
+  it('rejects create, save, update, and delete when no project is selected', async () => {
+    const context = commandContext();
+
+    await expect(createFirestoreDocumentCommand(context.store, context.env, {
+      collectionPath: 'orders',
+      data: { status: 'new' },
+      documentId: 'ord_new',
+      project: null,
+    })).rejects.toThrow('Choose a project before creating a document.');
+    await expect(saveFirestoreDocumentCommand(context.store, context.env, {
+      data: { status: 'paid' },
+      documentPath: 'orders/ord_1',
+      project: null,
+    })).rejects.toThrow('Choose a project before saving a document.');
+    await expect(updateFirestoreDocumentFieldsCommand(context.store, context.env, {
+      documentPath: 'orders/ord_1',
+      operations: [{
+        baseValue: 'draft',
+        fieldPath: ['status'],
+        type: 'set',
+        value: 'paid',
+      }],
+      options: { staleBehavior: 'save-and-notify' },
+      project: null,
+    })).rejects.toThrow('Choose a project before updating fields.');
+    await expect(deleteFirestoreDocumentCommand(context.store, context.env, {
+      deleteSubcollectionPaths: [],
+      documentPath: 'orders/ord_1',
+      project: null,
+    })).rejects.toThrow('Choose a project before deleting a document.');
+
+    expect(context.firestore.createDocument).not.toHaveBeenCalled();
+    expect(context.firestore.saveDocument).not.toHaveBeenCalled();
+    expect(context.firestore.updateDocumentFields).not.toHaveBeenCalled();
+    expect(context.firestore.deleteDocument).not.toHaveBeenCalled();
+    expect(context.activity).toEqual([]);
   });
 
   it('returns full save conflicts without invalidating', async () => {
@@ -102,9 +140,9 @@ describe('firestore write commands', () => {
     });
 
     expect(context.invalidateFirestoreQueries).not.toHaveBeenCalled();
-    expect(result?.result).toBe(conflict);
-    expect(result?.lastAction).toBe('Save conflict: orders/ord_1');
-    expect(result?.notification).toBe('Save conflict: orders/ord_1');
+    expect(result.result).toBe(conflict);
+    expect(result.lastAction).toBe('Save conflict: orders/ord_1');
+    expect(result.notification).toBe('Save conflict: orders/ord_1');
     expect(context.activity.at(-1)).toMatchObject({
       action: 'Save document',
       metadata: { lastUpdateTime: 'old', remoteUpdateTime: null },
@@ -146,7 +184,7 @@ describe('firestore write commands', () => {
       }],
       { staleBehavior: 'save-and-notify' },
     );
-    expect(result?.lastAction).toBe('Saved orders/ord_1; document changed elsewhere');
+    expect(result.lastAction).toBe('Saved orders/ord_1; document changed elsewhere');
     expect(context.activity.at(-1)).toMatchObject({
       action: 'Update fields',
       metadata: { classification: 'document-changed-saved', writeMode: 'field-patch' },
@@ -178,8 +216,8 @@ describe('firestore write commands', () => {
     });
 
     expect(context.invalidateFirestoreQueries).not.toHaveBeenCalled();
-    expect(result?.lastAction).toBe('Field conflict: orders/ord_1');
-    expect(result?.notification).toBe('Field conflict: orders/ord_1');
+    expect(result.lastAction).toBe('Field conflict: orders/ord_1');
+    expect(result.notification).toBe('Field conflict: orders/ord_1');
     expect(context.activity.at(-1)).toMatchObject({
       metadata: { classification: 'conflict', staleBehavior: 'block' },
       status: 'conflict',
@@ -198,7 +236,7 @@ describe('firestore write commands', () => {
     expect(context.firestore.deleteDocument).toHaveBeenCalledWith('emu', 'orders/ord_1', {
       deleteSubcollectionPaths: ['orders/ord_1/events'],
     });
-    expect(result?.lastAction).toBe('Deleted orders/ord_1');
+    expect(result.lastAction).toBe('Deleted orders/ord_1');
     expect(context.store.get().deleteDocument.status).toBe('deleted');
   });
 

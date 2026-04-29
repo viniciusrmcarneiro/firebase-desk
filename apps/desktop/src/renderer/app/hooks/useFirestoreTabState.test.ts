@@ -1,5 +1,5 @@
 import type { FirestoreDocumentResult, ProjectSummary } from '@firebase-desk/repo-contracts';
-import { act, renderHook } from '@testing-library/react';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { selectionActions, selectionStore } from '../stores/selectionStore.ts';
 import { tabActions, type WorkspaceTab } from '../stores/tabsStore.ts';
@@ -202,6 +202,57 @@ describe('useFirestoreTabState', () => {
 
     expect(result.current.selectedDocumentPath).toBe('orders/ord_1024');
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
+  });
+
+  it('records multi-page refresh activity once after all requested pages load', async () => {
+    const fetchNextPage = vi.fn();
+    const onQueryActivity = vi.fn();
+    let queryResult = runQueryResult({
+      pages: [{ items: rows }, { items: rows }],
+      hasNextPage: true,
+    });
+    vi.mocked(useRunQuery).mockImplementation(() => queryResult);
+    const { rerender, result } = renderHook(() =>
+      useFirestoreTabState({
+        activeProject: project,
+        activeTab: tab,
+        onQueryActivity,
+        selectedTreeItemId: 'collection:emu:orders',
+      })
+    );
+
+    act(() => {
+      result.current.runQuery();
+    });
+    await waitFor(() => expect(onQueryActivity).toHaveBeenCalledTimes(1));
+    onQueryActivity.mockClear();
+
+    act(() => {
+      expect(result.current.refreshQuery()).toBe('orders');
+      queryResult = runQueryResult({
+        fetchNextPage,
+        hasNextPage: true,
+        pages: [{ items: rows }],
+      });
+    });
+    rerender();
+
+    expect(fetchNextPage).toHaveBeenCalledTimes(1);
+    expect(onQueryActivity).not.toHaveBeenCalled();
+
+    queryResult = runQueryResult({
+      hasNextPage: false,
+      pages: [{ items: rows }, { items: rows }],
+    });
+    rerender();
+
+    await waitFor(() => expect(onQueryActivity).toHaveBeenCalledTimes(1));
+    expect(onQueryActivity).toHaveBeenLastCalledWith(expect.objectContaining({
+      metadata: expect.objectContaining({
+        loadedPages: 2,
+        resultCount: 2,
+      }),
+    }));
   });
 });
 

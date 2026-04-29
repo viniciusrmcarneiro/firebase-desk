@@ -42,8 +42,9 @@ describe('firestore query commands', () => {
     expect(result).toEqual({ interaction: null, path: null, state });
   });
 
-  it('can submit invisible scheduler queries without an open tab', () => {
-    const result = runFirestoreQueryCommand(createInitialFirestoreQueryRuntimeState(), {
+  it('ignores invisible scheduler queries until a background runner exists', () => {
+    const state = createInitialFirestoreQueryRuntimeState();
+    const result = runFirestoreQueryCommand(state, {
       activeDraft: draft('orders'),
       clearSelection: false,
       commandOptions: {
@@ -57,11 +58,18 @@ describe('firestore query commands', () => {
     });
 
     expect(result.interaction).toBeNull();
-    expect(result.path).toBe('orders');
-    expect(result.state.queryRequests['nightly-orders']).toMatchObject({
-      query: { path: 'orders' },
-      runId: 1,
+    expect(result.path).toBeNull();
+    expect(result.state).toEqual(state);
+
+    const activeTabResult = runFirestoreQueryCommand(state, {
+      activeDraft: draft('orders'),
+      clearSelection: false,
+      commandOptions: { source: 'scheduler', visible: false },
+      query: query('orders'),
+      selectedTreeItemId: null,
+      tab,
     });
+    expect(activeTabResult).toEqual({ interaction: null, path: null, state });
   });
 
   it('submits refreshes without clearing selection and stores pages to reload', () => {
@@ -161,6 +169,19 @@ describe('firestore query commands', () => {
       metadata: { isDocument: true },
       status: 'failure',
       target: { path: 'orders/ord_1', type: 'firestore-document' },
+    });
+
+    expect(firestoreQueryCompletionActivity({
+      connectionId: 'emu',
+      draft: draft(''),
+      errorMessage: 'Path is required.',
+      loadedPages: 0,
+      resultCount: 0,
+    })).toMatchObject({
+      action: 'Run query',
+      metadata: { isDocument: false },
+      status: 'failure',
+      target: { path: '', type: 'firestore-query' },
     });
   });
 });

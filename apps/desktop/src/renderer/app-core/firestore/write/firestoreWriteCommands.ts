@@ -93,9 +93,9 @@ export async function createFirestoreDocumentCommand(
     readonly project: FirestoreWriteProjectContext | null;
   },
 ): Promise<
-  FirestoreWriteCommandResult<Awaited<ReturnType<FirestoreRepository['createDocument']>>> | void
+  FirestoreWriteCommandResult<Awaited<ReturnType<FirestoreRepository['createDocument']>>>
 > {
-  if (!input.project) return;
+  const project = requireProject(input.project, 'creating a document');
   const startedAt = env.now();
   const documentPath = input.collectionPath
     ? `${input.collectionPath}/${input.documentId}`
@@ -103,7 +103,7 @@ export async function createFirestoreDocumentCommand(
   store.update((state) => firestoreCreateStarted(state, documentPath));
   try {
     const document = await env.firestore.createDocument(
-      input.project.connectionId,
+      project.connectionId,
       input.collectionPath,
       input.documentId,
       input.data,
@@ -123,7 +123,7 @@ export async function createFirestoreDocumentCommand(
       payload: { data: input.data },
       status: 'success',
       summary: `Created ${document.path}`,
-      target: firestoreDocumentTarget(input.project, document.path),
+      target: firestoreDocumentTarget(project, document.path),
     });
     return commandResult(`Created ${document.path}`, 'success', document, input.commandOptions);
   } catch (error) {
@@ -143,7 +143,7 @@ export async function createFirestoreDocumentCommand(
       payload: { data: input.data },
       status: 'failure',
       summary: message,
-      target: firestoreDocumentTarget(input.project, documentPath),
+      target: firestoreDocumentTarget(project, documentPath),
     });
     throw toError(error, message);
   }
@@ -159,13 +159,13 @@ export async function saveFirestoreDocumentCommand(
     readonly options?: FirestoreSaveDocumentOptions | undefined;
     readonly project: FirestoreWriteProjectContext | null;
   },
-): Promise<FirestoreWriteCommandResult<FirestoreSaveDocumentResult> | void> {
-  if (!input.project) return;
+): Promise<FirestoreWriteCommandResult<FirestoreSaveDocumentResult>> {
+  const project = requireProject(input.project, 'saving a document');
   const startedAt = env.now();
   store.update((state) => firestoreSaveStarted(state, input.documentPath));
   try {
     const result = await env.firestore.saveDocument(
-      input.project.connectionId,
+      project.connectionId,
       input.documentPath,
       input.data,
       input.options,
@@ -185,7 +185,7 @@ export async function saveFirestoreDocumentCommand(
         payload: { data: input.data },
         status: 'conflict',
         summary: `Save conflict on ${input.documentPath}`,
-        target: firestoreDocumentTarget(input.project, input.documentPath),
+        target: firestoreDocumentTarget(project, input.documentPath),
       });
       return commandResult(
         `Save conflict: ${input.documentPath}`,
@@ -208,7 +208,7 @@ export async function saveFirestoreDocumentCommand(
       payload: { data: input.data },
       status: 'success',
       summary: `Saved ${result.document.path}`,
-      target: firestoreDocumentTarget(input.project, result.document.path),
+      target: firestoreDocumentTarget(project, result.document.path),
     });
     return commandResult(`Saved ${result.document.path}`, 'success', result, input.commandOptions);
   } catch (error) {
@@ -227,7 +227,7 @@ export async function saveFirestoreDocumentCommand(
       payload: { data: input.data },
       status: 'failure',
       summary: message,
-      target: firestoreDocumentTarget(input.project, input.documentPath),
+      target: firestoreDocumentTarget(project, input.documentPath),
     });
     throw toError(error, message);
   }
@@ -243,13 +243,13 @@ export async function updateFirestoreDocumentFieldsCommand(
     readonly options: FirestoreUpdateDocumentFieldsOptions;
     readonly project: FirestoreWriteProjectContext | null;
   },
-): Promise<FirestoreWriteCommandResult<FirestoreUpdateDocumentFieldsResult> | void> {
-  if (!input.project) return;
+): Promise<FirestoreWriteCommandResult<FirestoreUpdateDocumentFieldsResult>> {
+  const project = requireProject(input.project, 'updating fields');
   const startedAt = env.now();
   store.update((state) => firestoreFieldPatchStarted(state, input.documentPath));
   try {
     const result = await env.firestore.updateDocumentFields(
-      input.project.connectionId,
+      project.connectionId,
       input.documentPath,
       input.operations,
       input.options,
@@ -273,7 +273,7 @@ export async function updateFirestoreDocumentFieldsCommand(
         payload: { operations: input.operations },
         status,
         summary: `${label} on ${input.documentPath}`,
-        target: firestoreDocumentTarget(input.project, input.documentPath),
+        target: firestoreDocumentTarget(project, input.documentPath),
       });
       return commandResult(
         `${label}: ${input.documentPath}`,
@@ -301,7 +301,7 @@ export async function updateFirestoreDocumentFieldsCommand(
       payload: { operations: input.operations },
       status: 'success',
       summary: lastAction,
-      target: firestoreDocumentTarget(input.project, result.document.path),
+      target: firestoreDocumentTarget(project, result.document.path),
     });
     return commandResult(lastAction, 'success', result, input.commandOptions);
   } catch (error) {
@@ -321,7 +321,7 @@ export async function updateFirestoreDocumentFieldsCommand(
       payload: { operations: input.operations },
       status: 'failure',
       summary: message,
-      target: firestoreDocumentTarget(input.project, input.documentPath),
+      target: firestoreDocumentTarget(project, input.documentPath),
     });
     throw toError(error, message);
   }
@@ -336,12 +336,12 @@ export async function deleteFirestoreDocumentCommand(
     readonly documentPath: string;
     readonly project: FirestoreWriteProjectContext | null;
   },
-): Promise<FirestoreWriteCommandResult<void> | void> {
-  if (!input.project) return;
+): Promise<FirestoreWriteCommandResult<void>> {
+  const project = requireProject(input.project, 'deleting a document');
   const startedAt = env.now();
   store.update((state) => firestoreDeleteStarted(state, input.documentPath));
   try {
-    await env.firestore.deleteDocument(input.project.connectionId, input.documentPath, {
+    await env.firestore.deleteDocument(project.connectionId, input.documentPath, {
       deleteSubcollectionPaths: input.deleteSubcollectionPaths,
     });
     if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
@@ -356,7 +356,7 @@ export async function deleteFirestoreDocumentCommand(
       },
       status: 'success',
       summary: `Deleted ${input.documentPath}`,
-      target: firestoreDocumentTarget(input.project, input.documentPath),
+      target: firestoreDocumentTarget(project, input.documentPath),
     });
     return commandResult(
       `Deleted ${input.documentPath}`,
@@ -378,10 +378,18 @@ export async function deleteFirestoreDocumentCommand(
       },
       status: 'failure',
       summary: message,
-      target: firestoreDocumentTarget(input.project, input.documentPath),
+      target: firestoreDocumentTarget(project, input.documentPath),
     });
     throw toError(error, message);
   }
+}
+
+function requireProject(
+  project: FirestoreWriteProjectContext | null,
+  action: string,
+): FirestoreWriteProjectContext {
+  if (!project) throw new Error(`Choose a project before ${action}.`);
+  return project;
 }
 
 function commandResult<T>(

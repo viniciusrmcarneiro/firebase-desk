@@ -125,11 +125,14 @@ export function useFirestoreTabState(
   useEffect(() => {
     if (
       !activeTab || activeTab.kind !== 'firestore-query' || queryRequestIsDocument
-      || pendingPageReloadCount <= 1 || loadedPageCount === 0
+      || pendingPageReloadCount === 0 || loadedPageCount === 0
     ) {
       return;
     }
-    if (loadedPageCount >= pendingPageReloadCount || !queryResult.hasNextPage) {
+    if (
+      pendingPageReloadCount <= 1 || loadedPageCount >= pendingPageReloadCount
+      || !queryResult.hasNextPage
+    ) {
       setQueryState((current) => firestorePendingPageReloadCleared(current, activeTab.id));
       return;
     }
@@ -153,17 +156,12 @@ export function useFirestoreTabState(
       ? queryDocumentResult.isLoading || queryDocumentResult.isFetching
       : queryResult.isLoading || queryResult.isFetching;
     if (isLoading) return;
+    if (!queryRequestIsDocument && pendingPageReloadCount > 0) return;
 
     const runErrorMessage = queryRequestIsDocument
       ? messageFromError(queryDocumentResult.error)
       : messageFromError(queryResult.error);
-    const key = [
-      activeTab.id,
-      activeQueryRequest.runId,
-      runErrorMessage ?? 'success',
-      queryRows.length,
-      activeLoadedPageCount,
-    ].join(':');
+    const key = [activeTab.id, activeQueryRequest.runId].join(':');
     if (!rememberQueryActivity(loggedQueryRuns.current, key)) return;
     onQueryActivity(firestoreQueryCompletionActivity({
       connectionId: activeTab.connectionId,
@@ -178,6 +176,7 @@ export function useFirestoreTabState(
     activeQueryRequest,
     activeTab,
     onQueryActivity,
+    pendingPageReloadCount,
     queryDocumentResult.error,
     queryDocumentResult.isFetching,
     queryDocumentResult.isLoading,

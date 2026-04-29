@@ -291,7 +291,7 @@ Schedulers should call the same commands as UI actions.
   - [x] notify policy
   - [x] cancellation policy
   - [x] serialization key
-- [x] Ensure Firestore query commands can run without opening a visible tab.
+- [x] Defer hidden Firestore query execution until a background query runner exists.
 - [x] Ensure mutation commands can choose whether to notify only on failure/conflict.
 - [x] Ensure Activity logging is shared between UI and scheduler commands.
 - [x] Add command tests for scheduler source.

@@ -125,16 +125,19 @@ export async function recordActivity(
 Commands should be callable by UI and non-UI sources.
 
 ```ts
-await commands.runFirestoreQuery({
+await commands.runJsQuery({
   connectionId,
-  query,
+  script,
   source: 'scheduler',
   visible: false,
   notifyOn: 'failure',
 });
 ```
 
-This makes scheduler behavior use the same workflow path as a user click.
+Only commands with a real execution adapter should support `visible: false`. For example,
+Firestore mutations and JavaScript Query can run in the background, but Firestore query reads
+must wait for a background query runner instead of storing hidden requests that React never
+executes.
 
 ### Stores
 
@@ -267,6 +270,7 @@ Every scheduled command must define:
 - serialization policy per project/tab/workflow
 
 Activity logging should happen in the command path so background and user actions are recorded consistently.
+Commands must not enqueue hidden work unless there is an execution path outside the active React tab.
 
 ## Migration Plan
 

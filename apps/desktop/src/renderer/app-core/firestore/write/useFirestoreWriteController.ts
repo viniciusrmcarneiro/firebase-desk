@@ -69,13 +69,13 @@ export interface FirestoreWriteController {
     documentPath: string,
     data: Record<string, unknown>,
     options?: FirestoreSaveDocumentOptions,
-  ) => Promise<FirestoreSaveDocumentResult | void>;
+  ) => Promise<FirestoreSaveDocumentResult>;
   readonly store: FirestoreWriteStore;
   readonly updateDocumentFields: (
     documentPath: string,
     operations: ReadonlyArray<FirestoreFieldPatchOperation>,
     options: FirestoreUpdateDocumentFieldsOptions,
-  ) => Promise<FirestoreUpdateDocumentFieldsResult | void>;
+  ) => Promise<FirestoreUpdateDocumentFieldsResult>;
 }
 
 export function useFirestoreWriteController(
@@ -118,7 +118,7 @@ export function useFirestoreWriteController(
         documentId,
         project,
       });
-      if (result?.notification) input.onStatus(result.notification);
+      if (result.notification) input.onStatus(result.notification);
     } catch (error) {
       input.onStatus(`Create failed: ${messageFromError(error, 'Could not create document.')}`);
       throw error;
@@ -129,7 +129,7 @@ export function useFirestoreWriteController(
     documentPath: string,
     data: Record<string, unknown>,
     options?: FirestoreSaveDocumentOptions,
-  ): Promise<FirestoreSaveDocumentResult | void> {
+  ): Promise<FirestoreSaveDocumentResult> {
     try {
       const result = await saveFirestoreDocumentCommand(store, env, {
         data,
@@ -137,8 +137,8 @@ export function useFirestoreWriteController(
         options,
         project,
       });
-      if (result?.notification) input.onStatus(result.notification);
-      return result?.result;
+      if (result.notification) input.onStatus(result.notification);
+      return result.result;
     } catch (error) {
       input.onStatus(`Save failed: ${messageFromError(error, 'Could not save document.')}`);
       throw error;
@@ -149,7 +149,7 @@ export function useFirestoreWriteController(
     documentPath: string,
     operations: ReadonlyArray<FirestoreFieldPatchOperation>,
     options: FirestoreUpdateDocumentFieldsOptions,
-  ): Promise<FirestoreUpdateDocumentFieldsResult | void> {
+  ): Promise<FirestoreUpdateDocumentFieldsResult> {
     try {
       const result = await updateFirestoreDocumentFieldsCommand(store, env, {
         documentPath,
@@ -157,8 +157,8 @@ export function useFirestoreWriteController(
         options,
         project,
       });
-      if (result?.notification) input.onStatus(result.notification);
-      return result?.result;
+      if (result.notification) input.onStatus(result.notification);
+      return result.result;
     } catch (error) {
       input.onStatus(`Update failed: ${messageFromError(error, 'Could not update fields.')}`);
       throw error;
@@ -175,7 +175,6 @@ export function useFirestoreWriteController(
         documentPath,
         project,
       });
-      if (!result) return;
       if (input.activeTab?.kind === 'firestore-query') {
         input.clearSelectedDocument(input.activeTab.id);
       }
