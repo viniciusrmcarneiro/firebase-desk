@@ -13,6 +13,19 @@ declare global {
     readonly check: (request: IpcRequest<'health.check'>) => Promise<IpcResponse<'health.check'>>;
   }
 
+  interface DesktopActivityApi {
+    readonly append: (
+      request: IpcRequest<'activity.append'>,
+    ) => Promise<IpcResponse<'activity.append'>>;
+    readonly clear: () => Promise<IpcResponse<'activity.clear'>>;
+    readonly export: (
+      request: IpcRequest<'activity.export'>,
+    ) => Promise<IpcResponse<'activity.export'>>;
+    readonly list: (
+      request: IpcRequest<'activity.list'>,
+    ) => Promise<IpcResponse<'activity.list'>>;
+  }
+
   interface DesktopProjectsApi {
     readonly list: () => Promise<IpcResponse<'projects.list'>>;
     readonly get: (request: IpcRequest<'projects.get'>) => Promise<IpcResponse<'projects.get'>>;
@@ -95,6 +108,7 @@ declare global {
 
   interface DesktopApi {
     readonly app: DesktopAppApi;
+    readonly activity: DesktopActivityApi;
     readonly health: DesktopHealthApi;
     readonly projects: DesktopProjectsApi;
     readonly settings: DesktopSettingsApi;

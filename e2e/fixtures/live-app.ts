@@ -10,17 +10,33 @@ export const FIRESTORE_PROJECT_ID = 'demo-local';
 export interface LiveApp {
   readonly app: ElectronApplication;
   readonly page: Page;
+  readonly userDataDir: string;
   readonly close: () => Promise<void>;
 }
 
-export async function openLiveApp(): Promise<LiveApp> {
+export interface OpenLiveAppOptions {
+  readonly activityExportFileName?: string;
+}
+
+export async function openLiveApp(options: OpenLiveAppOptions = {}): Promise<LiveApp> {
   const userDataDir = await mkdtemp(join(tmpdir(), 'firebase-desk-e2e-'));
-  const app = await launchDesktop({ args: ['--data-mode=live'], userDataDir });
+  const app = await launchDesktop({
+    args: ['--data-mode=live'],
+    ...(options.activityExportFileName
+      ? {
+        env: {
+          FIREBASE_DESK_ACTIVITY_EXPORT_PATH: join(userDataDir, options.activityExportFileName),
+        },
+      }
+      : {}),
+    userDataDir,
+  });
   const page = await app.firstWindow();
   await expect(page).toHaveTitle(/Firebase Desk/);
   return {
     app,
     page,
+    userDataDir,
     close: async () => {
       await app.close();
       await rm(userDataDir, { force: true, recursive: true });

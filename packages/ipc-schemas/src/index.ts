@@ -1,3 +1,4 @@
+export * from './activity.ts';
 export * from './auth.ts';
 export * from './channels.ts';
 export * from './firestore.ts';

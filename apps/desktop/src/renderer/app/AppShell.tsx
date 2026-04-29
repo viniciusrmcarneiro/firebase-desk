@@ -2,6 +2,7 @@ import type { AppearanceMode, DensityName } from '@firebase-desk/design-tokens';
 import { useHotkey } from '@firebase-desk/hotkeys';
 import {
   AccountTree,
+  ActivityDrawer,
   AuthUsersSurface,
   CommandPalette,
   type DeleteDocumentOptions,
@@ -19,6 +20,11 @@ import {
   WorkspaceTabStrip,
 } from '@firebase-desk/product-ui';
 import type {
+  ActivityLogAppendInput,
+  ActivityLogArea,
+  ActivityLogEntry,
+  ActivityLogListRequest,
+  ActivityLogStatus,
   AuthUser,
   FirestoreCollectionNode,
   FirestoreDocumentResult,
@@ -28,6 +34,7 @@ import type {
   ProjectSummary,
   ProjectUpdatePatch,
   ScriptRunResult,
+  SettingsPatch,
 } from '@firebase-desk/repo-contracts';
 import {
   Badge,
@@ -51,6 +58,7 @@ import {
   ArrowLeft,
   ArrowRight,
   Database,
+  ListChecks,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
@@ -60,7 +68,7 @@ import {
   Sun,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import appIconUrl from '../assets/app-icon.png';
 import { AddProjectDialog } from './dialogs/AddProjectDialog.tsx';
 import { EditProjectDialog } from './dialogs/EditProjectDialog.tsx';
@@ -143,6 +151,14 @@ export function AppShell(
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [credentialWarning, setCredentialWarning] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState('Ready');
+  const [activityOpen, setActivityOpen] = useState(false);
+  const [activityExpanded, setActivityExpanded] = useState(false);
+  const [activityEntries, setActivityEntries] = useState<ReadonlyArray<ActivityLogEntry>>([]);
+  const [activitySearch, setActivitySearch] = useState('');
+  const [activityArea, setActivityArea] = useState<ActivityLogArea | 'all'>('all');
+  const [activityStatus, setActivityStatus] = useState<ActivityLogStatus | 'all'>('all');
+  const [activityIsLoading, setActivityIsLoading] = useState(false);
+  const [latestActivityIssue, setLatestActivityIssue] = useState<ActivityLogEntry | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pendingDestructiveAction, setPendingDestructiveAction] = useState<
     DestructiveAction | null
@@ -151,6 +167,11 @@ export function AppShell(
     PendingCreateDocumentRequest | null
   >(null);
   const nextCreateDocumentRequestId = useRef(1);
+  const loggedFirestoreRuns = useRef<Set<string>>(new Set());
+  const loggedScriptRuns = useRef<Set<string>>(new Set());
+  const loggedAuthFailures = useRef<Set<string>>(new Set());
+  const activityOpenRef = useRef(false);
+  const activityListRequestRef = useRef<ActivityLogListRequest>({ limit: 200 });
   const firestoreTab = useFirestoreTabState({
     activeProject,
     activeTab,
@@ -182,10 +203,61 @@ export function AppShell(
     ? projects.find((project) => project.id === editingProjectId) ?? null
     : null;
   const sidebarDefaultWidth = clampSidebarWidth(initialSidebarWidth);
+  const activityListRequest = useMemo<ActivityLogListRequest>(() => ({
+    area: activityArea,
+    limit: 200,
+    search: activitySearch.trim() || undefined,
+    status: activityStatus,
+  }), [activityArea, activitySearch, activityStatus]);
+
+  const loadActivity = useCallback(async () => {
+    setActivityIsLoading(true);
+    try {
+      const entries = await repositories.activity.list(activityListRequest);
+      setActivityEntries(entries);
+      setLatestActivityIssue(entries.find(isActivityIssue) ?? null);
+    } catch (error) {
+      setLastAction(`Activity load failed: ${messageFromError(error, 'Could not load activity.')}`);
+    } finally {
+      setActivityIsLoading(false);
+    }
+  }, [activityListRequest, repositories.activity]);
+
+  const recordActivity = useCallback((input: ActivityLogAppendInput) => {
+    void repositories.activity.append(input)
+      .then((entry) => {
+        if (isActivityIssue(entry)) setLatestActivityIssue(entry);
+        setActivityEntries((current) =>
+          activityOpenRef.current
+            && activityEntryMatchesRequest(entry, activityListRequestRef.current)
+            ? [entry, ...current].slice(0, 200)
+            : current
+        );
+      })
+      .catch(() => {});
+  }, [repositories.activity]);
 
   useEffect(() => {
     document.documentElement.dataset.density = density;
   }, [density]);
+
+  useEffect(() => {
+    activityOpenRef.current = activityOpen;
+  }, [activityOpen]);
+
+  useEffect(() => {
+    activityListRequestRef.current = activityListRequest;
+  }, [activityListRequest]);
+
+  useEffect(() => {
+    void repositories.activity.list({ limit: 50 })
+      .then((entries) => setLatestActivityIssue(entries.find(isActivityIssue) ?? null))
+      .catch(() => {});
+  }, [repositories.activity]);
+
+  useEffect(() => {
+    if (activityOpen) void loadActivity();
+  }, [activityOpen, loadActivity]);
 
   useEffect(() => {
     savePersistedWorkspaceState({
@@ -217,6 +289,104 @@ export function AppShell(
     };
   }, [settingsOpen]);
 
+  useEffect(() => {
+    if (!activeTab || activeTab.kind !== 'firestore-query') return;
+    const runId = firestoreTab.activeQueryRunId;
+    const path = firestoreTab.activeQueryPath;
+    if (!runId || !path || firestoreTab.isLoading) return;
+
+    const key = `${activeTab.id}:${runId}`;
+    if (loggedFirestoreRuns.current.has(key)) return;
+    loggedFirestoreRuns.current.add(key);
+
+    const isDocument = firestoreTab.activeQueryIsDocument;
+    const errorMessage = firestoreTab.errorMessage;
+    recordActivity({
+      action: isDocument ? 'Read document' : 'Run query',
+      area: 'firestore',
+      ...(errorMessage ? { error: { message: errorMessage } } : {}),
+      metadata: {
+        loadedPages: firestoreTab.activeLoadedPageCount,
+        path,
+        resultCount: firestoreTab.queryRows.length,
+        ...queryDraftMetadata(firestoreTab.activeDraft),
+      },
+      status: errorMessage ? 'failure' : 'success',
+      summary: errorMessage
+        ? `Failed to load ${path}`
+        : `Loaded ${firestoreTab.queryRows.length} result${
+          firestoreTab.queryRows.length === 1 ? '' : 's'
+        } from ${path}`,
+      target: {
+        connectionId: activeTab.connectionId,
+        path,
+        type: isDocument ? 'firestore-document' : 'firestore-query',
+      },
+    });
+  }, [
+    activeTab,
+    firestoreTab.activeDraft,
+    firestoreTab.activeLoadedPageCount,
+    firestoreTab.activeQueryIsDocument,
+    firestoreTab.activeQueryPath,
+    firestoreTab.activeQueryRunId,
+    firestoreTab.errorMessage,
+    firestoreTab.isLoading,
+    firestoreTab.queryRows.length,
+    recordActivity,
+  ]);
+
+  useEffect(() => {
+    if (!activeTab || activeTab.kind !== 'auth-users' || !authTab.errorMessage) return;
+    const key = `${activeTab.id}:${authTab.authFilter}:${authTab.errorMessage}`;
+    if (loggedAuthFailures.current.has(key)) return;
+    loggedAuthFailures.current.add(key);
+    recordActivity({
+      action: authTab.authFilter.trim() ? 'Search users' : 'Load users',
+      area: 'auth',
+      error: { message: authTab.errorMessage },
+      metadata: { filter: authTab.authFilter.trim() || null },
+      status: 'failure',
+      summary: authTab.errorMessage,
+      target: { connectionId: activeTab.connectionId, type: 'auth-user' },
+    });
+  }, [activeTab, authTab.authFilter, authTab.errorMessage, recordActivity]);
+
+  useEffect(() => {
+    if (!activeTab || activeTab.kind !== 'js-query' || !jsTab.scriptRunId || !jsTab.scriptResult) {
+      return;
+    }
+    if (loggedScriptRuns.current.has(jsTab.scriptRunId)) return;
+    loggedScriptRuns.current.add(jsTab.scriptRunId);
+    const result = jsTab.scriptResult;
+    const status: ActivityLogStatus = result.cancelled
+      ? 'cancelled'
+      : result.errors.length > 0
+      ? 'failure'
+      : 'success';
+    recordActivity({
+      action: result.cancelled ? 'Cancel JavaScript query' : 'Run JavaScript query',
+      area: 'js-query',
+      ...(result.errors[0] ? { error: result.errors[0] } : {}),
+      durationMs: result.durationMs,
+      metadata: {
+        errorCount: result.errors.length,
+        logCount: result.logs.length,
+        outputCount: result.stream?.length ?? 0,
+      },
+      payload: { source: jsTab.scriptSource },
+      status,
+      summary: result.cancelled
+        ? 'JavaScript query cancelled'
+        : result.errors.length > 0
+        ? `JavaScript query failed with ${result.errors.length} error${
+          result.errors.length === 1 ? '' : 's'
+        }`
+        : 'JavaScript query completed',
+      target: { connectionId: activeTab.connectionId, type: 'script' },
+    });
+  }, [activeTab, jsTab.scriptResult, jsTab.scriptRunId, jsTab.scriptSource, recordActivity]);
+
   const tabModels = useMemo<ReadonlyArray<WorkspaceTabModel>>(
     () =>
       tabsState.tabs.map((tab) => ({
@@ -243,8 +413,7 @@ export function AppShell(
     {
       id: 'theme',
       label: 'Toggle theme',
-      onSelect: () =>
-        void appearance.setMode(appearance.resolvedTheme === 'dark' ? 'light' : 'dark'),
+      onSelect: () => handleThemeChange(appearance.resolvedTheme === 'dark' ? 'light' : 'dark'),
     },
     { id: 'focus-tree', label: 'Focus tree filter', onSelect: focusTreeFilter },
     { id: 'run-query', label: 'Run query', onSelect: handleRunQuery },
@@ -417,10 +586,35 @@ export function AppShell(
       confirmLabel: 'Remove',
       description: `Remove ${project?.name ?? 'this project'} from the workspace tree?`,
       onConfirm: () => {
-        void repositories.projects.remove(connectionId).then(() =>
-          queryClient.invalidateQueries({ queryKey: ['projects'] })
-        );
-        setLastAction(`Removed ${project?.name ?? 'project'}`);
+        const startedAt = Date.now();
+        void repositories.projects.remove(connectionId)
+          .then(async () => {
+            await queryClient.invalidateQueries({ queryKey: ['projects'] });
+            setLastAction(`Removed ${project?.name ?? 'project'}`);
+            recordActivity({
+              action: 'Remove account',
+              area: 'projects',
+              durationMs: elapsedMs(startedAt),
+              metadata: { connectionId, projectId: project?.projectId ?? null },
+              status: 'success',
+              summary: `Removed ${project?.name ?? 'project'}`,
+              target: projectTarget(project ?? null),
+            });
+          })
+          .catch((error) => {
+            const message = messageFromError(error, 'Could not remove project.');
+            setLastAction(`Remove failed: ${message}`);
+            recordActivity({
+              action: 'Remove account',
+              area: 'projects',
+              durationMs: elapsedMs(startedAt),
+              error: { message },
+              metadata: { connectionId, projectId: project?.projectId ?? null },
+              status: 'failure',
+              summary: message,
+              target: projectTarget(project ?? null),
+            });
+          });
       },
       title: 'Remove project',
     });
@@ -467,25 +661,126 @@ export function AppShell(
   }
 
   async function handleAddProject(input: ProjectAddInput): Promise<ProjectSummary> {
-    const project = await repositories.projects.add(input);
-    await queryClient.invalidateQueries({ queryKey: ['projects'] });
-    setLastAction(`Added ${project.name}`);
-    return project;
+    const startedAt = Date.now();
+    try {
+      const project = await repositories.projects.add(input);
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
+      setLastAction(`Added ${project.name}`);
+      recordActivity({
+        action: 'Add account',
+        area: 'projects',
+        durationMs: elapsedMs(startedAt),
+        metadata: {
+          name: project.name,
+          projectId: project.projectId,
+          target: project.target,
+        },
+        status: 'success',
+        summary: `Added ${project.name}`,
+        target: projectTarget(project),
+      });
+      return project;
+    } catch (error) {
+      const message = messageFromError(error, 'Could not add project.');
+      recordActivity({
+        action: 'Add account',
+        area: 'projects',
+        durationMs: elapsedMs(startedAt),
+        error: { message },
+        metadata: {
+          hasCredential: Boolean(input.credentialJson),
+          name: input.name,
+          projectId: input.projectId,
+          target: input.target,
+        },
+        status: 'failure',
+        summary: message,
+      });
+      throw error;
+    }
   }
 
   async function handleUpdateProject(
     id: string,
     patch: ProjectUpdatePatch,
   ): Promise<ProjectSummary> {
-    const project = await repositories.projects.update(id, patch);
-    await queryClient.invalidateQueries({ queryKey: ['projects'] });
-    setLastAction(`Updated ${project.name}`);
-    return project;
+    const startedAt = Date.now();
+    try {
+      const project = await repositories.projects.update(id, patch);
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
+      setLastAction(`Updated ${project.name}`);
+      recordActivity({
+        action: 'Update account',
+        area: 'projects',
+        durationMs: elapsedMs(startedAt),
+        metadata: {
+          changedKeys: Object.keys(patch).filter((key) => key !== 'credentialJson'),
+          projectId: project.projectId,
+          target: project.target,
+        },
+        status: 'success',
+        summary: `Updated ${project.name}`,
+        target: projectTarget(project),
+      });
+      return project;
+    } catch (error) {
+      const message = messageFromError(error, 'Could not update project.');
+      recordActivity({
+        action: 'Update account',
+        area: 'projects',
+        durationMs: elapsedMs(startedAt),
+        error: { message },
+        metadata: {
+          changedKeys: Object.keys(patch).filter((key) => key !== 'credentialJson'),
+          projectId: id,
+        },
+        status: 'failure',
+        summary: message,
+      });
+      throw error;
+    }
   }
 
   function handleRunQuery() {
     const path = firestoreTab.runQuery();
     if (path) setLastAction(`Ran query ${path}`);
+  }
+
+  function handleRefreshResults() {
+    const path = firestoreTab.refreshQuery();
+    if (path) setLastAction(`Refreshed results ${path}`);
+  }
+
+  function handleLoadMoreFirestore() {
+    const startedAt = Date.now();
+    firestoreTab.loadMore();
+    recordActivity({
+      action: 'Load more results',
+      area: 'firestore',
+      durationMs: elapsedMs(startedAt),
+      metadata: queryDraftMetadata(firestoreTab.activeDraft),
+      status: 'success',
+      summary: `Requested more results from ${firestoreTab.activeDraft.path}`,
+      target: {
+        connectionId: activeTab?.connectionId,
+        path: firestoreTab.activeDraft.path,
+        type: 'firestore-query',
+      },
+    });
+  }
+
+  function handleLoadMoreUsers() {
+    const startedAt = Date.now();
+    authTab.loadMore();
+    recordActivity({
+      action: 'Load more users',
+      area: 'auth',
+      durationMs: elapsedMs(startedAt),
+      metadata: { filter: authTab.authFilter.trim() || null },
+      status: 'success',
+      summary: 'Requested more Authentication users',
+      target: { connectionId: activeTab?.connectionId, type: 'auth-user' },
+    });
   }
 
   function handleRunScript() {
@@ -575,8 +870,8 @@ export function AppShell(
         onDeleteDocument={(path, options) => handleDeleteDocument(path, options)}
         onDraftChange={firestoreTab.setDraft}
         onGenerateDocumentId={handleGenerateDocumentId}
-        onLoadMore={firestoreTab.loadMore}
-        onLoadMoreUsers={authTab.loadMore}
+        onLoadMore={handleLoadMoreFirestore}
+        onLoadMoreUsers={handleLoadMoreUsers}
         onLoadSubcollections={handleLoadSubcollections}
         onOpenDocumentInNewTab={(path) => {
           const tabId = openFirestoreTabInNewTab(activeTab.connectionId, path);
@@ -588,11 +883,11 @@ export function AppShell(
           setLastAction(`Opened ${path} in new tab`);
         }}
         onReset={firestoreTab.resetDraft}
-        onRefreshResults={firestoreTab.refreshQuery}
+        onRefreshResults={handleRefreshResults}
         onRunQuery={handleRunQuery}
         onRunScript={handleRunScript}
         onSaveDocument={(path, data, options) => handleSaveDocument(path, data, options)}
-        onSaveUserCustomClaims={authTab.saveCustomClaims}
+        onSaveUserCustomClaims={handleSaveUserCustomClaims}
         onScriptChange={jsTab.setScriptSource}
         onSelectDocument={(path) => firestoreTab.selectDocument(activeTab.id, path)}
         onSelectUser={(uid) => selectionActions.selectAuthUser(uid)}
@@ -692,8 +987,20 @@ export function AppShell(
 
   function handleRefreshActiveTab() {
     if (!activeTab) return;
+    const startedAt = Date.now();
     if (activeTab.kind === 'firestore-query') handleRunQuery();
-    if (activeTab.kind === 'auth-users') authTab.refetch();
+    if (activeTab.kind === 'auth-users') {
+      authTab.refetch();
+      recordActivity({
+        action: 'Refresh users',
+        area: 'auth',
+        durationMs: elapsedMs(startedAt),
+        metadata: { filter: authTab.authFilter.trim() || null },
+        status: 'success',
+        summary: 'Requested Authentication refresh',
+        target: { connectionId: activeTab.connectionId, type: 'auth-user' },
+      });
+    }
     if (activeTab.kind === 'js-query') handleRunScript();
     setLastAction(`Refreshed ${activeTab.title}`);
   }
@@ -713,6 +1020,8 @@ export function AppShell(
     data: Record<string, unknown>,
   ) {
     if (!activeProject) return;
+    const startedAt = Date.now();
+    const documentPath = collectionPath ? `${collectionPath}/${documentId}` : documentId;
     try {
       const document = await repositories.firestore.createDocument(
         activeProject.id,
@@ -722,9 +1031,48 @@ export function AppShell(
       );
       if (dataMode !== 'mock') await queryClient.invalidateQueries({ queryKey: ['firestore'] });
       setLastAction(`Created ${document.path}`);
+      recordActivity({
+        action: 'Create document',
+        area: 'firestore',
+        durationMs: elapsedMs(startedAt),
+        metadata: {
+          collectionPath,
+          documentId,
+          ...documentDataMetadata(data),
+        },
+        payload: { data },
+        status: 'success',
+        summary: `Created ${document.path}`,
+        target: {
+          connectionId: activeProject.id,
+          path: document.path,
+          projectId: activeProject.projectId,
+          type: 'firestore-document',
+        },
+      });
     } catch (error) {
       const message = messageFromError(error, 'Could not create document.');
       setLastAction(`Create failed: ${message}`);
+      recordActivity({
+        action: 'Create document',
+        area: 'firestore',
+        durationMs: elapsedMs(startedAt),
+        error: { message },
+        metadata: {
+          collectionPath,
+          documentId,
+          ...documentDataMetadata(data),
+        },
+        payload: { data },
+        status: 'failure',
+        summary: message,
+        target: {
+          connectionId: activeProject.id,
+          path: documentPath,
+          projectId: activeProject.projectId,
+          type: 'firestore-document',
+        },
+      });
       throw error instanceof Error ? error : new Error(message);
     }
   }
@@ -735,6 +1083,7 @@ export function AppShell(
     options?: FirestoreSaveDocumentOptions,
   ): Promise<FirestoreSaveDocumentResult | void> {
     if (!activeProject) return;
+    const startedAt = Date.now();
     try {
       const result = await repositories.firestore.saveDocument(
         activeProject.id,
@@ -744,14 +1093,71 @@ export function AppShell(
       );
       if (result.status === 'conflict') {
         setLastAction(`Save conflict: ${documentPath}`);
+        recordActivity({
+          action: 'Save document',
+          area: 'firestore',
+          durationMs: elapsedMs(startedAt),
+          metadata: {
+            lastUpdateTime: options?.lastUpdateTime ?? null,
+            remoteUpdateTime: result.remoteDocument?.updateTime ?? null,
+            ...documentDataMetadata(data),
+          },
+          payload: { data },
+          status: 'conflict',
+          summary: `Save conflict on ${documentPath}`,
+          target: {
+            connectionId: activeProject.id,
+            path: documentPath,
+            projectId: activeProject.projectId,
+            type: 'firestore-document',
+          },
+        });
         return result;
       }
       if (dataMode !== 'mock') await queryClient.invalidateQueries({ queryKey: ['firestore'] });
       setLastAction(`Saved ${result.document.path}`);
+      recordActivity({
+        action: 'Save document',
+        area: 'firestore',
+        durationMs: elapsedMs(startedAt),
+        metadata: {
+          lastUpdateTime: options?.lastUpdateTime ?? null,
+          updateTime: result.document.updateTime ?? null,
+          ...documentDataMetadata(data),
+        },
+        payload: { data },
+        status: 'success',
+        summary: `Saved ${result.document.path}`,
+        target: {
+          connectionId: activeProject.id,
+          path: result.document.path,
+          projectId: activeProject.projectId,
+          type: 'firestore-document',
+        },
+      });
       return result;
     } catch (error) {
       const message = messageFromError(error, 'Could not save document.');
       setLastAction(`Save failed: ${message}`);
+      recordActivity({
+        action: 'Save document',
+        area: 'firestore',
+        durationMs: elapsedMs(startedAt),
+        error: { message },
+        metadata: {
+          lastUpdateTime: options?.lastUpdateTime ?? null,
+          ...documentDataMetadata(data),
+        },
+        payload: { data },
+        status: 'failure',
+        summary: message,
+        target: {
+          connectionId: activeProject.id,
+          path: documentPath,
+          projectId: activeProject.projectId,
+          type: 'firestore-document',
+        },
+      });
       throw error instanceof Error ? error : new Error(message);
     }
   }
@@ -761,6 +1167,7 @@ export function AppShell(
     options: DeleteDocumentOptions,
   ) {
     if (!activeProject || !activeTab) return;
+    const startedAt = Date.now();
     try {
       await repositories.firestore.deleteDocument(activeProject.id, documentPath, {
         deleteSubcollectionPaths: options.deleteSubcollectionPaths,
@@ -768,9 +1175,90 @@ export function AppShell(
       if (dataMode !== 'mock') await queryClient.invalidateQueries({ queryKey: ['firestore'] });
       firestoreTab.selectDocument(activeTab.id, null);
       setLastAction(`Deleted ${documentPath}`);
+      recordActivity({
+        action: 'Delete document',
+        area: 'firestore',
+        durationMs: elapsedMs(startedAt),
+        metadata: {
+          deleteSubcollectionPaths: options.deleteSubcollectionPaths,
+        },
+        status: 'success',
+        summary: `Deleted ${documentPath}`,
+        target: {
+          connectionId: activeProject.id,
+          path: documentPath,
+          projectId: activeProject.projectId,
+          type: 'firestore-document',
+        },
+      });
     } catch (error) {
       const message = messageFromError(error, 'Could not delete document.');
       setLastAction(`Delete failed: ${message}`);
+      recordActivity({
+        action: 'Delete document',
+        area: 'firestore',
+        durationMs: elapsedMs(startedAt),
+        error: { message },
+        metadata: {
+          deleteSubcollectionPaths: options.deleteSubcollectionPaths,
+        },
+        status: 'failure',
+        summary: message,
+        target: {
+          connectionId: activeProject.id,
+          path: documentPath,
+          projectId: activeProject.projectId,
+          type: 'firestore-document',
+        },
+      });
+      throw error instanceof Error ? error : new Error(message);
+    }
+  }
+
+  async function handleSaveUserCustomClaims(
+    uid: string,
+    claims: Record<string, unknown>,
+  ): Promise<void> {
+    if (!activeProject) {
+      await authTab.saveCustomClaims(uid, claims);
+      return;
+    }
+    const startedAt = Date.now();
+    try {
+      await authTab.saveCustomClaims(uid, claims);
+      recordActivity({
+        action: 'Save custom claims',
+        area: 'auth',
+        durationMs: elapsedMs(startedAt),
+        metadata: documentDataMetadata(claims),
+        payload: { claims },
+        status: 'success',
+        summary: `Saved custom claims for ${uid}`,
+        target: {
+          connectionId: activeProject.id,
+          projectId: activeProject.projectId,
+          type: 'auth-user',
+          uid,
+        },
+      });
+    } catch (error) {
+      const message = messageFromError(error, 'Could not save custom claims.');
+      recordActivity({
+        action: 'Save custom claims',
+        area: 'auth',
+        durationMs: elapsedMs(startedAt),
+        error: { message },
+        metadata: documentDataMetadata(claims),
+        payload: { claims },
+        status: 'failure',
+        summary: message,
+        target: {
+          connectionId: activeProject.id,
+          projectId: activeProject.projectId,
+          type: 'auth-user',
+          uid,
+        },
+      });
       throw error instanceof Error ? error : new Error(message);
     }
   }
@@ -789,6 +1277,106 @@ export function AppShell(
     setLastAction('Opened data location');
   }
 
+  function handleThemeChange(mode: AppearanceMode) {
+    const startedAt = Date.now();
+    void appearance.setMode(mode)
+      .then(() => {
+        recordActivity({
+          action: 'Change theme',
+          area: 'settings',
+          durationMs: elapsedMs(startedAt),
+          metadata: { mode },
+          status: 'success',
+          summary: `Theme changed to ${mode}`,
+          target: { type: 'settings' },
+        });
+      })
+      .catch((error) => {
+        const message = messageFromError(error, 'Could not change theme.');
+        setLastAction(`Theme failed: ${message}`);
+        recordActivity({
+          action: 'Change theme',
+          area: 'settings',
+          durationMs: elapsedMs(startedAt),
+          error: { message },
+          metadata: { mode },
+          status: 'failure',
+          summary: message,
+          target: { type: 'settings' },
+        });
+      });
+  }
+
+  function handleSettingsSaved(patch: SettingsPatch) {
+    recordActivity({
+      action: 'Update settings',
+      area: 'settings',
+      metadata: settingsPatchMetadata(patch),
+      status: 'success',
+      summary: settingsPatchSummary(patch),
+      target: { type: 'settings' },
+    });
+  }
+
+  function handleClearActivity() {
+    requestDestructiveAction({
+      confirmLabel: 'Clear',
+      description: 'Clear local Activity entries?',
+      onConfirm: () => {
+        void repositories.activity.clear()
+          .then(() => {
+            setActivityEntries([]);
+            setLatestActivityIssue(null);
+            setLastAction('Cleared activity');
+          })
+          .catch((error) => {
+            setLastAction(
+              `Activity clear failed: ${messageFromError(error, 'Could not clear activity.')}`,
+            );
+          });
+      },
+      title: 'Clear activity',
+    });
+  }
+
+  function handleExportActivity() {
+    void repositories.activity.export(activityListRequest)
+      .then((result) => {
+        if (!result.canceled) setLastAction(`Exported activity ${result.filePath ?? ''}`.trim());
+      })
+      .catch((error) => {
+        setLastAction(
+          `Activity export failed: ${messageFromError(error, 'Could not export activity.')}`,
+        );
+      });
+  }
+
+  function handleOpenActivityTarget(entry: ActivityLogEntry) {
+    const target = entry.target;
+    if (!target?.connectionId) return;
+    if (target.type === 'firestore-document' || target.type === 'firestore-query') {
+      const path = target.path ?? '';
+      if (!path) return;
+      const tabId = openFirestoreTab(target.connectionId, path);
+      tabActions.recordInteraction({
+        activeTabId: tabId,
+        path,
+        selectedTreeItemId: selection.treeItemId,
+      });
+      setLastAction(`Opened ${path}`);
+      return;
+    }
+    if (target.type === 'auth-user') {
+      const tabId = openToolTab('auth-users', target.connectionId);
+      selectionActions.selectAuthUser(target.uid ?? null);
+      tabActions.recordInteraction({
+        activeTabId: tabId,
+        selectedTreeItemId: selection.treeItemId,
+      });
+      setLastAction(target.uid ? `Opened ${target.uid}` : 'Opened Authentication');
+    }
+  }
+
   const desktopAppApi = getDesktopAppApi();
 
   return (
@@ -802,7 +1390,7 @@ export function AppShell(
         onAddProject={() => setAddProjectOpen(true)}
         onBack={handleBackInteraction}
         onForward={handleForwardInteraction}
-        onModeChange={(mode) => void appearance.setMode(mode)}
+        onModeChange={handleThemeChange}
         onOpenSettings={() => setSettingsOpen(true)}
       />
       <ResizablePanelGroup direction='horizontal' className='h-full min-h-0'>
@@ -850,7 +1438,7 @@ export function AppShell(
         </ResizablePanel>
         <ResizableHandle className='h-full w-px' />
         <ResizablePanel className='h-full' minSize={`${MIN_WORKSPACE_WIDTH}px`}>
-          <div className='grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto]'>
+          <div className='grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto_auto]'>
             <WorkspaceShell
               className='h-full min-h-0'
               tabStrip={
@@ -913,6 +1501,23 @@ export function AppShell(
                 {activeView}
               </RenderErrorBoundary>
             </WorkspaceShell>
+            <ActivityDrawer
+              area={activityArea}
+              entries={activityEntries}
+              expanded={activityExpanded}
+              isLoading={activityIsLoading}
+              open={activityOpen}
+              search={activitySearch}
+              status={activityStatus}
+              onAreaChange={setActivityArea}
+              onClear={handleClearActivity}
+              onClose={() => setActivityOpen(false)}
+              onExport={handleExportActivity}
+              onExpandedChange={setActivityExpanded}
+              onOpenTarget={handleOpenActivityTarget}
+              onSearchChange={setActivitySearch}
+              onStatusChange={setActivityStatus}
+            />
             <StatusBar
               left={
                 <>
@@ -923,7 +1528,27 @@ export function AppShell(
                   <span>{selection.treeItemId ?? 'No tree selection'}</span>
                 </>
               }
-              right={<span>{lastAction}</span>}
+              right={
+                <>
+                  <Button
+                    aria-pressed={activityOpen}
+                    size='xs'
+                    variant={activityButtonVariant(latestActivityIssue)}
+                    onClick={() => setActivityOpen((current) => !current)}
+                  >
+                    <ListChecks size={13} aria-hidden='true' />
+                    Activity
+                    {latestActivityIssue
+                      ? (
+                        <Badge variant={activityIssueBadgeVariant(latestActivityIssue.status)}>
+                          {latestActivityIssue.status}
+                        </Badge>
+                      )
+                      : null}
+                  </Button>
+                  <span>{lastAction}</span>
+                </>
+              }
             />
           </div>
         </ResizablePanel>
@@ -936,6 +1561,7 @@ export function AppShell(
         open={settingsOpen}
         onDensityChange={setDensity}
         onOpenChange={setSettingsOpen}
+        onSettingsSaved={handleSettingsSaved}
       />
       <DestructiveActionDialog
         action={pendingDestructiveAction}
@@ -1313,4 +1939,112 @@ function persistSidebarWidth(repositories: RepositorySet, size: number) {
 function messageFromError(error: unknown, fallback: string): string {
   if (error instanceof Error) return error.message;
   return fallback;
+}
+
+function isActivityIssue(entry: ActivityLogEntry): boolean {
+  return entry.status === 'failure' || entry.status === 'conflict';
+}
+
+function activityEntryMatchesRequest(
+  entry: ActivityLogEntry,
+  request: ActivityLogListRequest,
+): boolean {
+  if (request.area && request.area !== 'all' && entry.area !== request.area) return false;
+  if (request.status && request.status !== 'all' && entry.status !== request.status) return false;
+  const search = request.search?.trim().toLowerCase();
+  if (!search) return true;
+  return [
+    entry.action,
+    entry.area,
+    entry.status,
+    entry.summary,
+    entry.target?.label,
+    entry.target?.path,
+    entry.target?.uid,
+    entry.error?.message,
+  ].some((value) => value?.toLowerCase().includes(search));
+}
+
+function activityButtonVariant(
+  entry: ActivityLogEntry | null,
+): 'danger' | 'secondary' | 'warning' {
+  if (entry?.status === 'failure') return 'danger';
+  if (entry?.status === 'conflict') return 'warning';
+  return 'secondary';
+}
+
+function activityIssueBadgeVariant(status: ActivityLogStatus): 'danger' | 'neutral' | 'warning' {
+  if (status === 'failure') return 'danger';
+  if (status === 'conflict') return 'warning';
+  return 'neutral';
+}
+
+function elapsedMs(startedAt: number): number {
+  return Math.max(0, Date.now() - startedAt);
+}
+
+function queryDraftMetadata(draft: FirestoreQueryDraft): Record<string, unknown> {
+  return {
+    filters: (draft.filters ?? []).map((filter) => ({
+      field: filter.field,
+      op: filter.op,
+      valueType: valueKind(filter.value),
+    })),
+    limit: draft.limit,
+    path: draft.path,
+    sort: draft.sortField
+      ? { direction: draft.sortDirection, field: draft.sortField }
+      : null,
+  };
+}
+
+function documentDataMetadata(data: Record<string, unknown>): Record<string, unknown> {
+  return {
+    fieldCount: Object.keys(data).length,
+    fields: Object.fromEntries(
+      Object.entries(data).map(([field, value]) => [field, valueKind(value)]),
+    ),
+  };
+}
+
+function valueKind(value: unknown): string {
+  if (value === null) return 'null';
+  if (Array.isArray(value)) return 'array';
+  if (typeof value === 'object') {
+    const type = (value as { readonly __type__?: unknown; }).__type__;
+    return typeof type === 'string' ? type : 'map';
+  }
+  return typeof value;
+}
+
+function projectTarget(project: ProjectSummary | null): ActivityLogEntry['target'] {
+  if (!project) return undefined;
+  return {
+    connectionId: project.id,
+    label: project.name,
+    projectId: project.projectId,
+    type: 'project',
+  };
+}
+
+function settingsPatchMetadata(patch: SettingsPatch): Record<string, unknown> {
+  return {
+    changedKeys: Object.keys(patch),
+    ...(patch.dataMode ? { dataMode: patch.dataMode } : {}),
+    ...(patch.activityLog
+      ? {
+        activityLog: {
+          detailMode: patch.activityLog.detailMode,
+          enabled: patch.activityLog.enabled,
+          maxBytes: patch.activityLog.maxBytes,
+        },
+      }
+      : {}),
+  };
+}
+
+function settingsPatchSummary(patch: SettingsPatch): string {
+  if (patch.dataMode) return `Data mode changed to ${patch.dataMode}`;
+  if (patch.activityLog) return 'Activity settings changed';
+  return 'Settings changed';
 }

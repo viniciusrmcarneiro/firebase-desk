@@ -1,11 +1,14 @@
 import type {
+  ActivityLogSettings,
   HotkeyOverrides,
   SettingsPatch,
   SettingsRepository,
   SettingsSnapshot,
 } from '@firebase-desk/repo-contracts';
+import { DEFAULT_ACTIVITY_LOG_SETTINGS } from '@firebase-desk/repo-contracts';
 
 const DEFAULT_SNAPSHOT: SettingsSnapshot = {
+  activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
   sidebarWidth: 320,
   inspectorWidth: 360,
   theme: 'system',
@@ -24,6 +27,9 @@ export class MockSettingsRepository implements SettingsRepository {
 
   async save(patch: SettingsPatch): Promise<SettingsSnapshot> {
     this.snapshot = {
+      activityLog: patch.activityLog ? cloneActivityLogSettings(patch.activityLog) : {
+        ...this.snapshot.activityLog,
+      },
       sidebarWidth: patch.sidebarWidth ?? this.snapshot.sidebarWidth,
       inspectorWidth: patch.inspectorWidth ?? this.snapshot.inspectorWidth,
       theme: patch.theme ?? this.snapshot.theme,
@@ -53,10 +59,15 @@ export class MockSettingsRepository implements SettingsRepository {
 function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
   return {
     ...snapshot,
+    activityLog: cloneActivityLogSettings(snapshot.activityLog),
     hotkeyOverrides: { ...snapshot.hotkeyOverrides },
     resultTableLayouts: cloneResultTableLayouts(snapshot.resultTableLayouts),
     firestoreFieldCatalogs: cloneFirestoreFieldCatalogs(snapshot.firestoreFieldCatalogs),
   };
+}
+
+function cloneActivityLogSettings(settings: ActivityLogSettings): ActivityLogSettings {
+  return { ...settings };
 }
 
 function cloneResultTableLayouts(

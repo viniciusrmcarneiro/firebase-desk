@@ -31,9 +31,11 @@ import { existsSync } from 'node:fs';
 import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
+import { MainActivityLogRepository } from '../activity/main-activity-log-repository.ts';
 import { resolveDataMode } from '../app/data-mode.ts';
 import { MainProjectsRepository } from '../projects/main-projects-repository.ts';
 import { MainSettingsRepository } from '../settings/main-settings-repository.ts';
+import { ActivityLogStore } from '../storage/activity-log-store.ts';
 import { CredentialsStore } from '../storage/credentials-store.ts';
 import { ProjectsStore } from '../storage/projects-store.ts';
 import { SettingsStore } from '../storage/settings-store.ts';
@@ -55,6 +57,23 @@ const ipcLogger: IpcLogger = {
 export function registerIpcHandlers(): void {
   const userDataPath = app.getPath('userData');
   const settingsRepository = new MainSettingsRepository(new SettingsStore(userDataPath));
+  const activityLogRepository = new MainActivityLogRepository(
+    new ActivityLogStore(userDataPath),
+    settingsRepository,
+    {
+      showSaveDialog: () =>
+        process.env['FIREBASE_DESK_ACTIVITY_EXPORT_PATH']
+          ? Promise.resolve({
+            canceled: false,
+            filePath: process.env['FIREBASE_DESK_ACTIVITY_EXPORT_PATH'],
+          })
+          : dialog.showSaveDialog({
+            defaultPath: 'firebase-desk-activity.jsonl',
+            filters: [{ name: 'JSON Lines', extensions: ['jsonl'] }],
+            title: 'Export activity',
+          }),
+    },
+  );
   const projectsStore = new ProjectsStore(userDataPath);
   const credentialsStore = new CredentialsStore(userDataPath);
   const projectsRepository = new MainProjectsRepository(projectsStore, credentialsStore);
@@ -91,6 +110,12 @@ export function registerIpcHandlers(): void {
       const errorMessage = await shell.openPath(userDataPath);
       if (errorMessage) throw new Error(errorMessage);
     },
+    'activity.append': (request) => activityLogRepository.append(request),
+    'activity.clear': async () => {
+      await activityLogRepository.clear();
+    },
+    'activity.export': (request) => activityLogRepository.export(request),
+    'activity.list': async (request) => [...await activityLogRepository.list(request)],
     'projects.list': async () => [...await projectsRepository.list()],
     'projects.get': ({ id }) => projectsRepository.get(id),
     'projects.add': (request) => projectsRepository.add(request),
@@ -172,7 +197,11 @@ export function registerIpcHandlers(): void {
     'auth.setCustomClaims': async ({ claims, projectId, uid }) =>
       toIpcAuthUser(await authRepository.setCustomClaims(projectId, uid, claims)),
     'settings.load': () => settingsRepository.load(),
-    'settings.save': (request) => settingsRepository.save(request),
+    'settings.save': async (request) => {
+      const snapshot = await settingsRepository.save(request);
+      if (request.activityLog?.maxBytes !== undefined) await activityLogRepository.prune();
+      return snapshot;
+    },
     'settings.getHotkeyOverrides': () => settingsRepository.getHotkeyOverrides(),
     'settings.setHotkeyOverrides': async (request) => {
       await settingsRepository.setHotkeyOverrides(request);

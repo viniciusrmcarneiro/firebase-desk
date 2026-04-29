@@ -90,6 +90,87 @@ describe('SettingsDialog', () => {
     await waitFor(async () => expect((await settings.load()).dataMode).toBe('live'));
   });
 
+  it('updates activity settings and notifies saves', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    const onSettingsSaved = vi.fn();
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} onSettingsSaved={onSettingsSaved} />
+      </AppearanceProvider>,
+    );
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Activity logging' }));
+    await waitFor(async () => expect((await settings.load()).activityLog.enabled).toBe(false));
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Activity retention MB' }), {
+      target: { value: '8' },
+    });
+    fireEvent.blur(screen.getByRole('spinbutton', { name: 'Activity retention MB' }));
+
+    await waitFor(async () =>
+      expect((await settings.load()).activityLog.maxBytes).toBe(
+        8 * 1024 * 1024,
+      )
+    );
+    expect(onSettingsSaved).toHaveBeenCalled();
+  });
+
+  it('keeps full payload detail when another activity setting saves before rerender', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    const { rerender } = render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    fireEvent.change(await screen.findByRole('combobox', { name: 'Activity detail' }), {
+      target: { value: 'fullPayload' },
+    });
+    fireEvent.change(screen.getByRole('spinbutton', { name: 'Activity retention MB' }), {
+      target: { value: '8' },
+    });
+    fireEvent.blur(screen.getByRole('spinbutton', { name: 'Activity retention MB' }));
+
+    await waitFor(async () =>
+      expect((await settings.load()).activityLog).toMatchObject({
+        detailMode: 'fullPayload',
+        maxBytes: 8 * 1024 * 1024,
+      })
+    );
+
+    rerender(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open={false} onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+    rerender(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    await waitFor(() =>
+      expect(
+        (screen.getByRole('combobox', { name: 'Activity detail' }) as HTMLSelectElement).value,
+      ).toBe('fullPayload')
+    );
+  });
+
   it('shows settings save failures', async () => {
     vi.stubGlobal(
       'matchMedia',

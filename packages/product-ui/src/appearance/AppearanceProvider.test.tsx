@@ -4,12 +4,14 @@ import type {
   SettingsRepository,
   SettingsSnapshot,
 } from '@firebase-desk/repo-contracts';
+import { DEFAULT_ACTIVITY_LOG_SETTINGS } from '@firebase-desk/repo-contracts';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AppearanceProvider, useAppearance } from './AppearanceProvider.tsx';
 
 class TestSettingsRepository implements SettingsRepository {
   snapshot: SettingsSnapshot = {
+    activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
     hotkeyOverrides: {},
     inspectorWidth: 360,
     sidebarWidth: 280,
@@ -30,6 +32,7 @@ class TestSettingsRepository implements SettingsRepository {
       theme: patch.theme ?? this.snapshot.theme,
       dataMode: patch.dataMode ?? this.snapshot.dataMode,
       hotkeyOverrides: patch.hotkeyOverrides ?? this.snapshot.hotkeyOverrides,
+      activityLog: patch.activityLog ?? this.snapshot.activityLog,
       resultTableLayouts: patch.resultTableLayouts ?? this.snapshot.resultTableLayouts,
       firestoreFieldCatalogs: patch.firestoreFieldCatalogs ?? this.snapshot.firestoreFieldCatalogs,
     };

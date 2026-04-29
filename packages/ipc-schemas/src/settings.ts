@@ -1,8 +1,10 @@
 import {
+  DEFAULT_ACTIVITY_LOG_SETTINGS,
   FIRESTORE_ARRAY_FIELD_TYPES,
   FIRESTORE_PRIMITIVE_FIELD_TYPES,
 } from '@firebase-desk/repo-contracts';
 import { z } from 'zod';
+import { ActivityLogSettingsSchema } from './activity.ts';
 
 export const HotkeyOverridesSchema = z.record(z.string(), z.string());
 
@@ -34,6 +36,7 @@ export const FirestoreFieldCatalogsSchema = z.record(
 );
 
 export const SettingsSnapshotSchema = z.object({
+  activityLog: ActivityLogSettingsSchema.default(DEFAULT_ACTIVITY_LOG_SETTINGS),
   sidebarWidth: z.number().int().nonnegative(),
   inspectorWidth: z.number().int().nonnegative(),
   theme: z.enum(['system', 'light', 'dark']),
@@ -43,7 +46,9 @@ export const SettingsSnapshotSchema = z.object({
   firestoreFieldCatalogs: FirestoreFieldCatalogsSchema.default({}),
 });
 
-export const SettingsPatchSchema = SettingsSnapshotSchema.partial();
+export const SettingsPatchSchema = SettingsSnapshotSchema.partial().extend({
+  activityLog: ActivityLogSettingsSchema.optional(),
+});
 
 export const SettingsFileSchema = z.object({
   version: z.literal(1),

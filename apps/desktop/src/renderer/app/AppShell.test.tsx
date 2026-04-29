@@ -114,6 +114,35 @@ describe('desktop AppShell', () => {
     await waitFor(() => expect(document.documentElement.dataset.theme).toBe('dark'));
   });
 
+  it('records settings activity and shows it in the drawer', async () => {
+    const repositories = createMockRepositories();
+    renderShell({ repositories });
+
+    fireEvent.click(screen.getByRole('button', { name: 'Dark theme' }));
+    fireEvent.click(screen.getByRole('button', { name: /Activity/ }));
+
+    expect(await screen.findByRole('region', { name: 'Activity' })).toBeTruthy();
+    expect(await screen.findByText('Change theme')).toBeTruthy();
+  });
+
+  it('records Firestore query activity', async () => {
+    const repositories = createMockRepositories();
+    const appendActivity = vi.spyOn(repositories.activity, 'append');
+    renderShell({ initialTab: { kind: 'firestore-query', connectionId: 'emu' }, repositories });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
+
+    await waitFor(() =>
+      expect(appendActivity).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'Run query',
+          area: 'firestore',
+          status: 'success',
+        }),
+      )
+    );
+  });
+
   it('shows real add account fields for service accounts and emulator profiles', async () => {
     renderShell();
     fireEvent.click(screen.getByRole('button', { name: 'Add account' }));

@@ -1,3 +1,4 @@
+export * from './activity/index.ts';
 export * from './app-shell/index.ts';
 export * from './appearance/index.ts';
 export * from './code-editor/index.ts';

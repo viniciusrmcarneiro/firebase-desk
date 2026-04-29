@@ -49,6 +49,11 @@ describe('desktop App', () => {
 
   it('shows the app shell after settings load', async () => {
     settingsLoad.mockResolvedValue({
+      activityLog: {
+        detailMode: 'metadata',
+        enabled: true,
+        maxBytes: 5 * 1024 * 1024,
+      },
       sidebarWidth: 280,
       inspectorWidth: 360,
       theme: 'system',

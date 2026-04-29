@@ -1,8 +1,13 @@
 import { type AppearanceMode, type DensityName } from '@firebase-desk/design-tokens';
-import type { DataMode, SettingsSnapshot } from '@firebase-desk/repo-contracts';
-import { Button, Dialog, DialogContent, InlineAlert } from '@firebase-desk/ui';
+import type {
+  ActivityLogDetailMode,
+  DataMode,
+  SettingsPatch,
+  SettingsSnapshot,
+} from '@firebase-desk/repo-contracts';
+import { Button, Dialog, DialogContent, InlineAlert, Input } from '@firebase-desk/ui';
 import { FolderOpen } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { useAppearance } from '../appearance/AppearanceProvider.tsx';
 
 export interface SettingsDialogProps {
@@ -11,12 +16,15 @@ export interface SettingsDialogProps {
   readonly onOpenChange: (open: boolean) => void;
   readonly onOpenDataDirectory?: () => Promise<void>;
   readonly onDensityChange?: (density: DensityName) => void;
+  readonly onSettingsSaved?: (patch: SettingsPatch, snapshot: SettingsSnapshot) => void;
   readonly open: boolean;
 }
 
 const modes: ReadonlyArray<AppearanceMode> = ['system', 'light', 'dark'];
 const dataModes: ReadonlyArray<DataMode> = ['live', 'mock'];
 const densities: ReadonlyArray<DensityName> = ['compact', 'comfortable'];
+const activityDetailModes: ReadonlyArray<ActivityLogDetailMode> = ['metadata', 'fullPayload'];
+const BYTES_PER_MB = 1024 * 1024;
 
 export function SettingsDialog(
   {
@@ -25,14 +33,17 @@ export function SettingsDialog(
     onDensityChange,
     onOpenChange,
     onOpenDataDirectory,
+    onSettingsSaved,
     open,
   }: SettingsDialogProps,
 ) {
   const appearance = useAppearance();
   const [settingsSnapshot, setSettingsSnapshot] = useState<SettingsSnapshot | null>(null);
+  const settingsSnapshotRef = useRef<SettingsSnapshot | null>(null);
   const [dataDirectoryError, setDataDirectoryError] = useState<string | null>(null);
   const [isOpeningDataDirectory, setIsOpeningDataDirectory] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
+  const [activityRetentionMb, setActivityRetentionMb] = useState('5');
   const [savingDataMode, setSavingDataMode] = useState<DataMode | null>(null);
   const dataDirectoryLabel = dataDirectoryPath === undefined
     ? 'Loading'
@@ -45,7 +56,10 @@ export function SettingsDialog(
     setSettingsError(null);
     appearance.settings.load()
       .then((snapshot) => {
-        if (!cancelled) setSettingsSnapshot(snapshot);
+        if (!cancelled) {
+          applySettingsSnapshot(snapshot);
+          setActivityRetentionMb(formatMegabytes(snapshot.activityLog.maxBytes));
+        }
       })
       .catch((caught) => {
         if (!cancelled) setSettingsError(messageFromError(caught, 'Could not load settings.'));
@@ -59,12 +73,46 @@ export function SettingsDialog(
     setSettingsError(null);
     setSavingDataMode(dataMode);
     try {
-      setSettingsSnapshot(await appearance.settings.save({ dataMode }));
+      const patch = { dataMode };
+      const snapshot = await appearance.settings.save(patch);
+      applySettingsSnapshot(snapshot);
+      onSettingsSaved?.(patch, snapshot);
     } catch (caught) {
       setSettingsError(messageFromError(caught, 'Could not save settings.'));
     } finally {
       setSavingDataMode(null);
     }
+  }
+
+  async function handleActivityLogChange(
+    patch: Partial<SettingsSnapshot['activityLog']>,
+  ) {
+    const currentSnapshot = settingsSnapshotRef.current ?? settingsSnapshot;
+    if (!currentSnapshot) return;
+    setSettingsError(null);
+    const activityLog = { ...currentSnapshot.activityLog, ...patch };
+    const patchToSave = { activityLog };
+    const optimisticSnapshot = { ...currentSnapshot, activityLog };
+    applySettingsSnapshot(optimisticSnapshot);
+    try {
+      const next = await appearance.settings.save(patchToSave);
+      applySettingsSnapshot(next);
+      setActivityRetentionMb(formatMegabytes(next.activityLog.maxBytes));
+      onSettingsSaved?.(patchToSave, next);
+    } catch (caught) {
+      applySettingsSnapshot(currentSnapshot);
+      setSettingsError(messageFromError(caught, 'Could not save settings.'));
+    }
+  }
+
+  function applySettingsSnapshot(snapshot: SettingsSnapshot) {
+    settingsSnapshotRef.current = snapshot;
+    setSettingsSnapshot(snapshot);
+  }
+
+  function handleActivityRetentionBlur() {
+    const maxBytes = Math.max(1, Math.round(Number(activityRetentionMb) || 5)) * BYTES_PER_MB;
+    void handleActivityLogChange({ maxBytes });
   }
 
   async function handleOpenDataDirectory() {
@@ -120,6 +168,52 @@ export function SettingsDialog(
                 ))}
               </div>
               <div className='text-xs text-text-secondary'>Changes apply immediately.</div>
+            </div>
+          )
+          : null}
+        {settingsSnapshot
+          ? (
+            <div className='grid gap-2'>
+              <div className='text-sm font-medium text-text-primary'>Activity</div>
+              <div className='flex flex-wrap items-center gap-2'>
+                <Button
+                  aria-label='Activity logging'
+                  variant={settingsSnapshot.activityLog.enabled ? 'primary' : 'secondary'}
+                  onClick={() =>
+                    void handleActivityLogChange({
+                      enabled: !settingsSnapshot.activityLog.enabled,
+                    })}
+                >
+                  {settingsSnapshot.activityLog.enabled ? 'enabled' : 'disabled'}
+                </Button>
+                <select
+                  aria-label='Activity detail'
+                  className='h-[var(--density-compact-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
+                  value={settingsSnapshot.activityLog.detailMode}
+                  onChange={(event) =>
+                    void handleActivityLogChange({
+                      detailMode: event.currentTarget.value as ActivityLogDetailMode,
+                    })}
+                >
+                  {activityDetailModes.map((mode) => <option key={mode} value={mode}>{mode}
+                  </option>)}
+                </select>
+                <label className='flex items-center gap-2 text-sm text-text-secondary'>
+                  <span>Max MB</span>
+                  <Input
+                    aria-label='Activity retention MB'
+                    className='w-24'
+                    min={1}
+                    type='number'
+                    value={activityRetentionMb}
+                    onBlur={handleActivityRetentionBlur}
+                    onChange={(event) => setActivityRetentionMb(event.currentTarget.value)}
+                  />
+                </label>
+              </div>
+              <div className='text-xs text-text-secondary'>
+                Metadata is default. Full payload stores submitted write data locally.
+              </div>
             </div>
           )
           : null}
@@ -211,11 +305,21 @@ function SettingsSummary({ snapshot }: { readonly snapshot: SettingsSnapshot | n
       <SettingRow label='Inspector' value={`${snapshot.inspectorWidth}px`} />
       <SettingRow label='Data source' value={snapshot.dataMode} />
       <SettingRow
+        label='Activity'
+        value={`${snapshot.activityLog.detailMode}, ${
+          formatMegabytes(snapshot.activityLog.maxBytes)
+        } MB`}
+      />
+      <SettingRow
         label='Hotkeys'
         value={`${Object.keys(snapshot.hotkeyOverrides).length} overrides`}
       />
     </div>
   );
+}
+
+function formatMegabytes(bytes: number): string {
+  return String(Math.max(1, Math.round(bytes / BYTES_PER_MB)));
 }
 
 function SettingRow({ label, value }: { readonly label: string; readonly value: string; }) {

@@ -1,10 +1,15 @@
-import type { SettingsRepository, SettingsSnapshot } from '@firebase-desk/repo-contracts';
+import {
+  DEFAULT_ACTIVITY_LOG_SETTINGS,
+  type SettingsRepository,
+  type SettingsSnapshot,
+} from '@firebase-desk/repo-contracts';
 import { type DataTableColumn } from '@firebase-desk/ui';
 import { act, renderHook } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { collectionLayoutKeyForPath, useResultTableLayout } from './resultTableLayout.ts';
 
 const settingsSnapshot: SettingsSnapshot = {
+  activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
   dataMode: 'mock',
   firestoreFieldCatalogs: {},
   hotkeyOverrides: {},

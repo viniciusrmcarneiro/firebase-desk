@@ -1,3 +1,5 @@
+import type { ActivityLogSettings } from './activity.ts';
+
 /**
  * Future map of user-defined hotkey overrides.
  * Keys are central registry IDs (see @firebase-desk/hotkeys); values are accelerator strings.
@@ -52,6 +54,7 @@ export interface FirestoreFieldCatalogEntry {
 export type FirestoreFieldCatalogs = Record<string, FirestoreFieldCatalogEntry[]>;
 
 export interface SettingsSnapshot {
+  readonly activityLog: ActivityLogSettings;
   readonly sidebarWidth: number;
   readonly inspectorWidth: number;
   readonly theme: 'system' | 'light' | 'dark';
@@ -62,6 +65,7 @@ export interface SettingsSnapshot {
 }
 
 export interface SettingsPatch {
+  readonly activityLog?: ActivityLogSettings | undefined;
   readonly sidebarWidth?: number | undefined;
   readonly inspectorWidth?: number | undefined;
   readonly theme?: SettingsSnapshot['theme'] | undefined;

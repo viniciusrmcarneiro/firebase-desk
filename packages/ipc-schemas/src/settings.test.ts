@@ -1,3 +1,4 @@
+import { DEFAULT_ACTIVITY_LOG_SETTINGS } from '@firebase-desk/repo-contracts';
 import { describe, expect, it } from 'vitest';
 import { SettingsFileSchema, SettingsPatchSchema } from './settings.ts';
 
@@ -13,8 +14,19 @@ describe('settings schemas', () => {
           dataMode: 'mock',
           hotkeyOverrides: {},
         },
-      }).snapshot.resultTableLayouts,
-    ).toEqual({});
+      }).snapshot,
+    ).toMatchObject({
+      activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
+      resultTableLayouts: {},
+    });
+  });
+
+  it('does not default activity settings in patches', () => {
+    expect(SettingsPatchSchema.parse({ sidebarWidth: 400 })).toEqual({
+      sidebarWidth: 400,
+      resultTableLayouts: {},
+      firestoreFieldCatalogs: {},
+    });
   });
 
   it('validates result table layouts in patches', () => {
