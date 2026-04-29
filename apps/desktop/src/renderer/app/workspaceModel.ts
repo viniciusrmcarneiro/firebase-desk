@@ -1,7 +1,8 @@
-import type { AccountTreeItem, FirestoreQueryDraft } from '@firebase-desk/product-ui';
+import type { AccountTreeItem } from '@firebase-desk/product-ui';
 import type {
   FirestoreCollectionNode,
   FirestoreQuery,
+  FirestoreQueryDraft,
   ProjectSummary,
 } from '@firebase-desk/repo-contracts';
 import { activePath, type WorkspaceTab } from './stores/tabsStore.ts';

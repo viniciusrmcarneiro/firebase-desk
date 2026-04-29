@@ -7,7 +7,6 @@ import {
   CommandPalette,
   type DeleteDocumentOptions,
   type FirestoreCreateDocumentRequest,
-  type FirestoreQueryDraft,
   FirestoreQuerySurface,
   JsQuerySurface,
   SettingsDialog,
@@ -25,6 +24,7 @@ import type {
   FirestoreCollectionNode,
   FirestoreDocumentResult,
   FirestoreFieldPatchOperation,
+  FirestoreQueryDraft,
   FirestoreSaveDocumentOptions,
   FirestoreSaveDocumentResult,
   FirestoreUpdateDocumentFieldsOptions,
@@ -66,17 +66,27 @@ import {
   Sun,
   X,
 } from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { type ActivityStore, useActivityController } from '../app-core/activity/index.ts';
 import { firestoreQueryDraftMetadata } from '../app-core/firestore/query/index.ts';
 import { useFirestoreWriteController } from '../app-core/firestore/write/index.ts';
 import { useSettingsController } from '../app-core/settings/index.ts';
+import {
+  addProjectCommand,
+  removeProjectCommand,
+  updateProjectCommand,
+} from '../app-core/workspace/index.ts';
 import appIconUrl from '../assets/app-icon.png';
 import { AddProjectDialog } from './dialogs/AddProjectDialog.tsx';
 import { EditProjectDialog } from './dialogs/EditProjectDialog.tsx';
 import { useAuthTabState } from './hooks/useAuthTabState.ts';
+import { useDocumentDensity } from './hooks/useDocumentDensity.ts';
 import { useFirestoreTabState } from './hooks/useFirestoreTabState.ts';
 import { useJsTabState } from './hooks/useJsTabState.ts';
+import {
+  usePersistedWorkspaceState,
+  usePersistWorkspaceSnapshot,
+} from './hooks/usePersistedWorkspaceState.ts';
 import { useProjects } from './hooks/useRepositoriesData.ts';
 import { useWorkspaceTree } from './hooks/useWorkspaceTree.ts';
 import { RenderErrorBoundary } from './RenderErrorBoundary.tsx';
@@ -100,10 +110,6 @@ import {
   resolveProject,
   treeItemIdForTab,
 } from './workspaceModel.ts';
-import {
-  loadPersistedWorkspaceState,
-  savePersistedWorkspaceState,
-} from './workspacePersistence.ts';
 
 interface DestructiveAction {
   readonly confirmLabel: string;
@@ -125,16 +131,7 @@ export function AppShell(
     initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH,
   }: AppShellProps,
 ) {
-  const [persistedWorkspace] = useState(() => {
-    const persisted = loadPersistedWorkspaceState();
-    if (!persisted) return null;
-    tabActions.restore(persisted.tabsState);
-    const activeRestoredTab = persisted.tabsState.tabs.find((tab) =>
-      tab.id === persisted.tabsState.activeTabId
-    ) ?? persisted.tabsState.tabs[0];
-    if (activeRestoredTab) selectionActions.selectTreeItem(treeItemIdForTab(activeRestoredTab));
-    return persisted;
-  });
+  const persistedWorkspace = usePersistedWorkspaceState();
   const appearance = useAppearance();
   const repositories = useRepositories();
   const queryClient = useQueryClient();
@@ -215,19 +212,23 @@ export function AppShell(
     ? projects.find((project) => project.id === editingProjectId) ?? null
     : null;
   const sidebarDefaultWidth = clampSidebarWidth(initialSidebarWidth);
+  const projectCommandEnv = useMemo(() => ({
+    invalidateProjects: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['projects'] });
+    },
+    now: Date.now,
+    projects: repositories.projects,
+    recordActivity,
+  }), [queryClient, recordActivity, repositories.projects]);
+  const workspaceSnapshot = useMemo(() => ({
+    authFilter: authTab.authFilter,
+    drafts: firestoreTab.drafts,
+    scripts: jsTab.scripts,
+    tabsState,
+  }), [authTab.authFilter, firestoreTab.drafts, jsTab.scripts, tabsState]);
 
-  useEffect(() => {
-    document.documentElement.dataset.density = density;
-  }, [density]);
-
-  useEffect(() => {
-    savePersistedWorkspaceState({
-      authFilter: authTab.authFilter,
-      drafts: firestoreTab.drafts,
-      scripts: jsTab.scripts,
-      tabsState,
-    });
-  }, [authTab.authFilter, firestoreTab.drafts, jsTab.scripts, tabsState]);
+  useDocumentDensity(density);
+  usePersistWorkspaceSnapshot(workspaceSnapshot);
 
   const tabModels = useMemo<ReadonlyArray<WorkspaceTabModel>>(
     () =>
@@ -429,34 +430,13 @@ export function AppShell(
       confirmLabel: 'Remove',
       description: `Remove ${project?.name ?? 'this project'} from the workspace tree?`,
       onConfirm: () => {
-        const startedAt = Date.now();
-        void repositories.projects.remove(connectionId)
-          .then(async () => {
-            await queryClient.invalidateQueries({ queryKey: ['projects'] });
-            setLastAction(`Removed ${project?.name ?? 'project'}`);
-            recordActivity({
-              action: 'Remove account',
-              area: 'projects',
-              durationMs: elapsedMs(startedAt),
-              metadata: { connectionId, projectId: project?.projectId ?? null },
-              status: 'success',
-              summary: `Removed ${project?.name ?? 'project'}`,
-              target: projectTarget(project ?? null),
-            });
-          })
+        void removeProjectCommand(projectCommandEnv, {
+          connectionId,
+          project: project ?? null,
+        })
+          .then((result) => setLastAction(result.lastAction))
           .catch((error) => {
-            const message = messageFromError(error, 'Could not remove project.');
-            setLastAction(`Remove failed: ${message}`);
-            recordActivity({
-              action: 'Remove account',
-              area: 'projects',
-              durationMs: elapsedMs(startedAt),
-              error: { message },
-              metadata: { connectionId, projectId: project?.projectId ?? null },
-              status: 'failure',
-              summary: message,
-              target: projectTarget(project ?? null),
-            });
+            setLastAction(`Remove failed: ${messageFromError(error, 'Could not remove project.')}`);
           });
       },
       title: 'Remove project',
@@ -504,84 +484,18 @@ export function AppShell(
   }
 
   async function handleAddProject(input: ProjectAddInput): Promise<ProjectSummary> {
-    const startedAt = Date.now();
-    try {
-      const project = await repositories.projects.add(input);
-      await queryClient.invalidateQueries({ queryKey: ['projects'] });
-      setLastAction(`Added ${project.name}`);
-      recordActivity({
-        action: 'Add account',
-        area: 'projects',
-        durationMs: elapsedMs(startedAt),
-        metadata: {
-          name: project.name,
-          projectId: project.projectId,
-          target: project.target,
-        },
-        status: 'success',
-        summary: `Added ${project.name}`,
-        target: projectTarget(project),
-      });
-      return project;
-    } catch (error) {
-      const message = messageFromError(error, 'Could not add project.');
-      recordActivity({
-        action: 'Add account',
-        area: 'projects',
-        durationMs: elapsedMs(startedAt),
-        error: { message },
-        metadata: {
-          hasCredential: Boolean(input.credentialJson),
-          name: input.name,
-          projectId: input.projectId,
-          target: input.target,
-        },
-        status: 'failure',
-        summary: message,
-      });
-      throw error;
-    }
+    const result = await addProjectCommand(projectCommandEnv, input);
+    setLastAction(result.lastAction);
+    return result.result;
   }
 
   async function handleUpdateProject(
     id: string,
     patch: ProjectUpdatePatch,
   ): Promise<ProjectSummary> {
-    const startedAt = Date.now();
-    try {
-      const project = await repositories.projects.update(id, patch);
-      await queryClient.invalidateQueries({ queryKey: ['projects'] });
-      setLastAction(`Updated ${project.name}`);
-      recordActivity({
-        action: 'Update account',
-        area: 'projects',
-        durationMs: elapsedMs(startedAt),
-        metadata: {
-          changedKeys: Object.keys(patch).filter((key) => key !== 'credentialJson'),
-          projectId: project.projectId,
-          target: project.target,
-        },
-        status: 'success',
-        summary: `Updated ${project.name}`,
-        target: projectTarget(project),
-      });
-      return project;
-    } catch (error) {
-      const message = messageFromError(error, 'Could not update project.');
-      recordActivity({
-        action: 'Update account',
-        area: 'projects',
-        durationMs: elapsedMs(startedAt),
-        error: { message },
-        metadata: {
-          changedKeys: Object.keys(patch).filter((key) => key !== 'credentialJson'),
-          projectId: id,
-        },
-        status: 'failure',
-        summary: message,
-      });
-      throw error;
-    }
+    const result = await updateProjectCommand(projectCommandEnv, { id, patch });
+    setLastAction(result.lastAction);
+    return result.result;
   }
 
   function handleRunQuery() {
@@ -1442,14 +1356,4 @@ function messageFromError(error: unknown, fallback: string): string {
 
 function elapsedMs(startedAt: number): number {
   return Math.max(0, Date.now() - startedAt);
-}
-
-function projectTarget(project: ProjectSummary | null): ActivityLogEntry['target'] {
-  if (!project) return undefined;
-  return {
-    connectionId: project.id,
-    label: project.name,
-    projectId: project.projectId,
-    type: 'project',
-  };
 }

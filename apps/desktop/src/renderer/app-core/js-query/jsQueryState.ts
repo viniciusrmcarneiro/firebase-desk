@@ -1,4 +1,3 @@
-import { JS_QUERY_SAMPLE_SOURCE } from '@firebase-desk/product-ui';
 import type { ScriptRunResult } from '@firebase-desk/repo-contracts';
 import type { AppCoreCommandOptions } from '../shared/index.ts';
 
@@ -35,6 +34,7 @@ export function createInitialJsQueryState(input: CreateJsQueryStateInput = {}): 
 export function scriptSourceForTab(
   state: JsQueryState,
   tabId: string | null | undefined,
+  defaultSource: string,
 ): string {
-  return tabId ? state.scripts[tabId] ?? JS_QUERY_SAMPLE_SOURCE : JS_QUERY_SAMPLE_SOURCE;
+  return tabId ? state.scripts[tabId] ?? defaultSource : defaultSource;
 }

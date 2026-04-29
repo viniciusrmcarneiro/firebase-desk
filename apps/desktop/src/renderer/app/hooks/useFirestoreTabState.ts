@@ -1,7 +1,7 @@
-import type { FirestoreQueryDraft } from '@firebase-desk/product-ui';
 import type {
   ActivityLogAppendInput,
   FirestoreDocumentResult,
+  FirestoreQueryDraft,
   ProjectSummary,
 } from '@firebase-desk/repo-contracts';
 import { useEffect, useRef, useState } from 'react';

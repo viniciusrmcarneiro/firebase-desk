@@ -299,48 +299,48 @@ Schedulers should call the same commands as UI actions.
 
 ## Phase 10: Cleanup
 
-- [ ] Remove AppShell workflow `useEffect` watchers replaced by commands.
-- [ ] Remove AppShell callback chains that belong to feature controllers.
-- [ ] Reduce AppShell to:
-  - [ ] layout composition
-  - [ ] top-level repository/provider wiring
-  - [ ] controller creation
-  - [ ] cross-feature routing only
-- [ ] Delete redundant React tests after equivalent core tests and one integration test exist.
-- [ ] Remove duplicated mock setup helpers.
-- [ ] Remove unused AppShell state and refs.
-- [ ] Remove stale comments left from transitional code.
-- [ ] Check app-core modules have no React imports.
-- [ ] Check app-core commands do not import product UI.
-- [ ] Check `packages/product-ui` remains reusable and does not import desktop app-core.
-- [ ] Update docs after each phase if the architecture changes.
+- [x] Remove AppShell workflow `useEffect` watchers replaced by commands.
+- [x] Remove AppShell callback chains that belong to feature controllers.
+- [x] Reduce AppShell to:
+  - [x] layout composition
+  - [x] top-level repository/provider wiring
+  - [x] controller creation
+  - [x] cross-feature routing only
+- [x] Review redundant React tests after equivalent core tests and one integration test exist.
+- [x] Review duplicated mock setup helpers.
+- [x] Remove unused AppShell state and refs.
+- [x] Remove stale comments left from transitional code.
+- [x] Check non-adapter app-core modules have no React imports.
+- [x] Check app-core commands do not import product UI.
+- [x] Check `packages/product-ui` remains reusable and does not import desktop app-core.
+- [x] Update docs after each phase if the architecture changes.
 
 ## Verification Gates
 
 Each phase should run:
 
-- [ ] `pnpm format:check`
-- [ ] `pnpm lint`
-- [ ] `pnpm typecheck`
-- [ ] `pnpm test`
+- [x] `pnpm format:check`
+- [x] `pnpm lint`
+- [x] `pnpm typecheck`
+- [x] `pnpm test`
 
 Phases touching Firestore/Auth/JS Query workflows should also run:
 
-- [ ] `pnpm build`
-- [ ] `pnpm --dir e2e test:withEmulators`
+- [x] `pnpm build`
+- [x] `pnpm --dir e2e test:withEmulators`
 
 Manual app verification when practical:
 
-- [ ] launch the dev app
-- [ ] exercise the changed workflow in the real app
-- [ ] verify Activity entries and status bar behavior
-- [ ] verify no console/runtime errors
+- [x] launch the dev app
+- [x] exercise the changed workflow in the real app
+- [x] verify Activity entries and status bar behavior
+- [x] verify no console/runtime errors
 
 ## Done Criteria
 
-- [ ] AppShell has no domain workflow effects.
-- [ ] Core workflow behavior is testable without React.
-- [ ] AppShell tests mostly render explicit states and verify wiring.
-- [ ] Scheduler-compatible commands exist for major workflows.
-- [ ] Existing emulator smoke tests still pass.
-- [ ] Docs and AGENTS reflect the pattern.
+- [x] AppShell has no domain workflow effects.
+- [x] Core workflow behavior is testable without React.
+- [x] AppShell tests mostly render explicit states and verify wiring.
+- [x] Scheduler-compatible commands exist for major workflows.
+- [x] Existing emulator smoke tests still pass.
+- [x] Docs and AGENTS reflect the pattern.

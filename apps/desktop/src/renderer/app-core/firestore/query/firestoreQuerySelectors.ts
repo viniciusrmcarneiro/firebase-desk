@@ -1,5 +1,8 @@
-import type { FirestoreQueryDraft } from '@firebase-desk/product-ui';
-import type { FirestoreDocumentResult, FirestoreQuery } from '@firebase-desk/repo-contracts';
+import type {
+  FirestoreDocumentResult,
+  FirestoreQuery,
+  FirestoreQueryDraft,
+} from '@firebase-desk/repo-contracts';
 import type { FirestoreQueryRuntimeState } from './firestoreQueryState.ts';
 
 interface FirestoreQueryTabLike {

@@ -1,4 +1,4 @@
-import type { FirestoreQueryDraft } from '@firebase-desk/product-ui';
+import type { FirestoreQueryDraft } from '@firebase-desk/repo-contracts';
 import type { FirestoreDocumentResult, FirestoreQuery } from '@firebase-desk/repo-contracts';
 import { describe, expect, it } from 'vitest';
 import {

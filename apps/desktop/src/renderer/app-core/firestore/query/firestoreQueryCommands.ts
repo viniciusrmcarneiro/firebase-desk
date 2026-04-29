@@ -1,8 +1,8 @@
-import type { FirestoreQueryDraft } from '@firebase-desk/product-ui';
 import type {
   ActivityLogAppendInput,
   FirestoreCollectionNode,
   FirestoreQuery,
+  FirestoreQueryDraft,
 } from '@firebase-desk/repo-contracts';
 import {
   type AppCoreCommandOptions,

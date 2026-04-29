@@ -24,13 +24,14 @@ export interface ScriptResultCounts {
 export function selectJsQueryTabModel(
   state: JsQueryState,
   activeTab: JsQueryTabLike | undefined,
+  defaultSource: string,
 ): JsQueryTabModel {
   if (!activeTab || activeTab.kind !== 'js-query') {
     return {
       isRunning: false,
       result: undefined,
       runId: null,
-      source: scriptSourceForTab(state, activeTab?.id),
+      source: scriptSourceForTab(state, activeTab?.id, defaultSource),
       startedAt: null,
     };
   }
@@ -39,7 +40,7 @@ export function selectJsQueryTabModel(
     isRunning: Boolean(run),
     result: state.results[activeTab.id],
     runId: run?.runId ?? state.runIds[activeTab.id] ?? null,
-    source: scriptSourceForTab(state, activeTab.id),
+    source: scriptSourceForTab(state, activeTab.id, defaultSource),
     startedAt: run?.startedAt ?? null,
   };
 }

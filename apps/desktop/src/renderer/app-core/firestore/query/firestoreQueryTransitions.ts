@@ -1,4 +1,4 @@
-import type { FirestoreQueryDraft } from '@firebase-desk/product-ui';
+import type { FirestoreQueryDraft } from '@firebase-desk/repo-contracts';
 import type { FirestoreCollectionNode, FirestoreQuery } from '@firebase-desk/repo-contracts';
 import type {
   FirestoreQueryRuntimeState,

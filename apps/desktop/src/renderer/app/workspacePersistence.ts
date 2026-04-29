@@ -1,5 +1,5 @@
 import { FirestoreFilterOpSchema } from '@firebase-desk/ipc-schemas';
-import type { FirestoreQueryDraft, FirestoreQueryFilterDraft } from '@firebase-desk/product-ui';
+import type { FirestoreQueryDraft, FirestoreQueryFilterDraft } from '@firebase-desk/repo-contracts';
 import { z } from 'zod';
 import {
   type InteractionHistoryEntry,

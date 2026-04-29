@@ -55,7 +55,7 @@ export function useJsTabState(
   const state = useAppCoreSelector(store, (snapshot) => snapshot);
   const scriptEventHandlerRef = useRef<(event: ScriptRunEvent) => void>(() => {});
   const repositories = useRepositories();
-  const model = selectJsQueryTabModel(state, activeTab);
+  const model = selectJsQueryTabModel(state, activeTab, JS_QUERY_SAMPLE_SOURCE);
   const env: JsQueryCommandEnvironment = {
     cancelScript: (runId) => repositories.scriptRunner.cancel(runId),
     now: Date.now,
