@@ -2,6 +2,7 @@ import { HotkeysProvider } from '@firebase-desk/hotkeys';
 import { AppearanceProvider } from '@firebase-desk/product-ui';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   type ActivityState,
@@ -57,6 +58,7 @@ vi.mock('@monaco-editor/react', () => ({
 }));
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -69,12 +71,14 @@ function renderShell(
     initialTab,
     repositories = createMockRepositories(),
     savedWorkspace,
+    strictMode = false,
   }: {
     readonly dataMode?: 'live' | 'mock';
     readonly activityState?: ActivityState | undefined;
     readonly initialTab?: InitialTab;
     readonly repositories?: RepositorySet;
     readonly savedWorkspace?: PersistedWorkspaceState;
+    readonly strictMode?: boolean;
   } = {},
 ) {
   window.localStorage.clear();
@@ -102,7 +106,7 @@ function renderShell(
   );
   const queryClient = createAppQueryClient();
   const activityStore = activityState ? createActivityStore(activityState) : undefined;
-  render(
+  const shell = (
     <RepositoryProvider repositories={repositories}>
       <QueryClientProvider client={queryClient}>
         <HotkeysProvider settings={repositories.settings}>
@@ -111,8 +115,9 @@ function renderShell(
           </AppearanceProvider>
         </HotkeysProvider>
       </QueryClientProvider>
-    </RepositoryProvider>,
+    </RepositoryProvider>
   );
+  render(strictMode ? <StrictMode>{shell}</StrictMode> : shell);
 }
 
 async function waitForLocalEmulatorProject() {
@@ -516,6 +521,57 @@ describe('desktop AppShell', () => {
         expect.objectContaining({ limit: 7 }),
       )
     );
+  });
+
+  it('restores persisted workspace once in StrictMode', async () => {
+    const tabId = 'tab-firestore-strict';
+    const savedWorkspace: PersistedWorkspaceState = {
+      version: 1,
+      authFilter: '',
+      scripts: {},
+      tabsState: {
+        activeTabId: tabId,
+        interactionHistory: [{
+          activeTabId: tabId,
+          path: 'customers',
+          selectedTreeItemId: 'collection:emu:customers',
+        }],
+        interactionHistoryIndex: 0,
+        tabs: [{
+          id: tabId,
+          kind: 'firestore-query',
+          title: 'customers',
+          connectionId: 'emu',
+          history: ['customers'],
+          historyIndex: 0,
+          inspectorWidth: 360,
+        }],
+      },
+      drafts: {
+        [tabId]: {
+          path: 'customers',
+          filters: [],
+          filterField: '',
+          filterOp: '==',
+          filterValue: '',
+          sortField: 'lastSeenAt',
+          sortDirection: 'desc',
+          limit: 7,
+        },
+      },
+    };
+    const restoreSpy = vi.spyOn(tabActions, 'restore');
+
+    renderShell({ savedWorkspace, strictMode: true });
+
+    const pathInput = await screen.findByRole('textbox', { name: 'Query path' });
+    expect((pathInput as HTMLInputElement).value).toBe('customers');
+    expect(restoreSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      const raw = window.localStorage.getItem(WORKSPACE_STATE_STORAGE_KEY) ?? '';
+      expect(raw).toContain('customers');
+      expect(raw).toContain('"limit":7');
+    });
   });
 
   it('persists user tab state without query results', async () => {

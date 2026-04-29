@@ -169,7 +169,7 @@ export function AppShell(
   const firestoreTab = useFirestoreTabState({
     activeProject,
     activeTab,
-    initialDrafts: persistedWorkspace?.drafts,
+    initialDrafts: persistedWorkspace.snapshot?.drafts,
     onQueryActivity: recordActivity,
     selectedTreeItemId: selection.treeItemId,
   });
@@ -188,13 +188,13 @@ export function AppShell(
   const authTab = useAuthTabState({
     activeProject,
     activeTab,
-    initialAuthFilter: persistedWorkspace?.authFilter,
+    initialAuthFilter: persistedWorkspace.snapshot?.authFilter,
     recordActivity,
     selectedUserId: selection.authUserId,
   });
   const jsTab = useJsTabState({
     activeTab,
-    initialScripts: persistedWorkspace?.scripts,
+    initialScripts: persistedWorkspace.snapshot?.scripts,
     recordActivity,
     selectedTreeItemId: selection.treeItemId,
   });
@@ -228,7 +228,7 @@ export function AppShell(
   }), [authTab.authFilter, firestoreTab.drafts, jsTab.scripts, tabsState]);
 
   useDocumentDensity(density);
-  usePersistWorkspaceSnapshot(workspaceSnapshot);
+  usePersistWorkspaceSnapshot(workspaceSnapshot, { enabled: persistedWorkspace.restored });
 
   const tabModels = useMemo<ReadonlyArray<WorkspaceTabModel>>(
     () =>
