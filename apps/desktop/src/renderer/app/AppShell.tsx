@@ -33,7 +33,6 @@ import type {
   ProjectSummary,
   ProjectUpdatePatch,
   ScriptRunResult,
-  SettingsPatch,
 } from '@firebase-desk/repo-contracts';
 import {
   Badge,
@@ -71,6 +70,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import { type ActivityStore, useActivityController } from '../app-core/activity/index.ts';
 import { firestoreQueryDraftMetadata } from '../app-core/firestore/query/index.ts';
 import { useFirestoreWriteController } from '../app-core/firestore/write/index.ts';
+import { useSettingsController } from '../app-core/settings/index.ts';
 import appIconUrl from '../assets/app-icon.png';
 import { AddProjectDialog } from './dialogs/AddProjectDialog.tsx';
 import { EditProjectDialog } from './dialogs/EditProjectDialog.tsx';
@@ -147,8 +147,6 @@ export function AppShell(
   const activeProject = activeTab ? resolveProject(projects, activeTab.connectionId) : null;
 
   const [density, setDensity] = useState<DensityName>('compact');
-  const [settingsOpen, setSettingsOpen] = useState(false);
-  const [dataDirectoryPath, setDataDirectoryPath] = useState<string | null | undefined>(undefined);
   const [addProjectOpen, setAddProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [credentialWarning, setCredentialWarning] = useState<string | null>(null);
@@ -165,6 +163,12 @@ export function AppShell(
     store: activityStore,
   });
   const recordActivity = activity.record;
+  const settings = useSettingsController({
+    dataDirectoryApi: getDesktopAppApi(),
+    onStatus: setLastAction,
+    recordActivity,
+    setAppearanceMode: appearance.setMode,
+  });
   const firestoreTab = useFirestoreTabState({
     activeProject,
     activeTab,
@@ -225,27 +229,6 @@ export function AppShell(
     });
   }, [authTab.authFilter, firestoreTab.drafts, jsTab.scripts, tabsState]);
 
-  useEffect(() => {
-    if (!settingsOpen) return;
-    const appApi = getDesktopAppApi();
-    setDataDirectoryPath(undefined);
-    if (!appApi?.getConfig) {
-      setDataDirectoryPath(null);
-      return;
-    }
-    let cancelled = false;
-    appApi.getConfig()
-      .then((config) => {
-        if (!cancelled) setDataDirectoryPath(config.dataDirectory);
-      })
-      .catch(() => {
-        if (!cancelled) setDataDirectoryPath(null);
-      });
-    return () => {
-      cancelled = true;
-    };
-  }, [settingsOpen]);
-
   const tabModels = useMemo<ReadonlyArray<WorkspaceTabModel>>(
     () =>
       tabsState.tabs.map((tab) => ({
@@ -268,17 +251,18 @@ export function AppShell(
     { id: 'new-firestore', label: 'New Firestore tab', onSelect: () => openTab('firestore-query') },
     { id: 'new-auth', label: 'New Auth tab', onSelect: () => openTab('auth-users') },
     { id: 'new-js', label: 'New JS Query tab', onSelect: () => openTab('js-query') },
-    { id: 'settings', label: 'Settings', onSelect: () => setSettingsOpen(true) },
+    { id: 'settings', label: 'Settings', onSelect: settings.openSettings },
     {
       id: 'theme',
       label: 'Toggle theme',
-      onSelect: () => handleThemeChange(appearance.resolvedTheme === 'dark' ? 'light' : 'dark'),
+      onSelect: () => settings.changeTheme(appearance.resolvedTheme === 'dark' ? 'light' : 'dark'),
     },
     { id: 'focus-tree', label: 'Focus tree filter', onSelect: focusTreeFilter },
     { id: 'run-query', label: 'Run query', onSelect: handleRunQuery },
     { id: 'run-script', label: 'Run script', onSelect: handleRunScript },
   ], [
     appearance,
+    settings,
     tabsState.tabs,
     activeTab,
     firestoreTab.activeDraft,
@@ -289,7 +273,7 @@ export function AppShell(
 
   useHotkey('settings.open', (event) => {
     event.preventDefault();
-    setSettingsOpen(true);
+    settings.openSettings();
   });
   useHotkey('tab.new', (event) => {
     event.preventDefault();
@@ -843,54 +827,6 @@ export function AppShell(
     return await repositories.firestore.listSubcollections(activeProject.id, documentPath);
   }
 
-  async function handleOpenDataDirectory(): Promise<void> {
-    const appApi = getDesktopAppApi();
-    if (!appApi?.openDataDirectory) throw new Error('Data location is unavailable.');
-    await appApi.openDataDirectory();
-    setLastAction('Opened data location');
-  }
-
-  function handleThemeChange(mode: AppearanceMode) {
-    const startedAt = Date.now();
-    void appearance.setMode(mode)
-      .then(() => {
-        recordActivity({
-          action: 'Change theme',
-          area: 'settings',
-          durationMs: elapsedMs(startedAt),
-          metadata: { mode },
-          status: 'success',
-          summary: `Theme changed to ${mode}`,
-          target: { type: 'settings' },
-        });
-      })
-      .catch((error) => {
-        const message = messageFromError(error, 'Could not change theme.');
-        setLastAction(`Theme failed: ${message}`);
-        recordActivity({
-          action: 'Change theme',
-          area: 'settings',
-          durationMs: elapsedMs(startedAt),
-          error: { message },
-          metadata: { mode },
-          status: 'failure',
-          summary: message,
-          target: { type: 'settings' },
-        });
-      });
-  }
-
-  function handleSettingsSaved(patch: SettingsPatch) {
-    recordActivity({
-      action: 'Update settings',
-      area: 'settings',
-      metadata: settingsPatchMetadata(patch),
-      status: 'success',
-      summary: settingsPatchSummary(patch),
-      target: { type: 'settings' },
-    });
-  }
-
   function handleClearActivity() {
     requestDestructiveAction({
       confirmLabel: 'Clear',
@@ -941,8 +877,8 @@ export function AppShell(
         onAddProject={() => setAddProjectOpen(true)}
         onBack={handleBackInteraction}
         onForward={handleForwardInteraction}
-        onModeChange={handleThemeChange}
-        onOpenSettings={() => setSettingsOpen(true)}
+        onModeChange={settings.changeTheme}
+        onOpenSettings={settings.openSettings}
       />
       <ResizablePanelGroup direction='horizontal' className='h-full min-h-0'>
         <ResizablePanel
@@ -1106,13 +1042,16 @@ export function AppShell(
       </ResizablePanelGroup>
       <SettingsDialog
         {...(desktopAppApi
-          ? { dataDirectoryPath, onOpenDataDirectory: handleOpenDataDirectory }
+          ? {
+            dataDirectoryPath: settings.dataDirectoryPath,
+            onOpenDataDirectory: settings.openDataDirectory,
+          }
           : {})}
         density={density}
-        open={settingsOpen}
+        open={settings.open}
         onDensityChange={setDensity}
-        onOpenChange={setSettingsOpen}
-        onSettingsSaved={handleSettingsSaved}
+        onOpenChange={settings.setOpen}
+        onSettingsSaved={settings.recordSettingsSaved}
       />
       <DestructiveActionDialog
         action={pendingDestructiveAction}
@@ -1513,34 +1452,4 @@ function projectTarget(project: ProjectSummary | null): ActivityLogEntry['target
     projectId: project.projectId,
     type: 'project',
   };
-}
-
-function settingsPatchMetadata(patch: SettingsPatch): Record<string, unknown> {
-  return {
-    changedKeys: Object.keys(patch),
-    ...(patch.dataMode ? { dataMode: patch.dataMode } : {}),
-    ...(patch.activityLog
-      ? {
-        activityLog: {
-          detailMode: patch.activityLog.detailMode,
-          enabled: patch.activityLog.enabled,
-          maxBytes: patch.activityLog.maxBytes,
-        },
-      }
-      : {}),
-    ...(patch.firestoreWrites
-      ? {
-        firestoreWrites: {
-          fieldStaleBehavior: patch.firestoreWrites.fieldStaleBehavior,
-        },
-      }
-      : {}),
-  };
-}
-
-function settingsPatchSummary(patch: SettingsPatch): string {
-  if (patch.dataMode) return `Data mode changed to ${patch.dataMode}`;
-  if (patch.activityLog) return 'Activity settings changed';
-  if (patch.firestoreWrites) return 'Firestore write settings changed';
-  return 'Settings changed';
 }

@@ -273,12 +273,12 @@ Move write flows after query extraction.
 
 ## Phase 8: Settings And Appearance
 
-- [ ] Create `app-core/settings` if settings workflows keep growing.
-- [ ] Keep durable preference storage in `SettingsRepository`.
-- [ ] Use React 19 `useActionState` for settings form submission where useful.
-- [ ] Keep appearance mode changes explicit and activity-logged.
-- [ ] Add tests for data mode, activity settings, Firestore write settings, and theme changes.
-- [ ] Remove settings-specific command logic from AppShell.
+- [x] Create `app-core/settings` if settings workflows keep growing.
+- [x] Keep durable preference storage in `SettingsRepository`.
+- [x] Use React 19 `useActionState` for settings form submission where useful.
+- [x] Keep appearance mode changes explicit and activity-logged.
+- [x] Add tests for data mode, activity settings, Firestore write settings, and theme changes.
+- [x] Remove settings-specific command logic from AppShell.
 
 ## Phase 9: Scheduler Readiness
 

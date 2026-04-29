@@ -9,7 +9,7 @@ import type {
 import { normalizeFirestoreWriteSettings } from '@firebase-desk/repo-contracts';
 import { Button, Dialog, DialogContent, InlineAlert, Input } from '@firebase-desk/ui';
 import { FolderOpen } from 'lucide-react';
-import { useEffect, useRef, useState } from 'react';
+import { useActionState, useEffect, useRef, useState } from 'react';
 import { useAppearance } from '../appearance/AppearanceProvider.tsx';
 
 export interface SettingsDialogProps {
@@ -47,8 +47,6 @@ export function SettingsDialog(
   const appearance = useAppearance();
   const [settingsSnapshot, setSettingsSnapshot] = useState<SettingsSnapshot | null>(null);
   const settingsSnapshotRef = useRef<SettingsSnapshot | null>(null);
-  const [dataDirectoryError, setDataDirectoryError] = useState<string | null>(null);
-  const [isOpeningDataDirectory, setIsOpeningDataDirectory] = useState(false);
   const [settingsError, setSettingsError] = useState<string | null>(null);
   const [activityRetentionMb, setActivityRetentionMb] = useState('5');
   const [savingDataMode, setSavingDataMode] = useState<DataMode | null>(null);
@@ -59,7 +57,6 @@ export function SettingsDialog(
   useEffect(() => {
     if (!open) return;
     let cancelled = false;
-    setDataDirectoryError(null);
     setSettingsError(null);
     appearance.settings.load()
       .then((snapshot) => {
@@ -75,6 +72,18 @@ export function SettingsDialog(
       cancelled = true;
     };
   }, [appearance.settings, open]);
+
+  async function handleAppearanceModeChange(mode: AppearanceMode) {
+    setSettingsError(null);
+    try {
+      await appearance.setMode(mode);
+      const snapshot = await appearance.settings.load();
+      applySettingsSnapshot(snapshot);
+      onSettingsSaved?.({ theme: mode }, snapshot);
+    } catch (caught) {
+      setSettingsError(messageFromError(caught, 'Could not save settings.'));
+    }
+  }
 
   async function handleDataModeChange(dataMode: DataMode) {
     setSettingsError(null);
@@ -149,19 +158,6 @@ export function SettingsDialog(
     void handleActivityLogChange({ maxBytes });
   }
 
-  async function handleOpenDataDirectory() {
-    if (!onOpenDataDirectory) return;
-    setDataDirectoryError(null);
-    setIsOpeningDataDirectory(true);
-    try {
-      await onOpenDataDirectory();
-    } catch (caught) {
-      setDataDirectoryError(messageFromError(caught, 'Could not open data location.'));
-    } finally {
-      setIsOpeningDataDirectory(false);
-    }
-  }
-
   return (
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
@@ -176,7 +172,7 @@ export function SettingsDialog(
                 key={mode}
                 data-state={appearance.mode === mode ? 'active' : 'inactive'}
                 variant={appearance.mode === mode ? 'primary' : 'secondary'}
-                onClick={() => void appearance.setMode(mode)}
+                onClick={() => void handleAppearanceModeChange(mode)}
               >
                 {mode}
               </Button>
@@ -299,29 +295,11 @@ export function SettingsDialog(
         <SettingsSummary snapshot={settingsSnapshot} />
         {dataDirectoryPath !== undefined || onOpenDataDirectory
           ? (
-            <div className='grid gap-2 rounded-md border border-border-subtle bg-bg-subtle p-3 text-sm'>
-              <div className='font-medium text-text-primary'>Local data</div>
-              <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
-                <code
-                  aria-label='Data storage folder'
-                  className='min-w-0 flex-1 break-all rounded border border-border-subtle bg-bg-panel px-2 py-1 font-mono text-xs text-text-secondary'
-                  title={dataDirectoryPath ?? undefined}
-                >
-                  {dataDirectoryLabel}
-                </code>
-                <Button
-                  disabled={!dataDirectoryPath || !onOpenDataDirectory || isOpeningDataDirectory}
-                  variant='secondary'
-                  onClick={() => void handleOpenDataDirectory()}
-                >
-                  <FolderOpen size={14} aria-hidden='true' />
-                  {isOpeningDataDirectory ? 'Opening' : 'Open location'}
-                </Button>
-              </div>
-              {dataDirectoryError
-                ? <InlineAlert variant='danger'>{dataDirectoryError}</InlineAlert>
-                : null}
-            </div>
+            <DataLocationSettings
+              dataDirectoryLabel={dataDirectoryLabel}
+              dataDirectoryPath={dataDirectoryPath}
+              onOpenDataDirectory={onOpenDataDirectory}
+            />
           )
           : null}
         <div className='grid gap-1 rounded-md border border-border-subtle bg-bg-subtle p-3 text-sm'>
@@ -340,6 +318,61 @@ export function SettingsDialog(
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface DataLocationSettingsProps {
+  readonly dataDirectoryLabel: string;
+  readonly dataDirectoryPath: string | null | undefined;
+  readonly onOpenDataDirectory?: (() => Promise<void>) | undefined;
+}
+
+interface DataDirectoryActionState {
+  readonly error: string | null;
+}
+
+function DataLocationSettings(
+  { dataDirectoryLabel, dataDirectoryPath, onOpenDataDirectory }: DataLocationSettingsProps,
+) {
+  const [state, openDataDirectoryAction, isOpeningDataDirectory] = useActionState(
+    async (): Promise<DataDirectoryActionState> => {
+      if (!onOpenDataDirectory) return { error: null };
+      try {
+        await onOpenDataDirectory();
+        return { error: null };
+      } catch (caught) {
+        return {
+          error: messageFromError(caught, 'Could not open data location.'),
+        };
+      }
+    },
+    { error: null },
+  );
+
+  return (
+    <div className='grid gap-2 rounded-md border border-border-subtle bg-bg-subtle p-3 text-sm'>
+      <div className='font-medium text-text-primary'>Local data</div>
+      <div className='flex flex-col gap-2 sm:flex-row sm:items-center'>
+        <code
+          aria-label='Data storage folder'
+          className='min-w-0 flex-1 break-all rounded border border-border-subtle bg-bg-panel px-2 py-1 font-mono text-xs text-text-secondary'
+          title={dataDirectoryPath ?? undefined}
+        >
+          {dataDirectoryLabel}
+        </code>
+        <form action={openDataDirectoryAction}>
+          <Button
+            disabled={!dataDirectoryPath || !onOpenDataDirectory || isOpeningDataDirectory}
+            type='submit'
+            variant='secondary'
+          >
+            <FolderOpen size={14} aria-hidden='true' />
+            {isOpeningDataDirectory ? 'Opening' : 'Open location'}
+          </Button>
+        </form>
+      </div>
+      {state.error ? <InlineAlert variant='danger'>{state.error}</InlineAlert> : null}
+    </div>
   );
 }
 
