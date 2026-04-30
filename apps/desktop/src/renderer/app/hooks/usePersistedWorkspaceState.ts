@@ -71,6 +71,7 @@ export function usePersistedWorkspaceState(
 export function usePersistWorkspaceSnapshot(
   snapshot: WorkspacePersistenceSnapshot,
   options: {
+    readonly debounceMs?: number | undefined;
     readonly enabled: boolean;
     readonly onError?: (error: WorkspacePersistenceFailure) => void;
     readonly settings: Pick<SettingsRepository, 'save'>;
@@ -78,17 +79,37 @@ export function usePersistWorkspaceSnapshot(
 ): void {
   const { onError, settings } = options;
   const skippedInitialSaveRef = useRef(false);
+  const lastQueuedSnapshotKeyRef = useRef<string | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+
   useEffect(() => {
+    function clearPendingSave() {
+      if (!saveTimerRef.current) return;
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+
     if (!options.enabled) {
       skippedInitialSaveRef.current = false;
+      lastQueuedSnapshotKeyRef.current = null;
+      clearPendingSave();
       return;
     }
+    const snapshotKey = JSON.stringify(snapshot);
     if (!skippedInitialSaveRef.current) {
       skippedInitialSaveRef.current = true;
+      lastQueuedSnapshotKeyRef.current = snapshotKey;
       return;
     }
-    void savePersistedWorkspaceState(settings, snapshot).then((error) => {
-      if (error) onError?.(error);
-    });
-  }, [onError, options.enabled, settings, snapshot]);
+    if (lastQueuedSnapshotKeyRef.current === snapshotKey) return;
+    lastQueuedSnapshotKeyRef.current = snapshotKey;
+    clearPendingSave();
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      void savePersistedWorkspaceState(settings, snapshot).then((error) => {
+        if (error) onError?.(error);
+      });
+    }, options.debounceMs ?? 300);
+    return clearPendingSave;
+  }, [onError, options.debounceMs, options.enabled, settings, snapshot]);
 }
