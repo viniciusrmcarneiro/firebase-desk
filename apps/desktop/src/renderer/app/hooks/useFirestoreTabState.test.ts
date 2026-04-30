@@ -1,15 +1,16 @@
+// @vitest-environment jsdom
+
 import type { FirestoreDocumentResult, ProjectSummary } from '@firebase-desk/repo-contracts';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useRepositories } from '../RepositoryProvider.tsx';
 import { selectionActions, selectionStore } from '../stores/selectionStore.ts';
 import { tabActions, type WorkspaceTab } from '../stores/tabsStore.ts';
 import { DEFAULT_FIRESTORE_DRAFT } from '../workspaceModel.ts';
 import { useFirestoreTabState } from './useFirestoreTabState.ts';
-import { useGetDocument, useRunQuery } from './useRepositoriesData.ts';
 
-vi.mock('./useRepositoriesData.ts', () => ({
-  useGetDocument: vi.fn(),
-  useRunQuery: vi.fn(),
+vi.mock('../RepositoryProvider.tsx', () => ({
+  useRepositories: vi.fn(),
 }));
 
 const project: ProjectSummary = {
@@ -38,11 +39,19 @@ const rows: ReadonlyArray<FirestoreDocumentResult> = [
 ];
 
 describe('useFirestoreTabState', () => {
+  let firestore: {
+    getDocument: ReturnType<typeof vi.fn>;
+    runQuery: ReturnType<typeof vi.fn>;
+  };
+
   beforeEach(() => {
     vi.restoreAllMocks();
     selectionActions.reset();
-    vi.mocked(useRunQuery).mockReturnValue(runQueryResult({ items: rows }));
-    vi.mocked(useGetDocument).mockReturnValue(documentResult(null));
+    firestore = {
+      getDocument: vi.fn(async () => null),
+      runQuery: vi.fn(async () => ({ items: rows, nextCursor: null })),
+    };
+    vi.mocked(useRepositories).mockReturnValue({ firestore } as never);
   });
 
   it('creates active drafts from tab history and updates drafts by active tab', () => {
@@ -62,12 +71,11 @@ describe('useFirestoreTabState', () => {
     expect(result.current.drafts[tab.id]?.path).toBe('customers');
   });
 
-  it('submits query requests and records tab interaction', () => {
+  it('submits query requests and records tab interaction', async () => {
     const pushHistory = vi.spyOn(tabActions, 'pushHistory').mockImplementation(() => {});
     const recordInteraction = vi.spyOn(tabActions, 'recordInteraction').mockImplementation(
       () => {},
     );
-    const runQueryHook = vi.mocked(useRunQuery);
     const { result } = renderHook(() =>
       useFirestoreTabState({
         activeProject: project,
@@ -82,12 +90,11 @@ describe('useFirestoreTabState', () => {
     });
 
     expect(path).toBe('orders');
-    expect(runQueryHook).toHaveBeenLastCalledWith(
-      expect.objectContaining({ connectionId: 'emu', path: 'orders' }),
-      25,
-      1,
-      true,
-      tab.id,
+    await waitFor(() =>
+      expect(firestore.runQuery).toHaveBeenCalledWith(
+        expect.objectContaining({ connectionId: 'emu', path: 'orders' }),
+        expect.objectContaining({ limit: 25 }),
+      )
     );
     expect(pushHistory).toHaveBeenCalledWith(tab.id, 'orders');
     expect(recordInteraction).toHaveBeenCalledWith({
@@ -98,7 +105,6 @@ describe('useFirestoreTabState', () => {
   });
 
   it('increments query run IDs so repeated runs do not reuse cached pages', () => {
-    const runQueryHook = vi.mocked(useRunQuery);
     const { result } = renderHook(() =>
       useFirestoreTabState({
         activeProject: project,
@@ -114,17 +120,11 @@ describe('useFirestoreTabState', () => {
       result.current.runQuery();
     });
 
-    expect(runQueryHook).toHaveBeenLastCalledWith(
-      expect.objectContaining({ connectionId: 'emu', path: 'orders' }),
-      25,
-      2,
-      true,
-      tab.id,
-    );
+    expect(result.current.activeQueryRunId).toBe(2);
   });
 
-  it('uses query run IDs for document path loads too', () => {
-    const getDocumentHook = vi.mocked(useGetDocument);
+  it('loads document path queries through the repository', async () => {
+    firestore.getDocument.mockResolvedValue(rows[0]);
     const { result } = renderHook(() =>
       useFirestoreTabState({
         activeProject: project,
@@ -138,10 +138,12 @@ describe('useFirestoreTabState', () => {
       result.current.runQuery();
     });
 
-    expect(getDocumentHook).toHaveBeenLastCalledWith('emu', 'orders/ord_1024', 1, tab.id);
+    await waitFor(() =>
+      expect(firestore.getDocument).toHaveBeenCalledWith('emu', 'orders/ord_1024')
+    );
   });
 
-  it('keeps selected document scoped to current query rows', () => {
+  it('keeps selected document scoped to current query rows', async () => {
     tabActions.restore({
       activeTabId: tab.id,
       interactionHistory: [],
@@ -155,6 +157,10 @@ describe('useFirestoreTabState', () => {
         selectedTreeItemId: 'collection:emu:orders',
       })
     );
+    act(() => {
+      result.current.runQuery();
+    });
+    await waitFor(() => expect(result.current.queryRows).toHaveLength(1));
 
     act(() => result.current.selectDocument(tab.id, 'orders/ord_1024'));
 
@@ -168,51 +174,49 @@ describe('useFirestoreTabState', () => {
     expect(result.current.selectedDocumentPath).toBeNull();
   });
 
-  it('refreshes from page one, reloads loaded page count, and preserves selection', () => {
-    const fetchNextPage = vi.fn();
-    let queryResult = runQueryResult({
-      pages: [{ items: rows }, { items: rows }],
-      hasNextPage: true,
-    });
-    vi.mocked(useRunQuery).mockImplementation(() => queryResult);
+  it('refreshes from page one, reloads loaded page count, and preserves selection', async () => {
+    firestore.runQuery
+      .mockResolvedValueOnce({ items: rows, nextCursor: { token: 'page-2' } })
+      .mockResolvedValueOnce({ items: rows, nextCursor: null })
+      .mockResolvedValueOnce({ items: rows, nextCursor: { token: 'page-2' } })
+      .mockResolvedValueOnce({ items: rows, nextCursor: null });
     tabActions.restore({
       activeTabId: tab.id,
       interactionHistory: [],
       interactionHistoryIndex: 0,
       tabs: [tab],
     });
-    const { rerender, result } = renderHook(() =>
+    const { result } = renderHook(() =>
       useFirestoreTabState({
         activeProject: project,
         activeTab: tab,
         selectedTreeItemId: 'collection:emu:orders',
       })
     );
+    act(() => {
+      expect(result.current.runQuery()).toBe('orders');
+    });
+    await waitFor(() => expect(result.current.activeLoadedPageCount).toBe(1));
     act(() => result.current.selectDocument(tab.id, 'orders/ord_1024'));
+    act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.activeLoadedPageCount).toBe(2));
 
     act(() => {
       expect(result.current.refreshQuery()).toBe('orders');
-      queryResult = runQueryResult({
-        fetchNextPage,
-        hasNextPage: true,
-        pages: [{ items: rows }],
-      });
     });
-    rerender();
 
+    await waitFor(() => expect(firestore.runQuery).toHaveBeenCalledTimes(4));
     expect(result.current.selectedDocumentPath).toBe('orders/ord_1024');
-    expect(fetchNextPage).toHaveBeenCalledTimes(1);
   });
 
   it('records multi-page refresh activity once after all requested pages load', async () => {
-    const fetchNextPage = vi.fn();
     const onQueryActivity = vi.fn();
-    let queryResult = runQueryResult({
-      pages: [{ items: rows }, { items: rows }],
-      hasNextPage: true,
-    });
-    vi.mocked(useRunQuery).mockImplementation(() => queryResult);
-    const { rerender, result } = renderHook(() =>
+    firestore.runQuery
+      .mockResolvedValueOnce({ items: rows, nextCursor: { token: 'page-2' } })
+      .mockResolvedValueOnce({ items: rows, nextCursor: null })
+      .mockResolvedValueOnce({ items: rows, nextCursor: { token: 'page-2' } })
+      .mockResolvedValueOnce({ items: rows, nextCursor: null });
+    const { result } = renderHook(() =>
       useFirestoreTabState({
         activeProject: project,
         activeTab: tab,
@@ -226,25 +230,12 @@ describe('useFirestoreTabState', () => {
     });
     await waitFor(() => expect(onQueryActivity).toHaveBeenCalledTimes(1));
     onQueryActivity.mockClear();
+    act(() => result.current.loadMore());
+    await waitFor(() => expect(result.current.activeLoadedPageCount).toBe(2));
 
     act(() => {
       expect(result.current.refreshQuery()).toBe('orders');
-      queryResult = runQueryResult({
-        fetchNextPage,
-        hasNextPage: true,
-        pages: [{ items: rows }],
-      });
     });
-    rerender();
-
-    expect(fetchNextPage).toHaveBeenCalledTimes(1);
-    expect(onQueryActivity).not.toHaveBeenCalled();
-
-    queryResult = runQueryResult({
-      hasNextPage: false,
-      pages: [{ items: rows }, { items: rows }],
-    });
-    rerender();
 
     await waitFor(() => expect(onQueryActivity).toHaveBeenCalledTimes(1));
     expect(onQueryActivity).toHaveBeenLastCalledWith(expect.objectContaining({
@@ -255,36 +246,3 @@ describe('useFirestoreTabState', () => {
     }));
   });
 });
-
-function runQueryResult(
-  {
-    fetchNextPage = vi.fn(),
-    hasNextPage = false,
-    isFetchingNextPage = false,
-    items,
-    pages,
-  }: {
-    readonly fetchNextPage?: () => void;
-    readonly hasNextPage?: boolean;
-    readonly isFetchingNextPage?: boolean;
-    readonly items?: ReadonlyArray<FirestoreDocumentResult>;
-    readonly pages?: ReadonlyArray<{ readonly items: ReadonlyArray<FirestoreDocumentResult>; }>;
-  },
-) {
-  return {
-    data: { pages: pages ?? [{ items: items ?? [] }] },
-    fetchNextPage,
-    hasNextPage,
-    isFetching: false,
-    isFetchingNextPage,
-    isLoading: false,
-  } as unknown as ReturnType<typeof useRunQuery>;
-}
-
-function documentResult(data: FirestoreDocumentResult | null) {
-  return {
-    data,
-    isFetching: false,
-    isLoading: false,
-  } as unknown as ReturnType<typeof useGetDocument>;
-}

@@ -28,8 +28,10 @@ export function firestoreQueryStarted(
   return {
     ...state,
     errorMessage: null,
+    hasMore: false,
     isLoading: true,
     nextRunId: Math.max(state.nextRunId, runId + 1),
+    pages: [],
     pendingPageReloads: omitKey(state.pendingPageReloads, input.tabId),
     queryRequests: {
       ...state.queryRequests,

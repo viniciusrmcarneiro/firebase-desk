@@ -2,6 +2,7 @@ import type {
   FirestoreDocumentResult,
   FirestoreQuery,
   FirestoreQueryDraft,
+  PageRequest,
 } from '@firebase-desk/repo-contracts';
 
 export type FirestoreResultView = 'json' | 'table' | 'tree';
@@ -14,6 +15,7 @@ export interface SubmittedFirestoreQuery {
 
 export interface FirestoreQueryPage {
   readonly items: ReadonlyArray<FirestoreDocumentResult>;
+  readonly nextCursor?: PageRequest['cursor'];
 }
 
 export interface FirestoreQueryRuntimeState {

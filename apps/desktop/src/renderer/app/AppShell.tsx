@@ -679,8 +679,7 @@ export function AppShell(
   function isTabBusy(tab: WorkspaceTab): boolean {
     if (tab.kind === 'js-query') return jsTab.isTabRunning(tab.id);
     if (tab.kind === 'firestore-query') {
-      return queryClient.isFetching({ queryKey: ['firestore', 'query', tab.id] }) > 0
-        || queryClient.isFetching({ queryKey: ['firestore', 'document', tab.id] }) > 0;
+      return firestoreTab.isTabLoading(tab.id);
     }
     if (tab.kind === 'auth-users') {
       return queryClient.isFetching({ queryKey: ['auth', tab.id] }) > 0;
