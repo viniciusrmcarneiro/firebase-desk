@@ -1,28 +1,58 @@
 import type {
   ActivityLogAppendInput,
   FirestoreCollectionNode,
+  FirestoreDocumentResult,
   FirestoreQuery,
   FirestoreQueryDraft,
+  Page,
+  PageRequest,
 } from '@firebase-desk/repo-contracts';
+import { messageFromError } from '../../shared/errors.ts';
 import {
   type AppCoreCommandOptions,
+  type AppCoreStore,
   commandActivityMetadata,
   normalizeCommandOptions,
 } from '../../shared/index.ts';
-import { firestoreQueryDraftMetadata } from './firestoreQuerySelectors.ts';
-import type { FirestoreQueryRuntimeState } from './firestoreQueryState.ts';
 import {
+  firestoreQueryDraftMetadata,
+  selectFirestoreLoadedPageCount,
+  selectFirestoreResultRows,
+} from './firestoreQuerySelectors.ts';
+import type { FirestoreQueryPage, FirestoreQueryRuntimeState } from './firestoreQueryState.ts';
+import {
+  firestoreLoadMoreFailed,
   firestoreLoadMoreStarted,
+  firestoreLoadMoreSucceeded,
   firestorePendingPageReloadCleared,
   firestoreQueryCompletionRecorded,
+  firestoreQueryFailed,
   firestoreQueryStarted,
+  firestoreQuerySucceeded,
   firestoreRefreshStarted,
+  firestoreRefreshSucceeded,
   firestoreSubcollectionsLoaded,
 } from './firestoreQueryTransitions.ts';
 
 interface FirestoreQueryTabLike {
   readonly id: string;
   readonly kind: string;
+}
+
+interface FirestoreQueryExecutionTabLike extends FirestoreQueryTabLike {
+  readonly connectionId: string;
+}
+
+export interface FirestoreQueryExecutionEnvironment {
+  readonly getDocument: (
+    connectionId: string,
+    path: string,
+  ) => Promise<FirestoreDocumentResult | null>;
+  readonly recordActivity?: ((input: ActivityLogAppendInput) => Promise<void> | void) | undefined;
+  readonly runQuery: (
+    query: FirestoreQuery,
+    request: PageRequest,
+  ) => Promise<Page<FirestoreDocumentResult>>;
 }
 
 export interface FirestoreQuerySubmitCommandInput {
@@ -119,6 +149,91 @@ export function loadMoreFirestoreQueryCommand(
   return { shouldFetchNextPage: true, state: firestoreLoadMoreStarted(state) };
 }
 
+export async function executeFirestoreQueryCommand(
+  store: AppCoreStore<FirestoreQueryRuntimeState>,
+  env: FirestoreQueryExecutionEnvironment,
+  input: {
+    readonly commandOptions?: AppCoreCommandOptions | undefined;
+    readonly draft: FirestoreQueryDraft;
+    readonly isRefresh: boolean;
+    readonly pagesToLoad: number;
+    readonly request: NonNullable<FirestoreQueryRuntimeState['queryRequests'][string]>;
+    readonly tab: FirestoreQueryExecutionTabLike;
+  },
+): Promise<void> {
+  const { query, limit, runId } = input.request;
+  const isDocumentQuery = isFirestoreDocumentPath(query.path);
+  try {
+    const pages = isDocumentQuery
+      ? await loadDocumentPage(env, query.connectionId, query.path)
+      : await loadQueryPages(env, query, limit, input.pagesToLoad);
+    const hasMore = !isDocumentQuery && Boolean(pages[pages.length - 1]?.nextCursor);
+    const transition = (current: FirestoreQueryRuntimeState) =>
+      input.isRefresh
+        ? firestoreRefreshSucceeded(current, input.tab.id, pages, hasMore)
+        : firestoreQuerySucceeded(current, pages, hasMore);
+    completeExecutedFirestoreQuery(store, env, {
+      commandOptions: input.commandOptions,
+      draft: input.draft,
+      errorMessage: null,
+      isDocumentQuery,
+      loadedPages: selectFirestoreLoadedPageCount(pages, isDocumentQuery, pages.length > 0),
+      resultCount: selectFirestoreResultRows(pages).length,
+      runId,
+      tab: input.tab,
+      transition,
+    });
+  } catch (error) {
+    const loadErrorMessage = messageFromError(error, 'Could not load Firestore data.');
+    completeExecutedFirestoreQuery(store, env, {
+      commandOptions: input.commandOptions,
+      draft: input.draft,
+      errorMessage: loadErrorMessage,
+      isDocumentQuery,
+      loadedPages: 0,
+      resultCount: 0,
+      runId,
+      tab: input.tab,
+      transition: (current) => firestoreQueryFailed(current, loadErrorMessage),
+    });
+  }
+}
+
+export async function executeFirestoreLoadMoreCommand(
+  store: AppCoreStore<FirestoreQueryRuntimeState>,
+  env: FirestoreQueryExecutionEnvironment,
+  input: {
+    readonly request: NonNullable<FirestoreQueryRuntimeState['queryRequests'][string]>;
+    readonly tab: FirestoreQueryExecutionTabLike;
+  },
+): Promise<void> {
+  const stateSnapshot = store.get();
+  const cursor = stateSnapshot.pages[stateSnapshot.pages.length - 1]?.nextCursor;
+  if (!cursor) {
+    store.update((state) => firestoreLoadMoreSucceeded(state, { items: [] }, false));
+    return;
+  }
+  try {
+    const page = await env.runQuery(input.request.query, pageRequest(cursor, input.request.limit));
+    store.update((state) =>
+      isCurrentFirestoreQueryRun(state, input.tab.id, input.request.runId)
+        ? firestoreLoadMoreSucceeded(
+          state,
+          firestoreQueryPage(page.items, page.nextCursor),
+          Boolean(page.nextCursor),
+        )
+        : state
+    );
+  } catch (error) {
+    const moreErrorMessage = messageFromError(error, 'Could not load Firestore data.');
+    store.update((state) =>
+      isCurrentFirestoreQueryRun(state, input.tab.id, input.request.runId)
+        ? firestoreLoadMoreFailed(state, moreErrorMessage)
+        : state
+    );
+  }
+}
+
 export function continueFirestorePageReloadCommand(
   state: FirestoreQueryRuntimeState,
   input: FirestorePageReloadCommandInput,
@@ -175,6 +290,86 @@ export function completeFirestoreQueryCommand(
     activity: firestoreQueryCompletionActivity(input),
     state: firestoreQueryCompletionRecorded(state, key),
   };
+}
+
+function completeExecutedFirestoreQuery(
+  store: AppCoreStore<FirestoreQueryRuntimeState>,
+  env: FirestoreQueryExecutionEnvironment,
+  input: {
+    readonly commandOptions?: AppCoreCommandOptions | undefined;
+    readonly draft: FirestoreQueryDraft;
+    readonly errorMessage: string | null;
+    readonly isDocumentQuery: boolean;
+    readonly loadedPages: number;
+    readonly resultCount: number;
+    readonly runId: number;
+    readonly tab: FirestoreQueryExecutionTabLike;
+    readonly transition: (state: FirestoreQueryRuntimeState) => FirestoreQueryRuntimeState;
+  },
+): void {
+  const current = store.get();
+  if (!isCurrentFirestoreQueryRun(current, input.tab.id, input.runId)) return;
+  const transitioned = input.transition(current);
+  const result = completeFirestoreQueryCommand(transitioned, {
+    commandOptions: input.commandOptions,
+    connectionId: input.tab.connectionId,
+    draft: input.draft,
+    errorMessage: input.errorMessage,
+    isDocumentQuery: input.isDocumentQuery,
+    isLoading: false,
+    loadedPages: input.loadedPages,
+    pendingPageReloadCount: 0,
+    resultCount: input.resultCount,
+    runId: input.runId,
+    tabId: input.tab.id,
+  });
+  store.set(result.state);
+  if (result.activity) void env.recordActivity?.(result.activity);
+}
+
+async function loadDocumentPage(
+  env: FirestoreQueryExecutionEnvironment,
+  connectionId: string,
+  path: string,
+): Promise<FirestoreQueryRuntimeState['pages']> {
+  const document = await env.getDocument(connectionId, path);
+  return document ? [{ items: [document] }] : [];
+}
+
+async function loadQueryPages(
+  env: FirestoreQueryExecutionEnvironment,
+  query: FirestoreQuery,
+  limit: number,
+  pagesToLoad: number,
+): Promise<FirestoreQueryRuntimeState['pages']> {
+  const pages: FirestoreQueryPage[] = [];
+  let cursor: PageRequest['cursor'] | undefined;
+  do {
+    // eslint-disable-next-line no-await-in-loop -- Each page depends on the previous cursor.
+    const page = await env.runQuery(query, pageRequest(cursor, limit));
+    pages.push(firestoreQueryPage(page.items, page.nextCursor));
+    cursor = page.nextCursor ?? undefined;
+  } while (cursor && pages.length < pagesToLoad);
+  return pages;
+}
+
+function isCurrentFirestoreQueryRun(
+  state: FirestoreQueryRuntimeState,
+  tabId: string,
+  runId: number,
+): boolean {
+  return state.queryRequests[tabId]?.runId === runId;
+}
+
+function pageRequest(cursor: PageRequest['cursor'] | undefined, limit: number): PageRequest {
+  return cursor ? { cursor, limit } : { limit };
+}
+
+function firestoreQueryPage(
+  items: ReadonlyArray<FirestoreDocumentResult>,
+  nextCursor: PageRequest['cursor'] | null | undefined,
+): FirestoreQueryPage {
+  return nextCursor ? { items, nextCursor } : { items };
 }
 
 export function firestoreQueryCompletionActivity(
