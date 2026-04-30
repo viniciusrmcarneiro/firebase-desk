@@ -52,7 +52,7 @@ export function useAuthTabState(
 ): AuthTabState {
   const store = useMemo(
     () => inputStore ?? createAuthStore({ filter: initialAuthFilter }),
-    [inputStore],
+    [initialAuthFilter, inputStore],
   );
   const state = useAppCoreSelector(store, (snapshot) => snapshot);
   const activeProjectId = activeTab?.kind === 'auth-users' ? activeProject?.id ?? null : null;

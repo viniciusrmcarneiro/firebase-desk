@@ -95,6 +95,27 @@ describe('useAuthTabState', () => {
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
   });
 
+  it('recreates the default store when the restored initial filter changes', () => {
+    let initialAuthFilter = 'ada';
+    const { rerender, result } = renderHook(() =>
+      useAuthTabState({
+        activeProject: project,
+        activeTab: tab,
+        initialAuthFilter,
+        recordActivity: vi.fn(),
+        selectedUserId: null,
+      })
+    );
+
+    expect(result.current.authFilter).toBe('ada');
+
+    initialAuthFilter = 'grace';
+    rerender();
+
+    expect(result.current.authFilter).toBe('grace');
+    expect(useSearchUsers).toHaveBeenLastCalledWith('emu', 'grace', true, 'tab-auth-1', 0);
+  });
+
   it('refreshes the current auth query from the first page', () => {
     const { result } = renderHook(() =>
       useAuthTabState({
