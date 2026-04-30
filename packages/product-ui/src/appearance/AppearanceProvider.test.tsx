@@ -23,6 +23,7 @@ class TestSettingsRepository implements SettingsRepository {
     resultTableLayouts: {},
     firestoreFieldCatalogs: {},
     firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
+    workspaceState: null,
   };
 
   async load(): Promise<SettingsSnapshot> {
@@ -40,6 +41,7 @@ class TestSettingsRepository implements SettingsRepository {
       resultTableLayouts: patch.resultTableLayouts ?? this.snapshot.resultTableLayouts,
       firestoreFieldCatalogs: patch.firestoreFieldCatalogs ?? this.snapshot.firestoreFieldCatalogs,
       firestoreWrites: patch.firestoreWrites ?? this.snapshot.firestoreWrites,
+      workspaceState: patch.workspaceState ?? this.snapshot.workspaceState,
     };
     return this.snapshot;
   }

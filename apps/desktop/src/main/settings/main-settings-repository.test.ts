@@ -16,6 +16,7 @@ const initialSnapshot: SettingsSnapshot = {
   resultTableLayouts: {},
   firestoreFieldCatalogs: {},
   firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
+  workspaceState: null,
 };
 
 describe('MainSettingsRepository', () => {

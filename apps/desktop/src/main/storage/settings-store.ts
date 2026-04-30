@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS_SNAPSHOT: SettingsSnapshot = {
   resultTableLayouts: {},
   firestoreFieldCatalogs: {},
   firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
+  workspaceState: null,
 };
 
 export class SettingsStore {
@@ -75,6 +76,7 @@ function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
     activityLog: cloneActivityLogSettings(snapshot.activityLog),
     firestoreWrites: normalizeFirestoreWriteSettings(snapshot.firestoreWrites),
     hotkeyOverrides: { ...snapshot.hotkeyOverrides },
+    workspaceState: cloneWorkspaceState(snapshot.workspaceState),
     firestoreFieldCatalogs: Object.fromEntries(
       Object.entries(snapshot.firestoreFieldCatalogs).map(([key, entries]) => [
         key,
@@ -95,6 +97,11 @@ function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
       ]),
     ),
   };
+}
+
+function cloneWorkspaceState(value: unknown | null): unknown | null {
+  if (value === null || value === undefined) return null;
+  return JSON.parse(JSON.stringify(value)) as unknown;
 }
 
 function cloneActivityLogSettings(settings: ActivityLogSettings): ActivityLogSettings {

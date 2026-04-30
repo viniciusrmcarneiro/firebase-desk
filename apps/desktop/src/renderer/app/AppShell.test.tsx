@@ -18,10 +18,7 @@ import {
 } from './RepositoryProvider.tsx';
 import { selectionActions } from './stores/selectionStore.ts';
 import { tabActions } from './stores/tabsStore.ts';
-import {
-  type PersistedWorkspaceState,
-  WORKSPACE_STATE_STORAGE_KEY,
-} from './workspacePersistence.ts';
+import { type PersistedWorkspaceState } from './workspacePersistence.ts';
 
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: (
@@ -80,16 +77,15 @@ function renderShell(
     readonly initialTab?: InitialTab;
     readonly repositories?: RepositorySet;
     readonly savedWorkspace?: PersistedWorkspaceState;
-    readonly savedWorkspaceRaw?: string;
+    readonly savedWorkspaceRaw?: unknown;
     readonly strictMode?: boolean;
   } = {},
 ) {
-  window.localStorage.clear();
   if (savedWorkspaceRaw !== undefined) {
-    window.localStorage.setItem(WORKSPACE_STATE_STORAGE_KEY, savedWorkspaceRaw);
+    void repositories.settings.save({ workspaceState: savedWorkspaceRaw });
   }
   if (savedWorkspace) {
-    window.localStorage.setItem(WORKSPACE_STATE_STORAGE_KEY, JSON.stringify(savedWorkspace));
+    void repositories.settings.save({ workspaceState: savedWorkspace });
   }
   tabActions.reset();
   selectionActions.reset();
@@ -642,13 +638,14 @@ describe('desktop AppShell', () => {
     };
     const restoreSpy = vi.spyOn(tabActions, 'restore');
 
-    renderShell({ savedWorkspace, strictMode: true });
+    const repositories = createMockRepositories();
+    renderShell({ repositories, savedWorkspace, strictMode: true });
 
     const pathInput = await screen.findByRole('textbox', { name: 'Query path' });
     expect((pathInput as HTMLInputElement).value).toBe('customers');
     expect(restoreSpy).toHaveBeenCalledTimes(1);
-    await waitFor(() => {
-      const raw = window.localStorage.getItem(WORKSPACE_STATE_STORAGE_KEY) ?? '';
+    await waitFor(async () => {
+      const raw = JSON.stringify((await repositories.settings.load()).workspaceState);
       expect(raw).toContain('customers');
       expect(raw).toContain('"limit":7');
     });
@@ -673,8 +670,8 @@ describe('desktop AppShell', () => {
       target: { value: '9' },
     });
 
-    await waitFor(() => {
-      const raw = window.localStorage.getItem(WORKSPACE_STATE_STORAGE_KEY);
+    await waitFor(async () => {
+      const raw = JSON.stringify((await repositories.settings.load()).workspaceState);
       expect(raw).toContain('customers');
       expect(raw).toContain('"limit":9');
       expect(raw).not.toContain('queryRows');

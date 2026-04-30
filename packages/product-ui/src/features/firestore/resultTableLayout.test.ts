@@ -19,6 +19,7 @@ const settingsSnapshot: SettingsSnapshot = {
   resultTableLayouts: {},
   sidebarWidth: 320,
   theme: 'system',
+  workspaceState: null,
 };
 
 const columns: ReadonlyArray<DataTableColumn<{ id: string; }>> = [

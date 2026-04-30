@@ -50,7 +50,7 @@ export function useJsTabState(
 ): JsTabState {
   const store = useMemo(
     () => inputStore ?? createJsQueryStore({ scripts: initialScripts }),
-    [inputStore],
+    [initialScripts, inputStore],
   );
   const state = useAppCoreSelector(store, (snapshot) => snapshot);
   const scriptEventHandlerRef = useRef<(event: ScriptRunEvent) => void>(() => {});

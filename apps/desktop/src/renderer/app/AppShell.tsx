@@ -158,6 +158,7 @@ export function AppShell(
   const recordActivity = activity.record;
   const persistedWorkspace = usePersistedWorkspaceState({
     onError: setWorkspacePersistenceError,
+    settings: repositories.settings,
   });
   const settings = useSettingsController({
     dataDirectoryApi: getDesktopAppApi(),
@@ -228,6 +229,7 @@ export function AppShell(
   usePersistWorkspaceSnapshot(workspaceSnapshot, {
     enabled: persistedWorkspace.restored,
     onError: setWorkspacePersistenceError,
+    settings: repositories.settings,
   });
   useEffect(() => {
     if (!workspacePersistenceError) return;

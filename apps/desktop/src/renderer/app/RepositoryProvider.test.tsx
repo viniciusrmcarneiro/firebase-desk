@@ -16,6 +16,7 @@ const snapshot: SettingsSnapshot = {
   resultTableLayouts: {},
   firestoreFieldCatalogs: {},
   firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
+  workspaceState: null,
 };
 
 afterEach(() => {

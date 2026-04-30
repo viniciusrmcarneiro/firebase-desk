@@ -51,6 +51,7 @@ export const SettingsSnapshotSchema = z.object({
   resultTableLayouts: ResultTableLayoutsSchema.default({}),
   firestoreFieldCatalogs: FirestoreFieldCatalogsSchema.default({}),
   firestoreWrites: FirestoreWriteSettingsSchema.default(DEFAULT_FIRESTORE_WRITE_SETTINGS),
+  workspaceState: z.unknown().nullable().default(null),
 });
 
 export const SettingsPatchSchema = z.object({
@@ -63,6 +64,7 @@ export const SettingsPatchSchema = z.object({
   resultTableLayouts: ResultTableLayoutsSchema.optional(),
   firestoreFieldCatalogs: FirestoreFieldCatalogsSchema.optional(),
   firestoreWrites: FirestoreWriteSettingsSchema.optional(),
+  workspaceState: z.unknown().nullable().optional(),
 });
 
 export const SettingsFileSchema = z.object({

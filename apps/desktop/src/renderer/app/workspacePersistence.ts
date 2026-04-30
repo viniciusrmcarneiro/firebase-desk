@@ -1,5 +1,9 @@
 import { FirestoreFilterOpSchema } from '@firebase-desk/ipc-schemas';
-import type { FirestoreQueryDraft, FirestoreQueryFilterDraft } from '@firebase-desk/repo-contracts';
+import type {
+  FirestoreQueryDraft,
+  FirestoreQueryFilterDraft,
+  SettingsRepository,
+} from '@firebase-desk/repo-contracts';
 import { z } from 'zod';
 import {
   type InteractionHistoryEntry,
@@ -7,8 +11,6 @@ import {
   WORKSPACE_TAB_KINDS,
   type WorkspaceTab,
 } from './stores/tabsStore.ts';
-
-export const WORKSPACE_STATE_STORAGE_KEY = 'firebase-desk.workspace.v1';
 
 const WorkspaceTabKindSchema = z.enum(WORKSPACE_TAB_KINDS);
 
@@ -118,15 +120,19 @@ export interface LoadPersistedWorkspaceStateResult {
   readonly snapshot: PersistedWorkspaceState | null;
 }
 
-export function loadPersistedWorkspaceState(): PersistedWorkspaceState | null {
-  return loadPersistedWorkspaceStateResult().snapshot;
+export async function loadPersistedWorkspaceState(
+  settings: Pick<SettingsRepository, 'load'>,
+): Promise<PersistedWorkspaceState | null> {
+  return (await loadPersistedWorkspaceStateResult(settings)).snapshot;
 }
 
-export function loadPersistedWorkspaceStateResult(): LoadPersistedWorkspaceStateResult {
+export async function loadPersistedWorkspaceStateResult(
+  settings: Pick<SettingsRepository, 'load'>,
+): Promise<LoadPersistedWorkspaceStateResult> {
   try {
-    const raw = window.localStorage.getItem(WORKSPACE_STATE_STORAGE_KEY);
-    if (!raw) return { error: null, snapshot: null };
-    const parsed = PersistedWorkspaceStateSchema.safeParse(JSON.parse(raw) as unknown);
+    const raw = (await settings.load()).workspaceState;
+    if (raw === null || raw === undefined) return { error: null, snapshot: null };
+    const parsed = PersistedWorkspaceStateSchema.safeParse(raw);
     if (!parsed.success) {
       return {
         error: {
@@ -149,24 +155,30 @@ export function loadPersistedWorkspaceStateResult(): LoadPersistedWorkspaceState
 }
 
 export function savePersistedWorkspaceState(
+  settings: Pick<SettingsRepository, 'save'>,
   state: Omit<PersistedWorkspaceState, 'version'>,
-): WorkspacePersistenceFailure | null {
+): Promise<WorkspacePersistenceFailure | null> {
   try {
-    persistWorkspaceState(state);
-    return null;
+    return persistWorkspaceState(settings, state)
+      .then(() => null)
+      .catch((error: unknown) => ({
+        message: messageFromError(error, 'Could not save workspace state.'),
+        operation: 'save' as const,
+      }));
   } catch (error) {
-    return {
+    return Promise.resolve({
       message: messageFromError(error, 'Could not save workspace state.'),
       operation: 'save',
-    };
+    });
   }
 }
 
-function persistWorkspaceState(
+async function persistWorkspaceState(
+  settings: Pick<SettingsRepository, 'save'>,
   state: Omit<PersistedWorkspaceState, 'version'>,
-): void {
+): Promise<void> {
   if (!state.tabsState.tabs.length) {
-    window.localStorage.removeItem(WORKSPACE_STATE_STORAGE_KEY);
+    await settings.save({ workspaceState: null });
     return;
   }
   const tabIds = new Set(state.tabsState.tabs.map((tab) => tab.id));
@@ -177,7 +189,34 @@ function persistWorkspaceState(
     scripts: pickTabRecord(state.scripts, tabIds),
     tabsState: sanitizeTabsState(state.tabsState),
   });
-  window.localStorage.setItem(WORKSPACE_STATE_STORAGE_KEY, JSON.stringify(payload));
+  await settings.save({ workspaceState: payload });
+}
+
+export function parsePersistedWorkspaceState(
+  value: unknown,
+): LoadPersistedWorkspaceStateResult {
+  try {
+    if (value === null || value === undefined) return { error: null, snapshot: null };
+    const parsed = PersistedWorkspaceStateSchema.safeParse(value);
+    if (!parsed.success) {
+      return {
+        error: {
+          message: 'Saved workspace state is invalid and was not restored.',
+          operation: 'load',
+        },
+        snapshot: null,
+      };
+    }
+    return { error: null, snapshot: parsed.data };
+  } catch (error) {
+    return {
+      error: {
+        message: messageFromError(error, 'Could not load saved workspace state.'),
+        operation: 'load',
+      },
+      snapshot: null,
+    };
+  }
 }
 
 function sanitizeTabsState(state: TabsState): TabsState {

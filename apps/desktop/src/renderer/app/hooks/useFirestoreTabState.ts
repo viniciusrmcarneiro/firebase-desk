@@ -73,6 +73,11 @@ export function useFirestoreTabState(
     createInitialFirestoreQueryRuntimeState({ drafts: initialDrafts })
   );
 
+  useEffect(() => {
+    if (!initialDrafts) return;
+    setQueryState(createInitialFirestoreQueryRuntimeState({ drafts: initialDrafts }));
+  }, [initialDrafts]);
+
   const activeDraft = selectFirestoreActiveDraft(
     queryState,
     activeTab,
