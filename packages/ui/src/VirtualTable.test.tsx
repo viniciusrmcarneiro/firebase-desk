@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@tanstack/react-virtual', () => ({
@@ -35,8 +35,12 @@ const columns: VirtualTableColumn<User>[] = [
 describe('VirtualTable', () => {
   it('renders headers and one cell per column per row', () => {
     render(<VirtualTable rows={rows} columns={columns} rowHeight={24} />);
-    expect(screen.getByText('Name')).toBeDefined();
-    expect(screen.getByText('Age')).toBeDefined();
+    expect(screen.getByRole('grid').getAttribute('aria-colcount')).toBe('2');
+    expect(screen.getByRole('grid').getAttribute('aria-rowcount')).toBe('3');
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeDefined();
+    expect(screen.getByRole('columnheader', { name: 'Age' })).toBeDefined();
+    expect(screen.getAllByRole('row')).toHaveLength(3);
+    expect(screen.getAllByRole('gridcell')).toHaveLength(4);
     expect(screen.getAllByTestId('name-cell').map((c) => c.textContent)).toEqual(['Ada', 'Linus']);
     expect(screen.getAllByTestId('age-cell').map((c) => c.textContent)).toEqual(['36', '54']);
   });
@@ -80,5 +84,25 @@ describe('VirtualTable', () => {
     );
 
     expect(screen.getByRole('separator', { name: 'Resize displayName' })).toBeDefined();
+  });
+
+  it('activates rows with keyboard and moves focus between rows', () => {
+    const onRowClick = vi.fn();
+    render(
+      <VirtualTable
+        rows={rows}
+        columns={columns}
+        onRowClick={onRowClick}
+        rowHeight={24}
+      />,
+    );
+
+    const dataRows = screen.getAllByRole('row').slice(1) as HTMLElement[];
+    dataRows[0]!.focus();
+    fireEvent.keyDown(dataRows[0]!, { key: 'Enter' });
+    fireEvent.keyDown(dataRows[0]!, { key: 'ArrowDown' });
+
+    expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+    expect(document.activeElement).toBe(dataRows[1]);
   });
 });

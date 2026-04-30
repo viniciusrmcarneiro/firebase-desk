@@ -121,6 +121,7 @@ export function DataTable<TData>(
           columnSizing: { ...sanitizedLayout.columnSizing, [columnId]: width },
         });
       }}
+      isRowSelected={(row) => selectedRowId === row.id}
       rowClassName={(row) =>
         cn(
           selectedRowId === row.id && 'bg-action-selected',

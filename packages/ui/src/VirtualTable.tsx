@@ -1,7 +1,16 @@
 import { density as densityTokens, type DensityName } from '@firebase-desk/design-tokens';
 import { useVirtualizer } from '@tanstack/react-virtual';
-import { Fragment, type Key, type MouseEvent, type ReactNode, useRef, useState } from 'react';
+import {
+  Fragment,
+  type Key,
+  type KeyboardEvent,
+  type MouseEvent,
+  type ReactNode,
+  useRef,
+  useState,
+} from 'react';
 import { cn } from './cn.ts';
+import { visibleVirtualRows } from './virtualRows.ts';
 
 export interface VirtualTableColumn<T> {
   readonly id: string;
@@ -22,6 +31,7 @@ export interface VirtualTableProps<T> {
   readonly enableColumnResize?: boolean;
   readonly getRowKey?: (row: T, index: number) => Key;
   readonly headerClassName?: string;
+  readonly isRowSelected?: (row: T, index: number) => boolean;
   readonly onColumnReorder?: (activeColumnId: string, overColumnId: string) => void;
   readonly onColumnResize?: (columnId: string, width: number) => void;
   readonly onRowClick?: (row: T) => void;
@@ -47,6 +57,7 @@ export function VirtualTable<T>(
     enableColumnResize = false,
     getRowKey,
     headerClassName,
+    isRowSelected,
     cellWrapper,
     onColumnReorder,
     onColumnResize,
@@ -69,27 +80,46 @@ export function VirtualTable<T>(
     count: rows.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => resolvedRowHeight,
+    initialRect: {
+      height: resolvedRowHeight * Math.min(Math.max(rows.length, 1), 12),
+      width: tableWidth ?? 0,
+    },
     overscan: 12,
   });
+  const virtualRows = visibleVirtualRows(
+    virtualizer.getVirtualItems(),
+    rows.length,
+    resolvedRowHeight,
+  );
 
   return (
-    <div ref={parentRef} className={cn('h-full overflow-auto', className)}>
+    <div
+      ref={parentRef}
+      aria-colcount={columns.length}
+      aria-rowcount={rows.length + 1}
+      className={cn('h-full overflow-auto', className)}
+      role='grid'
+    >
       <div
+        aria-rowindex={1}
         className={cn(
           'sticky top-0 z-10 flex border-b border-border-subtle bg-bg-elevated text-xs font-semibold text-text-secondary shadow-sm',
           headerClassName,
         )}
+        role='row'
         style={tableWidthStyle}
       >
-        {columns.map((c) => (
+        {columns.map((c, columnIndex) => (
           <div
             key={c.id}
+            aria-colindex={columnIndex + 1}
             className={cn(
               'relative flex min-w-0 items-center border-r border-border-subtle px-2 py-1 last:border-r-0',
               enableColumnReorder && !isResizingColumn && 'cursor-grab active:cursor-grabbing',
               isResizingColumn && 'cursor-col-resize',
             )}
             draggable={enableColumnReorder && !isResizingColumn}
+            role='columnheader'
             style={{ flex: columnFlex(c) }}
             onDragOver={(event) => {
               if (!enableColumnReorder) return;
@@ -125,6 +155,7 @@ export function VirtualTable<T>(
       </div>
       <div
         className={cn(rows.length === 0 && 'grid place-items-center')}
+        role='rowgroup'
         style={{
           minHeight: rows.length === 0 ? 'calc(100% - 28px)' : undefined,
           height: rows.length === 0 ? undefined : virtualizer.getTotalSize(),
@@ -133,17 +164,21 @@ export function VirtualTable<T>(
         }}
       >
         {rows.length === 0 ? emptyState : null}
-        {virtualizer.getVirtualItems().map((row) => {
+        {virtualRows.map((row) => {
           const item = rows[row.index];
           if (item === undefined) return null;
           const rowKey = getRowKey?.(item, row.index) ?? row.key;
           const rowElement = (
             <div
+              aria-rowindex={row.index + 2}
+              aria-selected={isRowSelected?.(item, row.index) ?? undefined}
               className={cn(
                 'flex border-b border-border-subtle text-sm text-text-primary hover:bg-action-ghost-hover',
                 onRowClick && 'cursor-pointer',
                 typeof rowClassName === 'function' ? rowClassName(item) : rowClassName,
               )}
+              data-virtual-table-row-index={row.index}
+              role='row'
               style={{
                 position: 'absolute',
                 top: 0,
@@ -153,13 +188,26 @@ export function VirtualTable<T>(
                 display: 'flex',
                 height: resolvedRowHeight,
               }}
+              tabIndex={onRowClick ? 0 : undefined}
               onClick={() => onRowClick?.(item)}
               onDoubleClick={() => onRowDoubleClick?.(item)}
+              onKeyDown={(event) => {
+                handleRowKeyDown({
+                  event,
+                  onRowClick,
+                  parent: parentRef.current,
+                  row: item,
+                  rowIndex: row.index,
+                  rowCount: rows.length,
+                });
+              }}
             >
-              {columns.map((c) => {
+              {columns.map((c, columnIndex) => {
                 const cellElement = (
                   <div
+                    aria-colindex={columnIndex + 1}
                     className='min-w-0 truncate border-r border-border-subtle px-2 py-1 last:border-r-0'
+                    role='gridcell'
                     style={{ flex: columnFlex(c) }}
                   >
                     {c.cell(item)}
@@ -178,6 +226,49 @@ export function VirtualTable<T>(
       </div>
     </div>
   );
+}
+
+function handleRowKeyDown<T>(
+  {
+    event,
+    onRowClick,
+    parent,
+    row,
+    rowCount,
+    rowIndex,
+  }: {
+    readonly event: KeyboardEvent<HTMLDivElement>;
+    readonly onRowClick?: ((row: T) => void) | undefined;
+    readonly parent: HTMLElement | null;
+    readonly row: T;
+    readonly rowCount: number;
+    readonly rowIndex: number;
+  },
+): void {
+  if ((event.key === 'Enter' || event.key === ' ') && onRowClick) {
+    event.preventDefault();
+    onRowClick(row);
+    return;
+  }
+
+  const nextIndex = nextKeyboardRowIndex(event.key, rowIndex, rowCount);
+  if (nextIndex === null) return;
+  event.preventDefault();
+  focusRow(parent, nextIndex);
+}
+
+function nextKeyboardRowIndex(key: string, rowIndex: number, rowCount: number): number | null {
+  if (key === 'ArrowDown') return Math.min(rowCount - 1, rowIndex + 1);
+  if (key === 'ArrowUp') return Math.max(0, rowIndex - 1);
+  if (key === 'Home') return 0;
+  if (key === 'End') return Math.max(0, rowCount - 1);
+  return null;
+}
+
+function focusRow(parent: HTMLElement | null, rowIndex: number): void {
+  const selector = `[data-virtual-table-row-index="${String(rowIndex)}"]`;
+  const row = parent?.querySelector<HTMLElement>(selector);
+  row?.focus();
 }
 
 function ColumnResizeHandle<T>(

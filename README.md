@@ -50,7 +50,7 @@ Every workflow has an identical local pnpm command:
 | Workflow      | Local equivalent                                                                                       |
 | ------------- | ------------------------------------------------------------------------------------------------------ |
 | `ci.yml`      | `pnpm install && pnpm format:check && pnpm lint && pnpm typecheck && pnpm test:coverage && pnpm build` |
-| `e2e.yml`     | `pnpm install && pnpm build && pnpm --filter @firebase-desk/e2e test:withEmulators`                    |
+| `e2e.yml`     | `pnpm install && pnpm build && pnpm test:smoke`                                                        |
 | `release.yml` | `pnpm install && pnpm package` (per-OS)                                                                |
 
 Linux package smoke can be reproduced from macOS with Docker:

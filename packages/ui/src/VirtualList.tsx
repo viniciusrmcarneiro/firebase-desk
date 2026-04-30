@@ -2,6 +2,7 @@ import { density as densityTokens, type DensityName } from '@firebase-desk/desig
 import { useVirtualizer } from '@tanstack/react-virtual';
 import { type Key, type ReactNode, useRef } from 'react';
 import { cn } from './cn.ts';
+import { visibleVirtualRows } from './virtualRows.ts';
 
 export interface VirtualListProps<T> {
   readonly items: ReadonlyArray<T>;
@@ -28,17 +29,27 @@ export function VirtualList<T>(
 ) {
   const parentRef = useRef<HTMLDivElement>(null);
   const rowHeight = densityTokens[density].rowHeight;
+  const estimateRowSize = estimateSize ?? (() => rowHeight);
   const virtualizer = useVirtualizer({
     count: items.length,
     getScrollElement: () => parentRef.current,
-    estimateSize: estimateSize ?? (() => rowHeight),
+    estimateSize: estimateRowSize,
+    initialRect: {
+      height: rowHeight * Math.min(Math.max(items.length, 1), 12),
+      width: 0,
+    },
     overscan,
   });
+  const virtualRows = visibleVirtualRows(
+    virtualizer.getVirtualItems(),
+    items.length,
+    estimateRowSize(0),
+  );
 
   return (
     <div ref={parentRef} className={cn('h-full overflow-auto', className)}>
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-        {virtualizer.getVirtualItems().map((row) => {
+        {virtualRows.map((row) => {
           const item = items[row.index];
           if (item === undefined) return null;
           return (

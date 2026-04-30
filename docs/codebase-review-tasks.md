@@ -140,23 +140,23 @@ Acceptance criteria:
 
 ## Phase 6: Tests, Build Output, And Accessibility
 
-- [ ] Split package build tsconfigs so tests/stories do not emit declarations.
-- [ ] Add a documented root smoke command or `test:all` path for emulator e2e.
-- [ ] Add complete IPC registry coverage.
-- [ ] Add hotkeys package tests.
-- [ ] Add DataTable/VirtualTable ARIA and keyboard tests.
-- [ ] Reduce mock-heavy product surface tests.
-- [ ] Split large test files by feature/workflow.
-- [ ] Consolidate duplicate AppShell/write tests into app-core command tests where possible.
-- [ ] Add missing storage, product integration, query builder, settings, workspace persistence, and race-condition tests from the findings.
+- [x] Split package build tsconfigs so tests/stories do not emit declarations.
+- [x] Add a documented root smoke command or `test:all` path for emulator e2e.
+- [x] Add complete IPC registry coverage.
+- [x] Add hotkeys package tests.
+- [x] Add DataTable/VirtualTable ARIA and keyboard tests.
+- [x] Reduce mock-heavy product surface tests.
+- [x] Split large test files by feature/workflow.
+- [x] Consolidate duplicate AppShell/write tests into app-core command tests where possible.
+- [x] Add missing storage, product integration, query builder, settings, workspace persistence, and race-condition tests from the findings.
 
 Acceptance criteria:
 
-- [ ] Build output no longer includes `*.test.d.ts` or story declarations.
-- [ ] Hotkeys tests cover overrides, editable suppression, and allow-in-editable behavior.
-- [ ] DataTable/VirtualTable exposes tested roles and keyboard behavior or is explicitly renamed away from table semantics.
-- [ ] Product integration tests use real table/tree components for at least one Firestore and one Auth path.
-- [ ] Large test files are split without losing coverage.
+- [x] Build output no longer includes `*.test.d.ts` or story declarations.
+- [x] Hotkeys tests cover overrides, editable suppression, and allow-in-editable behavior.
+- [x] DataTable/VirtualTable exposes tested roles and keyboard behavior or is explicitly renamed away from table semantics.
+- [x] Product integration tests use real table/tree components for at least one Firestore and one Auth path.
+- [x] Large test files are split without losing coverage.
 
 ## Phase 7: UI, Security, Storage, And Boundary Polish
 
