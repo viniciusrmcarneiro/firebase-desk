@@ -80,7 +80,10 @@ export function usePersistWorkspaceSnapshot(
   const { onError, settings } = options;
   const skippedInitialSaveRef = useRef(false);
   const lastQueuedSnapshotKeyRef = useRef<string | null>(null);
+  const pendingSnapshotRef = useRef<WorkspacePersistenceSnapshot | null>(null);
   const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestSaveOptionsRef = useRef({ onError, settings });
+  latestSaveOptionsRef.current = { onError, settings };
 
   useEffect(() => {
     function clearPendingSave() {
@@ -92,6 +95,7 @@ export function usePersistWorkspaceSnapshot(
     if (!options.enabled) {
       skippedInitialSaveRef.current = false;
       lastQueuedSnapshotKeyRef.current = null;
+      pendingSnapshotRef.current = null;
       clearPendingSave();
       return;
     }
@@ -103,13 +107,30 @@ export function usePersistWorkspaceSnapshot(
     }
     if (lastQueuedSnapshotKeyRef.current === snapshotKey) return;
     lastQueuedSnapshotKeyRef.current = snapshotKey;
+    pendingSnapshotRef.current = snapshot;
     clearPendingSave();
     saveTimerRef.current = setTimeout(() => {
       saveTimerRef.current = null;
-      void savePersistedWorkspaceState(settings, snapshot).then((error) => {
-        if (error) onError?.(error);
+      const pendingSnapshot = pendingSnapshotRef.current;
+      pendingSnapshotRef.current = null;
+      if (!pendingSnapshot) return;
+      void savePersistedWorkspaceState(settings, pendingSnapshot).then((error) => {
+        if (error) latestSaveOptionsRef.current.onError?.(error);
       });
     }, options.debounceMs ?? 300);
-    return clearPendingSave;
   }, [onError, options.debounceMs, options.enabled, settings, snapshot]);
+
+  useEffect(() => () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const pendingSnapshot = pendingSnapshotRef.current;
+    pendingSnapshotRef.current = null;
+    if (!pendingSnapshot) return;
+    const latest = latestSaveOptionsRef.current;
+    void savePersistedWorkspaceState(latest.settings, pendingSnapshot).then((error) => {
+      if (error) latest.onError?.(error);
+    });
+  }, []);
 }

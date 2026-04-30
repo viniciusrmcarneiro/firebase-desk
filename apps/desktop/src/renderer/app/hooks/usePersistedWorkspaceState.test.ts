@@ -79,6 +79,30 @@ describe('usePersistWorkspaceSnapshot', () => {
     });
     expect(settings.save).toHaveBeenCalledTimes(1);
   });
+
+  it('flushes the queued snapshot when unmounted', async () => {
+    const settings = settingsSaveSpy();
+    const { rerender, unmount } = renderHook(
+      (props: { readonly snapshot: WorkspacePersistenceSnapshot; }) =>
+        usePersistWorkspaceSnapshot(props.snapshot, {
+          debounceMs: 50,
+          enabled: true,
+          settings,
+        }),
+      { initialProps: { snapshot: snapshot('orders') } },
+    );
+
+    rerender({ snapshot: snapshot('customers') });
+    unmount();
+    await act(async () => {
+      await Promise.resolve();
+    });
+
+    expect(settings.save).toHaveBeenCalledTimes(1);
+    expect(JSON.stringify(settings.save.mock.calls[0]?.[0].workspaceState)).toContain(
+      'customers',
+    );
+  });
 });
 
 function settingsSaveSpy(): Pick<SettingsRepository, 'save'> & {
