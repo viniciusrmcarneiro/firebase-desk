@@ -51,9 +51,11 @@ export function usePersistedWorkspaceState(
         restoredRef.current = true;
         const persistedWorkspace = loadResult.snapshot;
         if (persistedWorkspace) {
-          const result = restoreWorkspaceTabsCommand(persistedWorkspace.tabsState);
-          tabsStore.setState(() => result.state);
-          if (result.activeTab) selectionActions.selectTreeItem(treeItemIdForTab(result.activeTab));
+          const restoreResult = restoreWorkspaceTabsCommand(persistedWorkspace.tabsState);
+          tabsStore.setState(() => restoreResult.state);
+          if (restoreResult.activeTab) {
+            selectionActions.selectTreeItem(treeItemIdForTab(restoreResult.activeTab));
+          }
         }
       }
       setResult({ restored: true, snapshot: loadResult.snapshot });

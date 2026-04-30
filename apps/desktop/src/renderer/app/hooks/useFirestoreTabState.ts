@@ -119,7 +119,7 @@ export function useFirestoreTabState(
     : null;
   const selectedDocument = selectFirestoreSelectedDocument(queryRows, activeSelectedDocumentPath);
   const selectedDocumentPath = selectedDocument?.path ?? null;
-  const errorMessage = queryState.errorMessage;
+  const activeErrorMessage = queryState.errorMessage;
   const activeLoadedPageCount = selectFirestoreLoadedPageCount(
     queryState.pages,
     queryRequestIsDocument,
@@ -262,7 +262,7 @@ export function useFirestoreTabState(
     activeQueryIsDocument: queryRequestIsDocument,
     activeQueryPath: submittedQuery?.path ?? null,
     activeQueryRunId: activeQueryRequest?.runId ?? null,
-    errorMessage,
+    errorMessage: activeErrorMessage,
     hasMore: !queryRequestIsDocument && queryState.hasMore,
     isFetchingMore: !queryRequestIsDocument && queryState.isFetchingMore,
     isLoading: queryState.isLoading,
@@ -316,16 +316,16 @@ export function useFirestoreTabState(
         transition: nextState,
       });
     } catch (error) {
-      const errorMessage = messageFromError(error);
+      const loadErrorMessage = messageFromError(error);
       completeQueryRun({
         draft: input.draft,
-        errorMessage,
+        errorMessage: loadErrorMessage,
         isDocumentQuery,
         loadedPages: 0,
         resultCount: 0,
         runId,
         tab: input.tab,
-        transition: (current) => firestoreQueryFailed(current, errorMessage),
+        transition: (current) => firestoreQueryFailed(current, loadErrorMessage),
       });
     }
   }
@@ -337,10 +337,10 @@ export function useFirestoreTabState(
       readonly tab: WorkspaceTab;
     },
   ): Promise<void> {
-    const current = queryStateRef.current;
-    const cursor = current.pages[current.pages.length - 1]?.nextCursor;
+    const stateSnapshot = queryStateRef.current;
+    const cursor = stateSnapshot.pages[stateSnapshot.pages.length - 1]?.nextCursor;
     if (!cursor) {
-      updateQueryState((current) => firestoreLoadMoreSucceeded(current, { items: [] }, false));
+      updateQueryState((state) => firestoreLoadMoreSucceeded(state, { items: [] }, false));
       return;
     }
     try {
@@ -348,21 +348,21 @@ export function useFirestoreTabState(
         input.request.query,
         pageRequest(cursor, input.request.limit),
       );
-      updateQueryState((current) =>
-        isCurrentRun(current, input.tab.id, input.request.runId)
+      updateQueryState((state) =>
+        isCurrentRun(state, input.tab.id, input.request.runId)
           ? firestoreLoadMoreSucceeded(
-            current,
+            state,
             firestoreQueryPage(page.items, page.nextCursor),
             Boolean(page.nextCursor),
           )
-          : current
+          : state
       );
     } catch (error) {
-      const errorMessage = messageFromError(error);
-      updateQueryState((current) =>
-        isCurrentRun(current, input.tab.id, input.request.runId)
-          ? firestoreLoadMoreFailed(current, errorMessage)
-          : current
+      const moreErrorMessage = messageFromError(error);
+      updateQueryState((state) =>
+        isCurrentRun(state, input.tab.id, input.request.runId)
+          ? firestoreLoadMoreFailed(state, moreErrorMessage)
+          : state
       );
     }
   }
@@ -383,6 +383,7 @@ export function useFirestoreTabState(
     const pages: Array<FirestoreQueryRuntimeState['pages'][number]> = [];
     let cursor: PageRequest['cursor'] | undefined;
     do {
+      // eslint-disable-next-line no-await-in-loop -- Each page depends on the previous cursor.
       const page = await repositories.firestore.runQuery(query, pageRequest(cursor, limit));
       pages.push(firestoreQueryPage(page.items, page.nextCursor));
       cursor = page.nextCursor ?? undefined;
