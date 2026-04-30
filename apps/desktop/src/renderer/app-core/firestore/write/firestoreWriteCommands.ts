@@ -101,52 +101,54 @@ export async function createFirestoreDocumentCommand(
     ? `${input.collectionPath}/${input.documentId}`
     : input.documentId;
   store.update((state) => firestoreCreateStarted(state, documentPath));
-  try {
-    const document = await env.firestore.createDocument(
-      project.connectionId,
-      input.collectionPath,
-      input.documentId,
-      input.data,
-    );
-    if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
-    store.update((state) => firestoreCreateSucceeded(state, document));
-    void env.recordActivity({
-      action: 'Create document',
-      area: 'firestore',
-      durationMs: elapsedMs(startedAt, env.now()),
-      metadata: {
-        collectionPath: input.collectionPath,
-        documentId: input.documentId,
-        ...commandActivityMetadata(input.commandOptions),
-        ...documentDataMetadata(input.data),
-      },
-      payload: { data: input.data },
-      status: 'success',
-      summary: `Created ${document.path}`,
-      target: firestoreDocumentTarget(project, document.path),
-    });
-    return commandResult(`Created ${document.path}`, 'success', document, input.commandOptions);
-  } catch (error) {
-    const message = messageFromError(error, 'Could not create document.');
-    store.update((state) => firestoreCreateFailed(state, documentPath, message));
-    void env.recordActivity({
-      action: 'Create document',
-      area: 'firestore',
-      durationMs: elapsedMs(startedAt, env.now()),
-      error: { message },
-      metadata: {
-        collectionPath: input.collectionPath,
-        documentId: input.documentId,
-        ...commandActivityMetadata(input.commandOptions),
-        ...documentDataMetadata(input.data),
-      },
-      payload: { data: input.data },
-      status: 'failure',
-      summary: message,
-      target: firestoreDocumentTarget(project, documentPath),
-    });
-    throw toError(error, message);
-  }
+  return await executeWriteCommand({
+    fallbackMessage: 'Could not create document.',
+    onFailure: (message) => {
+      store.update((state) => firestoreCreateFailed(state, documentPath, message));
+      void env.recordActivity({
+        action: 'Create document',
+        area: 'firestore',
+        durationMs: elapsedMs(startedAt, env.now()),
+        error: { message },
+        metadata: {
+          collectionPath: input.collectionPath,
+          documentId: input.documentId,
+          ...commandActivityMetadata(input.commandOptions),
+          ...documentDataMetadata(input.data),
+        },
+        payload: { data: input.data },
+        status: 'failure',
+        summary: message,
+        target: firestoreDocumentTarget(project, documentPath),
+      });
+    },
+    run: async () => {
+      const document = await env.firestore.createDocument(
+        project.connectionId,
+        input.collectionPath,
+        input.documentId,
+        input.data,
+      );
+      if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
+      store.update((state) => firestoreCreateSucceeded(state, document));
+      void env.recordActivity({
+        action: 'Create document',
+        area: 'firestore',
+        durationMs: elapsedMs(startedAt, env.now()),
+        metadata: {
+          collectionPath: input.collectionPath,
+          documentId: input.documentId,
+          ...commandActivityMetadata(input.commandOptions),
+          ...documentDataMetadata(input.data),
+        },
+        payload: { data: input.data },
+        status: 'success',
+        summary: `Created ${document.path}`,
+        target: firestoreDocumentTarget(project, document.path),
+      });
+      return commandResult(`Created ${document.path}`, 'success', document, input.commandOptions);
+    },
+  });
 }
 
 export async function saveFirestoreDocumentCommand(
@@ -163,74 +165,81 @@ export async function saveFirestoreDocumentCommand(
   const project = requireProject(input.project, 'saving a document');
   const startedAt = env.now();
   store.update((state) => firestoreSaveStarted(state, input.documentPath));
-  try {
-    const result = await env.firestore.saveDocument(
-      project.connectionId,
-      input.documentPath,
-      input.data,
-      input.options,
-    );
-    store.update((state) => firestoreSaveSucceeded(state, input.documentPath, result));
-    if (result.status === 'conflict') {
+  return await executeWriteCommand({
+    fallbackMessage: 'Could not save document.',
+    onFailure: (message) => {
+      store.update((state) => firestoreSaveFailed(state, input.documentPath, message));
+      void env.recordActivity({
+        action: 'Save document',
+        area: 'firestore',
+        durationMs: elapsedMs(startedAt, env.now()),
+        error: { message },
+        metadata: {
+          lastUpdateTime: input.options?.lastUpdateTime ?? null,
+          ...commandActivityMetadata(input.commandOptions),
+          ...documentDataMetadata(input.data),
+        },
+        payload: { data: input.data },
+        status: 'failure',
+        summary: message,
+        target: firestoreDocumentTarget(project, input.documentPath),
+      });
+    },
+    run: async () => {
+      const result = await env.firestore.saveDocument(
+        project.connectionId,
+        input.documentPath,
+        input.data,
+        input.options,
+      );
+      store.update((state) => firestoreSaveSucceeded(state, input.documentPath, result));
+      if (result.status === 'conflict') {
+        void env.recordActivity({
+          action: 'Save document',
+          area: 'firestore',
+          durationMs: elapsedMs(startedAt, env.now()),
+          metadata: {
+            lastUpdateTime: input.options?.lastUpdateTime ?? null,
+            remoteUpdateTime: result.remoteDocument?.updateTime ?? null,
+            ...commandActivityMetadata(input.commandOptions),
+            ...documentDataMetadata(input.data),
+          },
+          payload: { data: input.data },
+          status: 'conflict',
+          summary: `Save conflict on ${input.documentPath}`,
+          target: firestoreDocumentTarget(project, input.documentPath),
+        });
+        return commandResult(
+          `Save conflict: ${input.documentPath}`,
+          'conflict',
+          result,
+          input.commandOptions,
+        );
+      }
+      if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
       void env.recordActivity({
         action: 'Save document',
         area: 'firestore',
         durationMs: elapsedMs(startedAt, env.now()),
         metadata: {
           lastUpdateTime: input.options?.lastUpdateTime ?? null,
-          remoteUpdateTime: result.remoteDocument?.updateTime ?? null,
+          updateTime: result.document.updateTime ?? null,
           ...commandActivityMetadata(input.commandOptions),
           ...documentDataMetadata(input.data),
         },
         payload: { data: input.data },
-        status: 'conflict',
-        summary: `Save conflict on ${input.documentPath}`,
-        target: firestoreDocumentTarget(project, input.documentPath),
+        status: 'success',
+        summary: `Saved ${result.document.path}`,
+        target: firestoreDocumentTarget(project, result.document.path),
       });
       return commandResult(
-        `Save conflict: ${input.documentPath}`,
-        'conflict',
+        `Saved ${result.document.path}`,
+        'success',
         result,
         input.commandOptions,
       );
-    }
-    if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
-    void env.recordActivity({
-      action: 'Save document',
-      area: 'firestore',
-      durationMs: elapsedMs(startedAt, env.now()),
-      metadata: {
-        lastUpdateTime: input.options?.lastUpdateTime ?? null,
-        updateTime: result.document.updateTime ?? null,
-        ...commandActivityMetadata(input.commandOptions),
-        ...documentDataMetadata(input.data),
-      },
-      payload: { data: input.data },
-      status: 'success',
-      summary: `Saved ${result.document.path}`,
-      target: firestoreDocumentTarget(project, result.document.path),
-    });
-    return commandResult(`Saved ${result.document.path}`, 'success', result, input.commandOptions);
-  } catch (error) {
-    const message = messageFromError(error, 'Could not save document.');
-    store.update((state) => firestoreSaveFailed(state, input.documentPath, message));
-    void env.recordActivity({
-      action: 'Save document',
-      area: 'firestore',
-      durationMs: elapsedMs(startedAt, env.now()),
-      error: { message },
-      metadata: {
-        lastUpdateTime: input.options?.lastUpdateTime ?? null,
-        ...commandActivityMetadata(input.commandOptions),
-        ...documentDataMetadata(input.data),
-      },
-      payload: { data: input.data },
-      status: 'failure',
-      summary: message,
-      target: firestoreDocumentTarget(project, input.documentPath),
-    });
-    throw toError(error, message);
-  }
+    },
+  });
 }
 
 export async function updateFirestoreDocumentFieldsCommand(
@@ -247,84 +256,86 @@ export async function updateFirestoreDocumentFieldsCommand(
   const project = requireProject(input.project, 'updating fields');
   const startedAt = env.now();
   store.update((state) => firestoreFieldPatchStarted(state, input.documentPath));
-  try {
-    const result = await env.firestore.updateDocumentFields(
-      project.connectionId,
-      input.documentPath,
-      input.operations,
-      input.options,
-    );
-    store.update((state) => firestoreFieldPatchSucceeded(state, input.documentPath, result));
-    if (result.status === 'conflict' || result.status === 'document-changed') {
-      const status = result.status === 'conflict' ? 'conflict' : 'success';
-      const label = fieldPatchStatusLabel(result.status);
+  return await executeWriteCommand({
+    fallbackMessage: 'Could not update fields.',
+    onFailure: (message) => {
+      store.update((state) => firestoreFieldPatchFailed(state, input.documentPath, message));
       void env.recordActivity({
         action: 'Update fields',
         area: 'firestore',
         durationMs: elapsedMs(startedAt, env.now()),
+        error: { message },
         metadata: {
-          classification: result.status,
           lastUpdateTime: input.options.lastUpdateTime ?? null,
-          remoteUpdateTime: result.remoteDocument?.updateTime ?? null,
           staleBehavior: input.options.staleBehavior,
           ...commandActivityMetadata(input.commandOptions),
           ...fieldPatchMetadata(input.operations),
         },
         payload: { operations: input.operations },
-        status,
-        summary: `${label} on ${input.documentPath}`,
+        status: 'failure',
+        summary: message,
         target: firestoreDocumentTarget(project, input.documentPath),
       });
-      return commandResult(
-        `${label}: ${input.documentPath}`,
-        status,
-        result,
-        input.commandOptions,
+    },
+    run: async () => {
+      const result = await env.firestore.updateDocumentFields(
+        project.connectionId,
+        input.documentPath,
+        input.operations,
+        input.options,
       );
-    }
-    if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
-    const lastAction = result.documentChanged
-      ? `Saved ${result.document.path}; document changed elsewhere`
-      : `Saved ${result.document.path}`;
-    void env.recordActivity({
-      action: 'Update fields',
-      area: 'firestore',
-      durationMs: elapsedMs(startedAt, env.now()),
-      metadata: {
-        classification: result.documentChanged ? 'document-changed-saved' : 'saved',
-        lastUpdateTime: input.options.lastUpdateTime ?? null,
-        staleBehavior: input.options.staleBehavior,
-        updateTime: result.document.updateTime ?? null,
-        ...commandActivityMetadata(input.commandOptions),
-        ...fieldPatchMetadata(input.operations),
-      },
-      payload: { operations: input.operations },
-      status: 'success',
-      summary: lastAction,
-      target: firestoreDocumentTarget(project, result.document.path),
-    });
-    return commandResult(lastAction, 'success', result, input.commandOptions);
-  } catch (error) {
-    const message = messageFromError(error, 'Could not update fields.');
-    store.update((state) => firestoreFieldPatchFailed(state, input.documentPath, message));
-    void env.recordActivity({
-      action: 'Update fields',
-      area: 'firestore',
-      durationMs: elapsedMs(startedAt, env.now()),
-      error: { message },
-      metadata: {
-        lastUpdateTime: input.options.lastUpdateTime ?? null,
-        staleBehavior: input.options.staleBehavior,
-        ...commandActivityMetadata(input.commandOptions),
-        ...fieldPatchMetadata(input.operations),
-      },
-      payload: { operations: input.operations },
-      status: 'failure',
-      summary: message,
-      target: firestoreDocumentTarget(project, input.documentPath),
-    });
-    throw toError(error, message);
-  }
+      store.update((state) => firestoreFieldPatchSucceeded(state, input.documentPath, result));
+      if (result.status === 'conflict' || result.status === 'document-changed') {
+        const status = result.status === 'conflict' ? 'conflict' : 'success';
+        const label = fieldPatchStatusLabel(result.status);
+        void env.recordActivity({
+          action: 'Update fields',
+          area: 'firestore',
+          durationMs: elapsedMs(startedAt, env.now()),
+          metadata: {
+            classification: result.status,
+            lastUpdateTime: input.options.lastUpdateTime ?? null,
+            remoteUpdateTime: result.remoteDocument?.updateTime ?? null,
+            staleBehavior: input.options.staleBehavior,
+            ...commandActivityMetadata(input.commandOptions),
+            ...fieldPatchMetadata(input.operations),
+          },
+          payload: { operations: input.operations },
+          status,
+          summary: `${label} on ${input.documentPath}`,
+          target: firestoreDocumentTarget(project, input.documentPath),
+        });
+        return commandResult(
+          `${label}: ${input.documentPath}`,
+          status,
+          result,
+          input.commandOptions,
+        );
+      }
+      if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
+      const lastAction = result.documentChanged
+        ? `Saved ${result.document.path}; document changed elsewhere`
+        : `Saved ${result.document.path}`;
+      void env.recordActivity({
+        action: 'Update fields',
+        area: 'firestore',
+        durationMs: elapsedMs(startedAt, env.now()),
+        metadata: {
+          classification: result.documentChanged ? 'document-changed-saved' : 'saved',
+          lastUpdateTime: input.options.lastUpdateTime ?? null,
+          staleBehavior: input.options.staleBehavior,
+          updateTime: result.document.updateTime ?? null,
+          ...commandActivityMetadata(input.commandOptions),
+          ...fieldPatchMetadata(input.operations),
+        },
+        payload: { operations: input.operations },
+        status: 'success',
+        summary: lastAction,
+        target: firestoreDocumentTarget(project, result.document.path),
+      });
+      return commandResult(lastAction, 'success', result, input.commandOptions);
+    },
+  });
 }
 
 export async function deleteFirestoreDocumentCommand(
@@ -340,46 +351,68 @@ export async function deleteFirestoreDocumentCommand(
   const project = requireProject(input.project, 'deleting a document');
   const startedAt = env.now();
   store.update((state) => firestoreDeleteStarted(state, input.documentPath));
+  return await executeWriteCommand({
+    fallbackMessage: 'Could not delete document.',
+    onFailure: (message) => {
+      store.update((state) => firestoreDeleteFailed(state, input.documentPath, message));
+      void env.recordActivity({
+        action: 'Delete document',
+        area: 'firestore',
+        durationMs: elapsedMs(startedAt, env.now()),
+        error: { message },
+        metadata: {
+          deleteSubcollectionPaths: input.deleteSubcollectionPaths,
+          ...commandActivityMetadata(input.commandOptions),
+        },
+        status: 'failure',
+        summary: message,
+        target: firestoreDocumentTarget(project, input.documentPath),
+      });
+    },
+    run: async () => {
+      await env.firestore.deleteDocument(project.connectionId, input.documentPath, {
+        deleteSubcollectionPaths: input.deleteSubcollectionPaths,
+      });
+      if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
+      store.update((state) => firestoreDeleteSucceeded(state, input.documentPath));
+      void env.recordActivity({
+        action: 'Delete document',
+        area: 'firestore',
+        durationMs: elapsedMs(startedAt, env.now()),
+        metadata: {
+          deleteSubcollectionPaths: input.deleteSubcollectionPaths,
+          ...commandActivityMetadata(input.commandOptions),
+        },
+        status: 'success',
+        summary: `Deleted ${input.documentPath}`,
+        target: firestoreDocumentTarget(project, input.documentPath),
+      });
+      return commandResult(
+        `Deleted ${input.documentPath}`,
+        'success',
+        undefined,
+        input.commandOptions,
+      );
+    },
+  });
+}
+
+async function executeWriteCommand<T>(
+  {
+    fallbackMessage,
+    onFailure,
+    run,
+  }: {
+    readonly fallbackMessage: string;
+    readonly onFailure: (message: string) => void;
+    readonly run: () => Promise<T>;
+  },
+): Promise<T> {
   try {
-    await env.firestore.deleteDocument(project.connectionId, input.documentPath, {
-      deleteSubcollectionPaths: input.deleteSubcollectionPaths,
-    });
-    if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
-    store.update((state) => firestoreDeleteSucceeded(state, input.documentPath));
-    void env.recordActivity({
-      action: 'Delete document',
-      area: 'firestore',
-      durationMs: elapsedMs(startedAt, env.now()),
-      metadata: {
-        deleteSubcollectionPaths: input.deleteSubcollectionPaths,
-        ...commandActivityMetadata(input.commandOptions),
-      },
-      status: 'success',
-      summary: `Deleted ${input.documentPath}`,
-      target: firestoreDocumentTarget(project, input.documentPath),
-    });
-    return commandResult(
-      `Deleted ${input.documentPath}`,
-      'success',
-      undefined,
-      input.commandOptions,
-    );
+    return await run();
   } catch (error) {
-    const message = messageFromError(error, 'Could not delete document.');
-    store.update((state) => firestoreDeleteFailed(state, input.documentPath, message));
-    void env.recordActivity({
-      action: 'Delete document',
-      area: 'firestore',
-      durationMs: elapsedMs(startedAt, env.now()),
-      error: { message },
-      metadata: {
-        deleteSubcollectionPaths: input.deleteSubcollectionPaths,
-        ...commandActivityMetadata(input.commandOptions),
-      },
-      status: 'failure',
-      summary: message,
-      target: firestoreDocumentTarget(project, input.documentPath),
-    });
+    const message = messageFromError(error, fallbackMessage);
+    onFailure(message);
     throw toError(error, message);
   }
 }

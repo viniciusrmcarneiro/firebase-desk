@@ -87,30 +87,30 @@ Acceptance criteria:
 
 ## Phase 4: IPC And Shell Structure Cleanup
 
-- [ ] Split main IPC registry handlers by domain.
+- [x] Split main IPC registry handlers by domain.
   - Firestore.
   - Auth.
   - Script runner.
   - Activity.
   - Projects.
   - Settings.
-- [ ] Add registry tests that assert every IPC channel has a handler.
-- [ ] Add request/response schema tests for registered handlers.
-- [ ] Extract `executeWriteCommand<T>()` or equivalent to reduce duplicated write command bodies.
-- [ ] Split AppShell responsibilities into controllers/coordinators.
+- [x] Add registry tests that assert every IPC channel has a handler.
+- [x] Add request/response schema tests for registered handlers.
+- [x] Extract `executeWriteCommand<T>()` or equivalent to reduce duplicated write command bodies.
+- [x] Split AppShell responsibilities into controllers/coordinators.
   - Tab/project controller.
   - Hotkeys controller.
   - Dialog coordinator.
   - Command palette model.
-- [ ] Reduce `TabView` prop drilling into grouped models/actions.
+- [x] Reduce `TabView` prop drilling into grouped models/actions.
 
 Acceptance criteria:
 
-- [ ] Main IPC registry is mostly composition, not domain logic.
-- [ ] Every `IPC_CHANNELS` key is covered by a handler registration test.
-- [ ] Firestore write command tests still cover success, failure, conflict, and stale cases.
-- [ ] AppShell is smaller and remains behavior-compatible.
-- [ ] `TabView` props are grouped by concern.
+- [x] Main IPC registry is mostly composition, not domain logic.
+- [x] Every `IPC_CHANNELS` key is covered by a handler registration test.
+- [x] Firestore write command tests still cover success, failure, conflict, and stale cases.
+- [x] AppShell is smaller and remains behavior-compatible.
+- [x] `TabView` props are grouped by concern.
 
 ## Phase 5: Shared Firestore And Value Utilities
 

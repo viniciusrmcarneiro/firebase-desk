@@ -1,5 +1,4 @@
 import type { AppearanceMode, DensityName } from '@firebase-desk/design-tokens';
-import { useHotkey } from '@firebase-desk/hotkeys';
 import {
   AccountTree,
   ActivityDrawer,
@@ -71,16 +70,17 @@ import { type ActivityStore, useActivityController } from '../app-core/activity/
 import { firestoreQueryDraftMetadata } from '../app-core/firestore/query/index.ts';
 import { useFirestoreWriteController } from '../app-core/firestore/write/index.ts';
 import { useSettingsController } from '../app-core/settings/index.ts';
-import {
-  addProjectCommand,
-  removeProjectCommand,
-  updateProjectCommand,
-} from '../app-core/workspace/projectCommands.ts';
 import { closeWorkspaceTabsCommand } from '../app-core/workspace/workspaceCommands.ts';
 import appIconUrl from '../assets/app-icon.png';
+import { createCommandPaletteModel } from './commandPaletteModel.ts';
 import { AddProjectDialog } from './dialogs/AddProjectDialog.tsx';
 import { EditProjectDialog } from './dialogs/EditProjectDialog.tsx';
+import { useAppShellHotkeys } from './hooks/useAppShellHotkeys.ts';
 import { useAuthTabState } from './hooks/useAuthTabState.ts';
+import {
+  type DestructiveAction,
+  useDestructiveActionController,
+} from './hooks/useDestructiveActionController.ts';
 import { useDocumentDensity } from './hooks/useDocumentDensity.ts';
 import { useFirestoreTabState } from './hooks/useFirestoreTabState.ts';
 import { useJsTabState } from './hooks/useJsTabState.ts';
@@ -88,6 +88,7 @@ import {
   usePersistedWorkspaceState,
   usePersistWorkspaceSnapshot,
 } from './hooks/usePersistedWorkspaceState.ts';
+import { useProjectCommandController } from './hooks/useProjectCommandController.ts';
 import { useProjects } from './hooks/useRepositoriesData.ts';
 import { useWorkspaceTree } from './hooks/useWorkspaceTree.ts';
 import { RenderErrorBoundary } from './RenderErrorBoundary.tsx';
@@ -112,13 +113,6 @@ import {
   treeItemIdForTab,
 } from './workspaceModel.ts';
 import type { WorkspacePersistenceFailure } from './workspacePersistence.ts';
-
-interface DestructiveAction {
-  readonly confirmLabel: string;
-  readonly description: string;
-  readonly onConfirm: () => void;
-  readonly title: string;
-}
 
 export interface AppShellProps {
   readonly activityStore?: ActivityStore | undefined;
@@ -153,9 +147,7 @@ export function AppShell(
     WorkspacePersistenceFailure | null
   >(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
-  const [pendingDestructiveAction, setPendingDestructiveAction] = useState<
-    DestructiveAction | null
-  >(null);
+  const destructiveAction = useDestructiveActionController();
   const nextCreateDocumentRequestId = useRef(1);
   const activity = useActivityController({
     loadIssuePreviewOnMount: !activityStore,
@@ -219,14 +211,12 @@ export function AppShell(
     ? projects.find((project) => project.id === editingProjectId) ?? null
     : null;
   const sidebarDefaultWidth = clampSidebarWidth(initialSidebarWidth);
-  const projectCommandEnv = useMemo(() => ({
-    invalidateProjects: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['projects'] });
-    },
-    now: Date.now,
+  const projectCommands = useProjectCommandController({
     projects: repositories.projects,
+    queryClient,
     recordActivity,
-  }), [queryClient, recordActivity, repositories.projects]);
+    setLastAction,
+  });
   const workspaceSnapshot = useMemo(() => ({
     authFilter: authTab.authFilter,
     drafts: firestoreTab.drafts,
@@ -268,68 +258,30 @@ export function AppShell(
     [tabsState.tabs],
   );
 
-  const commands = useMemo(() => [
-    ...tabsState.tabs.map((tab) => ({
-      id: `switch-${tab.id}`,
-      label: `Switch to ${tab.title}`,
-      onSelect: () => tabActions.selectTab(tab.id),
-    })),
-    { id: 'new-firestore', label: 'New Firestore tab', onSelect: () => openTab('firestore-query') },
-    { id: 'new-auth', label: 'New Auth tab', onSelect: () => openTab('auth-users') },
-    { id: 'new-js', label: 'New JS Query tab', onSelect: () => openTab('js-query') },
-    { id: 'settings', label: 'Settings', onSelect: settings.openSettings },
-    {
-      id: 'theme',
-      label: 'Toggle theme',
-      onSelect: () => settings.changeTheme(appearance.resolvedTheme === 'dark' ? 'light' : 'dark'),
-    },
-    { id: 'focus-tree', label: 'Focus tree filter', onSelect: focusTreeFilter },
-    { id: 'run-query', label: 'Run query', onSelect: handleRunQuery },
-    { id: 'run-script', label: 'Run script', onSelect: handleRunScript },
-  ], [
-    appearance,
-    settings,
-    tabsState.tabs,
-    activeTab,
-    firestoreTab.activeDraft,
-    activeProject,
-    jsTab.isRunning,
-    jsTab.scriptSource,
-  ]);
+  const commands = createCommandPaletteModel({
+    onChangeTheme: settings.changeTheme,
+    onFocusTreeFilter: handleFocusSearch,
+    onOpenSettings: settings.openSettings,
+    onOpenTab: openTab,
+    onRunQuery: handleRunQuery,
+    onRunScript: handleRunScript,
+    onSelectTab: tabActions.selectTab,
+    resolvedTheme: appearance.resolvedTheme,
+    tabs: tabsState.tabs,
+  });
 
-  useHotkey('settings.open', (event) => {
-    event.preventDefault();
-    settings.openSettings();
-  });
-  useHotkey('tab.new', (event) => {
-    event.preventDefault();
-    openTab(activeTab?.kind ?? 'firestore-query');
-  });
-  useHotkey('tab.close', (event) => {
-    event.preventDefault();
-    if (activeTab) requestCloseTab(activeTab.id);
-  });
-  useHotkey('history.back', (event) => {
-    event.preventDefault();
-    handleBackInteraction();
-  });
-  useHotkey('history.forward', (event) => {
-    event.preventDefault();
-    handleForwardInteraction();
-  });
-  useHotkey('tree.focusFilter', (event) => {
-    event.preventDefault();
-    if (activeTab?.kind === 'auth-users') {
-      document.querySelector<HTMLInputElement>('input[aria-label="Filter users"]')?.focus();
-      return;
-    }
-    focusTreeFilter();
-  });
-  useHotkey('query.run', (event) => {
-    if (activeTab?.kind !== 'firestore-query' && activeTab?.kind !== 'js-query') return;
-    event.preventDefault();
-    if (activeTab.kind === 'firestore-query') handleRunQuery();
-    else handleRunScript();
+  useAppShellHotkeys({
+    activeTabKind: activeTab?.kind ?? null,
+    onBack: handleBackInteraction,
+    onCloseTab: () => {
+      if (activeTab) requestCloseTab(activeTab.id);
+    },
+    onFocusSearch: handleFocusSearch,
+    onForward: handleForwardInteraction,
+    onNewTab: () => openTab(activeTab?.kind ?? 'firestore-query'),
+    onOpenSettings: settings.openSettings,
+    onRunQuery: handleRunQuery,
+    onRunScript: handleRunScript,
   });
 
   function handleBackInteraction() {
@@ -350,8 +302,16 @@ export function AppShell(
     setLastAction('Restored previous interaction');
   }
 
+  function handleFocusSearch() {
+    if (activeTab?.kind === 'auth-users') {
+      document.querySelector<HTMLInputElement>('input[aria-label="Filter users"]')?.focus();
+      return;
+    }
+    focusTreeFilter();
+  }
+
   function requestDestructiveAction(action: DestructiveAction) {
-    setPendingDestructiveAction(action);
+    destructiveAction.request(action);
   }
 
   function requestCloseTab(tabId: string) {
@@ -443,11 +403,7 @@ export function AppShell(
       confirmLabel: 'Remove',
       description: `Remove ${project?.name ?? 'this project'} from the workspace tree?`,
       onConfirm: () => {
-        void removeProjectCommand(projectCommandEnv, {
-          connectionId,
-          project: project ?? null,
-        })
-          .then((result) => setLastAction(result.lastAction))
+        void projectCommands.removeProject(connectionId, project ?? null)
           .catch((error) => {
             setLastAction(`Remove failed: ${messageFromError(error, 'Could not remove project.')}`);
           });
@@ -497,18 +453,14 @@ export function AppShell(
   }
 
   async function handleAddProject(input: ProjectAddInput): Promise<ProjectSummary> {
-    const result = await addProjectCommand(projectCommandEnv, input);
-    setLastAction(result.lastAction);
-    return result.result;
+    return await projectCommands.addProject(input);
   }
 
   async function handleUpdateProject(
     id: string,
     patch: ProjectUpdatePatch,
   ): Promise<ProjectSummary> {
-    const result = await updateProjectCommand(projectCommandEnv, { id, patch });
-    setLastAction(result.lastAction);
-    return result.result;
+    return await projectCommands.updateProject(id, patch);
   }
 
   function handleRunQuery() {
@@ -593,58 +545,65 @@ export function AppShell(
     ? (
       <TabView
         activeTab={activeTab}
-        authErrorMessage={authTab.errorMessage}
-        authFilter={authTab.authFilter}
-        draft={firestoreTab.activeDraft}
-        firestoreErrorMessage={firestoreTab.errorMessage}
-        hasMore={firestoreTab.hasMore}
-        isFetchingMore={firestoreTab.isFetchingMore}
-        isLoading={firestoreTab.isLoading}
-        queryRows={firestoreTab.queryRows}
-        repositories={repositories}
-        scriptIsRunning={jsTab.isRunning}
-        scriptResult={jsTab.scriptResult}
-        scriptRunId={jsTab.scriptRunId}
-        scriptStartedAt={jsTab.scriptStartedAt}
-        scriptSource={jsTab.scriptSource}
-        selectedDocument={firestoreTab.selectedDocument}
-        selectedDocumentPath={firestoreTab.selectedDocumentPath}
-        selectedUser={authTab.selectedUser}
-        selectedUserId={selection.authUserId}
-        users={authTab.users}
-        usersHasMore={authTab.usersHasMore}
-        usersIsFetchingMore={authTab.usersIsFetchingMore}
-        usersIsLoading={authTab.usersIsLoading}
-        createDocumentRequest={firestoreWrite.createDocumentRequest}
-        onAuthFilterChange={authTab.setAuthFilter}
-        onCancelScript={handleCancelScript}
-        onCreateDocument={firestoreWrite.createDocument}
-        onCreateDocumentRequestHandled={firestoreWrite.handleCreateDocumentRequestHandled}
-        onDeleteDocument={firestoreWrite.deleteDocument}
-        onDraftChange={firestoreTab.setDraft}
-        onGenerateDocumentId={firestoreWrite.generateDocumentId}
-        onLoadMore={handleLoadMoreFirestore}
-        onLoadMoreUsers={handleLoadMoreUsers}
-        onLoadSubcollections={handleLoadSubcollections}
-        onOpenDocumentInNewTab={(path) => {
-          const tabId = openFirestoreTabInNewTab(activeTab.connectionId, path);
-          tabActions.recordInteraction({
-            activeTabId: tabId,
-            path,
-            selectedTreeItemId: selection.treeItemId,
-          });
-          setLastAction(`Opened ${path} in new tab`);
+        auth={{
+          errorMessage: authTab.errorMessage,
+          filter: authTab.authFilter,
+          hasMore: authTab.usersHasMore,
+          isFetchingMore: authTab.usersIsFetchingMore,
+          isLoading: authTab.usersIsLoading,
+          onFilterChange: authTab.setAuthFilter,
+          onLoadMore: handleLoadMoreUsers,
+          onSaveCustomClaims: authTab.saveCustomClaims,
+          onSelectUser: (uid) => selectionActions.selectAuthUser(uid),
+          selectedUser: authTab.selectedUser,
+          selectedUserId: selection.authUserId,
+          users: authTab.users,
         }}
-        onReset={firestoreTab.resetDraft}
-        onRefreshResults={handleRefreshResults}
-        onRunQuery={handleRunQuery}
-        onRunScript={handleRunScript}
-        onSaveDocument={firestoreWrite.saveDocument}
-        onUpdateDocumentFields={firestoreWrite.updateDocumentFields}
-        onSaveUserCustomClaims={authTab.saveCustomClaims}
-        onScriptChange={jsTab.setScriptSource}
-        onSelectDocument={(path) => firestoreTab.selectDocument(activeTab.id, path)}
-        onSelectUser={(uid) => selectionActions.selectAuthUser(uid)}
+        firestore={{
+          createDocumentRequest: firestoreWrite.createDocumentRequest,
+          draft: firestoreTab.activeDraft,
+          errorMessage: firestoreTab.errorMessage,
+          hasMore: firestoreTab.hasMore,
+          isFetchingMore: firestoreTab.isFetchingMore,
+          isLoading: firestoreTab.isLoading,
+          onCreateDocument: firestoreWrite.createDocument,
+          onCreateDocumentRequestHandled: firestoreWrite.handleCreateDocumentRequestHandled,
+          onDeleteDocument: firestoreWrite.deleteDocument,
+          onDraftChange: firestoreTab.setDraft,
+          onGenerateDocumentId: firestoreWrite.generateDocumentId,
+          onLoadMore: handleLoadMoreFirestore,
+          onLoadSubcollections: handleLoadSubcollections,
+          onOpenDocumentInNewTab: (path) => {
+            const tabId = openFirestoreTabInNewTab(activeTab.connectionId, path);
+            tabActions.recordInteraction({
+              activeTabId: tabId,
+              path,
+              selectedTreeItemId: selection.treeItemId,
+            });
+            setLastAction(`Opened ${path} in new tab`);
+          },
+          onRefreshResults: handleRefreshResults,
+          onReset: firestoreTab.resetDraft,
+          onRunQuery: handleRunQuery,
+          onSaveDocument: firestoreWrite.saveDocument,
+          onSelectDocument: (path) => firestoreTab.selectDocument(activeTab.id, path),
+          onUpdateDocumentFields: firestoreWrite.updateDocumentFields,
+          rows: firestoreTab.queryRows,
+          selectedDocument: firestoreTab.selectedDocument,
+          selectedDocumentPath: firestoreTab.selectedDocumentPath,
+          settings: repositories.settings,
+        }}
+        script={{
+          isRunning: jsTab.isRunning,
+          onCancel: handleCancelScript,
+          onRun: handleRunScript,
+          onSourceChange: jsTab.setScriptSource,
+          result: jsTab.scriptResult,
+          runId: jsTab.scriptRunId,
+          runStartedAt: jsTab.scriptStartedAt,
+          settings: repositories.settings,
+          source: jsTab.scriptSource,
+        }}
       />
     )
     : null;
@@ -969,10 +928,8 @@ export function AppShell(
         onSettingsSaved={settings.recordSettingsSaved}
       />
       <DestructiveActionDialog
-        action={pendingDestructiveAction}
-        onOpenChange={(open) => {
-          if (!open) setPendingDestructiveAction(null);
-        }}
+        action={destructiveAction.pendingAction}
+        onOpenChange={destructiveAction.setOpen}
       />
       <AddProjectDialog
         open={addProjectOpen}
@@ -1207,16 +1164,36 @@ function ProjectSwitcher({ activeProject, onConnectionChange, projects }: Projec
 
 interface TabViewProps {
   readonly activeTab: WorkspaceTab;
-  readonly authErrorMessage: string | null;
-  readonly authFilter: string;
-  readonly createDocumentRequest: FirestoreCreateDocumentRequest | null;
-  readonly draft: FirestoreQueryDraft;
-  readonly firestoreErrorMessage: string | null;
+  readonly auth: AuthTabSurfaceModel;
+  readonly firestore: FirestoreTabSurfaceModel;
+  readonly script: ScriptTabSurfaceModel;
+}
+
+interface AuthTabSurfaceModel {
+  readonly errorMessage: string | null;
+  readonly filter: string;
   readonly hasMore: boolean;
   readonly isFetchingMore: boolean;
   readonly isLoading: boolean;
-  readonly onAuthFilterChange: (value: string) => void;
-  readonly onCancelScript: () => void;
+  readonly onFilterChange: (value: string) => void;
+  readonly onLoadMore: () => void;
+  readonly onSaveCustomClaims: (
+    uid: string,
+    claims: Record<string, unknown>,
+  ) => Promise<void> | void;
+  readonly onSelectUser: (uid: string) => void;
+  readonly selectedUser: AuthUser | null;
+  readonly selectedUserId: string | null;
+  readonly users: ReadonlyArray<AuthUser>;
+}
+
+interface FirestoreTabSurfaceModel {
+  readonly createDocumentRequest: FirestoreCreateDocumentRequest | null;
+  readonly draft: FirestoreQueryDraft;
+  readonly errorMessage: string | null;
+  readonly hasMore: boolean;
+  readonly isFetchingMore: boolean;
+  readonly isLoading: boolean;
   readonly onCreateDocument: (
     collectionPath: string,
     documentId: string,
@@ -1230,7 +1207,6 @@ interface TabViewProps {
   readonly onDraftChange: (draft: FirestoreQueryDraft) => void;
   readonly onGenerateDocumentId: (collectionPath: string) => Promise<string> | string;
   readonly onLoadMore: () => void;
-  readonly onLoadMoreUsers: () => void;
   readonly onLoadSubcollections: (
     documentPath: string,
   ) => Promise<ReadonlyArray<FirestoreCollectionNode>>;
@@ -1238,7 +1214,6 @@ interface TabViewProps {
   readonly onReset: () => void;
   readonly onRefreshResults: () => void;
   readonly onRunQuery: () => void;
-  readonly onRunScript: () => void;
   readonly onSaveDocument: (
     documentPath: string,
     data: Record<string, unknown>,
@@ -1252,90 +1227,85 @@ interface TabViewProps {
     | Promise<FirestoreUpdateDocumentFieldsResult | void>
     | FirestoreUpdateDocumentFieldsResult
     | void;
-  readonly onSaveUserCustomClaims: (
-    uid: string,
-    claims: Record<string, unknown>,
-  ) => Promise<void> | void;
-  readonly onScriptChange: (source: string) => void;
   readonly onSelectDocument: (documentPath: string) => void;
-  readonly onSelectUser: (uid: string) => void;
-  readonly queryRows: ReadonlyArray<FirestoreDocumentResult>;
-  readonly repositories: RepositorySet;
-  readonly scriptIsRunning: boolean;
-  readonly scriptResult: ScriptRunResult | undefined;
-  readonly scriptRunId: string | null;
-  readonly scriptStartedAt: number | null;
-  readonly scriptSource: string;
+  readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocument: FirestoreDocumentResult | null;
   readonly selectedDocumentPath: string | null;
-  readonly selectedUser: AuthUser | null;
-  readonly selectedUserId: string | null;
-  readonly users: ReadonlyArray<AuthUser>;
-  readonly usersHasMore: boolean;
-  readonly usersIsFetchingMore: boolean;
-  readonly usersIsLoading: boolean;
+  readonly settings: RepositorySet['settings'];
+}
+
+interface ScriptTabSurfaceModel {
+  readonly isRunning: boolean;
+  readonly onCancel: () => void;
+  readonly onRun: () => void;
+  readonly onSourceChange: (source: string) => void;
+  readonly result: ScriptRunResult | undefined;
+  readonly runId: string | null;
+  readonly runStartedAt: number | null;
+  readonly settings: RepositorySet['settings'];
+  readonly source: string;
 }
 
 function TabView(props: TabViewProps) {
   if (props.activeTab.kind === 'auth-users') {
     return (
       <AuthUsersSurface
-        errorMessage={props.authErrorMessage}
-        filterValue={props.authFilter}
-        hasMore={props.usersHasMore}
-        isFetchingMore={props.usersIsFetchingMore}
-        isLoading={props.usersIsLoading}
-        selectedUser={props.selectedUser}
-        selectedUserId={props.selectedUserId}
-        users={props.users}
-        onFilterChange={props.onAuthFilterChange}
-        onLoadMore={props.onLoadMoreUsers}
-        onSaveCustomClaims={props.onSaveUserCustomClaims}
-        onSelectUser={props.onSelectUser}
+        errorMessage={props.auth.errorMessage}
+        filterValue={props.auth.filter}
+        hasMore={props.auth.hasMore}
+        isFetchingMore={props.auth.isFetchingMore}
+        isLoading={props.auth.isLoading}
+        selectedUser={props.auth.selectedUser}
+        selectedUserId={props.auth.selectedUserId}
+        users={props.auth.users}
+        onFilterChange={props.auth.onFilterChange}
+        onLoadMore={props.auth.onLoadMore}
+        onSaveCustomClaims={props.auth.onSaveCustomClaims}
+        onSelectUser={props.auth.onSelectUser}
       />
     );
   }
   if (props.activeTab.kind === 'js-query') {
     return (
       <JsQuerySurface
-        isRunning={props.scriptIsRunning}
-        result={props.scriptResult ?? null}
-        runId={props.scriptRunId}
-        runStartedAt={props.scriptStartedAt}
-        settings={props.repositories.settings}
-        source={props.scriptSource}
-        onCancel={props.onCancelScript}
-        onRun={props.onRunScript}
-        onSourceChange={props.onScriptChange}
+        isRunning={props.script.isRunning}
+        result={props.script.result ?? null}
+        runId={props.script.runId}
+        runStartedAt={props.script.runStartedAt}
+        settings={props.script.settings}
+        source={props.script.source}
+        onCancel={props.script.onCancel}
+        onRun={props.script.onRun}
+        onSourceChange={props.script.onSourceChange}
       />
     );
   }
   return (
     <FirestoreQuerySurface
-      createDocumentRequest={props.createDocumentRequest}
-      draft={props.draft}
-      errorMessage={props.firestoreErrorMessage}
-      hasMore={props.hasMore}
-      isFetchingMore={props.isFetchingMore}
-      isLoading={props.isLoading}
-      rows={props.queryRows}
-      selectedDocument={props.selectedDocument}
-      selectedDocumentPath={props.selectedDocumentPath}
-      settings={props.repositories.settings}
-      onCreateDocument={props.onCreateDocument}
-      onCreateDocumentRequestHandled={props.onCreateDocumentRequestHandled}
-      onDraftChange={props.onDraftChange}
-      onDeleteDocument={props.onDeleteDocument}
-      onGenerateDocumentId={props.onGenerateDocumentId}
-      onLoadMore={props.onLoadMore}
-      onLoadSubcollections={props.onLoadSubcollections}
-      onOpenDocumentInNewTab={props.onOpenDocumentInNewTab}
-      onReset={props.onReset}
-      onRefreshResults={props.onRefreshResults}
-      onRun={props.onRunQuery}
-      onSaveDocument={props.onSaveDocument}
-      onUpdateDocumentFields={props.onUpdateDocumentFields}
-      onSelectDocument={props.onSelectDocument}
+      createDocumentRequest={props.firestore.createDocumentRequest}
+      draft={props.firestore.draft}
+      errorMessage={props.firestore.errorMessage}
+      hasMore={props.firestore.hasMore}
+      isFetchingMore={props.firestore.isFetchingMore}
+      isLoading={props.firestore.isLoading}
+      rows={props.firestore.rows}
+      selectedDocument={props.firestore.selectedDocument}
+      selectedDocumentPath={props.firestore.selectedDocumentPath}
+      settings={props.firestore.settings}
+      onCreateDocument={props.firestore.onCreateDocument}
+      onCreateDocumentRequestHandled={props.firestore.onCreateDocumentRequestHandled}
+      onDraftChange={props.firestore.onDraftChange}
+      onDeleteDocument={props.firestore.onDeleteDocument}
+      onGenerateDocumentId={props.firestore.onGenerateDocumentId}
+      onLoadMore={props.firestore.onLoadMore}
+      onLoadSubcollections={props.firestore.onLoadSubcollections}
+      onOpenDocumentInNewTab={props.firestore.onOpenDocumentInNewTab}
+      onReset={props.firestore.onReset}
+      onRefreshResults={props.firestore.onRefreshResults}
+      onRun={props.firestore.onRunQuery}
+      onSaveDocument={props.firestore.onSaveDocument}
+      onUpdateDocumentFields={props.firestore.onUpdateDocumentFields}
+      onSelectDocument={props.firestore.onSelectDocument}
     />
   );
 }
