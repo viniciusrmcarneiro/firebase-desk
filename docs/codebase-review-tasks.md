@@ -71,19 +71,19 @@ Acceptance criteria:
 
 ## Phase 3: App-Core Workflow Cleanup
 
-- [ ] Move Firestore page-reload watcher behavior out of hook-only effects.
-- [ ] Move Activity completion recording into command paths where commands own completion.
-- [ ] Track query activity dedupe in app-core state instead of hook refs.
-- [ ] Unify tab-close cleanup in one app-core path.
-- [ ] Move Firestore write conflict/stale/create modal workflow state fully into app-core.
-- [ ] Replace durable workspace `localStorage` persistence with an app storage/settings path or visible failure handling.
+- [x] Move Firestore page-reload watcher behavior out of hook-only effects.
+- [x] Move Activity completion recording into command paths where commands own completion.
+- [x] Track query activity dedupe in app-core state instead of hook refs.
+- [x] Unify tab-close cleanup in one app-core path.
+- [x] Move Firestore write conflict/stale/create modal workflow state fully into app-core.
+- [x] Replace durable workspace `localStorage` persistence with an app storage/settings path or visible failure handling.
 
 Acceptance criteria:
 
-- [ ] React adapters render state and dispatch intent; workflow rules live in app-core.
-- [ ] Page reload, Activity completion, tab close cleanup, and write conflict flows have app-core tests.
-- [ ] Existing AppShell integration behavior is unchanged.
-- [ ] Workspace persistence failures are not silently swallowed.
+- [x] React adapters render state and dispatch intent; workflow rules live in app-core.
+- [x] Page reload, Activity completion, tab close cleanup, and write conflict flows have app-core tests.
+- [x] Existing AppShell integration behavior is unchanged.
+- [x] Workspace persistence failures are not silently swallowed.
 
 ## Phase 4: IPC And Shell Structure Cleanup
 

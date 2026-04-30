@@ -15,6 +15,7 @@ import {
   firestoreLoadMoreStarted,
   firestoreLoadMoreSucceeded,
   firestorePendingPageReloadCleared,
+  firestoreQueryCompletionRecorded,
   firestoreQueryFailed,
   firestoreQueryStarted,
   firestoreQuerySucceeded,
@@ -123,8 +124,12 @@ describe('firestore query transitions and selectors', () => {
     );
     expect(clearedReload.pendingPageReloads['tab-1']).toBeUndefined();
 
-    const clearedTab = firestoreTabCleared(stale, 'tab-1');
+    const recorded = firestoreQueryCompletionRecorded(stale, 'tab-1:1');
+    expect(recorded.recordedQueryCompletions['tab-1:1']).toBe(true);
+
+    const clearedTab = firestoreTabCleared(recorded, 'tab-1');
     expect(clearedTab.selectedDocumentPaths['tab-1']).toBeUndefined();
+    expect(clearedTab.recordedQueryCompletions['tab-1:1']).toBeUndefined();
   });
 
   it('merges loaded subcollections into matching result rows', () => {

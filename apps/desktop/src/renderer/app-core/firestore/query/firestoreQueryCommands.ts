@@ -13,6 +13,8 @@ import { firestoreQueryDraftMetadata } from './firestoreQuerySelectors.ts';
 import type { FirestoreQueryRuntimeState } from './firestoreQueryState.ts';
 import {
   firestoreLoadMoreStarted,
+  firestorePendingPageReloadCleared,
+  firestoreQueryCompletionRecorded,
   firestoreQueryStarted,
   firestoreRefreshStarted,
   firestoreSubcollectionsLoaded,
@@ -49,6 +51,28 @@ export interface FirestoreQueryCompletionInput {
   readonly errorMessage: string | null;
   readonly loadedPages: number;
   readonly resultCount: number;
+}
+
+export interface FirestoreQueryCompletionCommandInput extends FirestoreQueryCompletionInput {
+  readonly isDocumentQuery: boolean;
+  readonly isLoading: boolean;
+  readonly pendingPageReloadCount: number;
+  readonly runId: number | null;
+  readonly tabId: string | null;
+}
+
+export interface FirestoreQueryCompletionCommandResult {
+  readonly activity: ActivityLogAppendInput | null;
+  readonly state: FirestoreQueryRuntimeState;
+}
+
+export interface FirestorePageReloadCommandInput {
+  readonly hasNextPage: boolean;
+  readonly isDocumentQuery: boolean;
+  readonly isFetchingNextPage: boolean;
+  readonly loadedPageCount: number;
+  readonly pendingPageReloadCount: number;
+  readonly tabId: string | null;
 }
 
 export interface FirestoreLoadMoreCommandResult {
@@ -95,6 +119,29 @@ export function loadMoreFirestoreQueryCommand(
   return { shouldFetchNextPage: true, state: firestoreLoadMoreStarted(state) };
 }
 
+export function continueFirestorePageReloadCommand(
+  state: FirestoreQueryRuntimeState,
+  input: FirestorePageReloadCommandInput,
+): FirestoreLoadMoreCommandResult {
+  if (
+    !input.tabId || input.isDocumentQuery || input.pendingPageReloadCount === 0
+    || input.loadedPageCount === 0
+  ) {
+    return { shouldFetchNextPage: false, state };
+  }
+  if (
+    input.pendingPageReloadCount <= 1 || input.loadedPageCount >= input.pendingPageReloadCount
+    || !input.hasNextPage
+  ) {
+    return {
+      shouldFetchNextPage: false,
+      state: firestorePendingPageReloadCleared(state, input.tabId),
+    };
+  }
+  if (input.isFetchingNextPage) return { shouldFetchNextPage: false, state };
+  return { shouldFetchNextPage: true, state };
+}
+
 export function loadFirestoreSubcollectionsCommand(
   state: FirestoreQueryRuntimeState,
   input: {
@@ -110,6 +157,24 @@ export function openFirestoreDocumentInNewTabCommand(
   path: string,
 ): FirestoreOpenDocumentIntent {
   return { connectionId, path };
+}
+
+export function completeFirestoreQueryCommand(
+  state: FirestoreQueryRuntimeState,
+  input: FirestoreQueryCompletionCommandInput,
+): FirestoreQueryCompletionCommandResult {
+  if (!input.tabId || input.runId === null || input.isLoading) {
+    return { activity: null, state };
+  }
+  if (!input.isDocumentQuery && input.pendingPageReloadCount > 0) {
+    return { activity: null, state };
+  }
+  const key = `${input.tabId}:${input.runId}`;
+  if (state.recordedQueryCompletions[key]) return { activity: null, state };
+  return {
+    activity: firestoreQueryCompletionActivity(input),
+    state: firestoreQueryCompletionRecorded(state, key),
+  };
 }
 
 export function firestoreQueryCompletionActivity(

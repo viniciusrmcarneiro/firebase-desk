@@ -1,6 +1,8 @@
 import type { FirestoreQuery, FirestoreQueryDraft } from '@firebase-desk/repo-contracts';
 import { describe, expect, it } from 'vitest';
 import {
+  completeFirestoreQueryCommand,
+  continueFirestorePageReloadCommand,
   firestoreQueryCompletionActivity,
   loadFirestoreSubcollectionsCommand,
   loadMoreFirestoreQueryCommand,
@@ -101,6 +103,96 @@ describe('firestore query commands', () => {
       shouldFetchNextPage: false,
       state: documentState,
     });
+  });
+
+  it('continues partial refreshes from app-core state', () => {
+    const state = refreshFirestoreQueryCommand(createInitialFirestoreQueryRuntimeState(), {
+      activeDraft: draft('orders'),
+      clearSelection: false,
+      pagesToReload: 3,
+      query: query('orders'),
+      selectedTreeItemId: null,
+      tab,
+    }).state;
+
+    expect(continueFirestorePageReloadCommand(state, {
+      hasNextPage: true,
+      isDocumentQuery: false,
+      isFetchingNextPage: false,
+      loadedPageCount: 1,
+      pendingPageReloadCount: 3,
+      tabId: tab.id,
+    })).toEqual({ shouldFetchNextPage: true, state });
+
+    const completed = continueFirestorePageReloadCommand(state, {
+      hasNextPage: true,
+      isDocumentQuery: false,
+      isFetchingNextPage: false,
+      loadedPageCount: 3,
+      pendingPageReloadCount: 3,
+      tabId: tab.id,
+    });
+
+    expect(completed.shouldFetchNextPage).toBe(false);
+    expect(completed.state.pendingPageReloads[tab.id]).toBeUndefined();
+  });
+
+  it('records query completion once and waits for refresh reloads', () => {
+    const state = refreshFirestoreQueryCommand(createInitialFirestoreQueryRuntimeState(), {
+      activeDraft: draft('orders'),
+      clearSelection: false,
+      pagesToReload: 2,
+      query: query('orders'),
+      selectedTreeItemId: null,
+      tab,
+    }).state;
+
+    expect(completeFirestoreQueryCommand(state, {
+      connectionId: 'emu',
+      draft: draft('orders'),
+      errorMessage: null,
+      isDocumentQuery: false,
+      isLoading: false,
+      loadedPages: 1,
+      pendingPageReloadCount: 2,
+      resultCount: 1,
+      runId: 1,
+      tabId: tab.id,
+    })).toEqual({ activity: null, state });
+
+    const readyState = { ...state, pendingPageReloads: {} };
+    const recorded = completeFirestoreQueryCommand(readyState, {
+      connectionId: 'emu',
+      draft: draft('orders'),
+      errorMessage: null,
+      isDocumentQuery: false,
+      isLoading: false,
+      loadedPages: 2,
+      pendingPageReloadCount: 0,
+      resultCount: 2,
+      runId: 1,
+      tabId: tab.id,
+    });
+
+    expect(recorded.activity).toMatchObject({
+      action: 'Run query',
+      metadata: { loadedPages: 2, resultCount: 2 },
+    });
+    expect(recorded.state.recordedQueryCompletions[`${tab.id}:1`]).toBe(true);
+    expect(
+      completeFirestoreQueryCommand(recorded.state, {
+        connectionId: 'emu',
+        draft: draft('orders'),
+        errorMessage: null,
+        isDocumentQuery: false,
+        isLoading: false,
+        loadedPages: 2,
+        pendingPageReloadCount: 0,
+        resultCount: 2,
+        runId: 1,
+        tabId: tab.id,
+      }).activity,
+    ).toBeNull();
   });
 
   it('merges loaded subcollections and returns document open intents', () => {

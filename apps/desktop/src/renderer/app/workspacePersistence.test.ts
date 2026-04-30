@@ -1,6 +1,7 @@
-import { beforeEach, describe, expect, it } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   loadPersistedWorkspaceState,
+  loadPersistedWorkspaceStateResult,
   type PersistedWorkspaceState,
   savePersistedWorkspaceState,
   WORKSPACE_STATE_STORAGE_KEY,
@@ -54,7 +55,10 @@ const persistedWorkspace: PersistedWorkspaceState = {
 };
 
 describe('workspacePersistence', () => {
-  beforeEach(() => window.localStorage.clear());
+  beforeEach(() => {
+    vi.restoreAllMocks();
+    window.localStorage.clear();
+  });
 
   it('loads valid user workspace state', () => {
     window.localStorage.setItem(WORKSPACE_STATE_STORAGE_KEY, JSON.stringify(persistedWorkspace));
@@ -72,6 +76,9 @@ describe('workspacePersistence', () => {
     );
 
     expect(loadPersistedWorkspaceState()).toBeNull();
+    expect(loadPersistedWorkspaceStateResult().error).toMatchObject({
+      operation: 'load',
+    });
   });
 
   it('does not restore invalid tab history state', () => {
@@ -110,7 +117,7 @@ describe('workspacePersistence', () => {
   });
 
   it('saves only user tab state and drops orphan tab records', () => {
-    savePersistedWorkspaceState({
+    expect(savePersistedWorkspaceState({
       ...persistedWorkspace,
       drafts: {
         ...persistedWorkspace.drafts,
@@ -120,7 +127,7 @@ describe('workspacePersistence', () => {
         },
       },
       scripts: { ...persistedWorkspace.scripts, 'closed-tab': 'return 2;' },
-    });
+    })).toBeNull();
 
     const raw = window.localStorage.getItem(WORKSPACE_STATE_STORAGE_KEY) ?? '';
     expect(raw).toContain('tab-firestore-1');
@@ -133,7 +140,7 @@ describe('workspacePersistence', () => {
   it('removes storage when no tabs are open', () => {
     window.localStorage.setItem(WORKSPACE_STATE_STORAGE_KEY, JSON.stringify(persistedWorkspace));
 
-    savePersistedWorkspaceState({
+    expect(savePersistedWorkspaceState({
       authFilter: '',
       drafts: {},
       scripts: {},
@@ -143,8 +150,19 @@ describe('workspacePersistence', () => {
         interactionHistoryIndex: 0,
         tabs: [],
       },
-    });
+    })).toBeNull();
 
     expect(window.localStorage.getItem(WORKSPACE_STATE_STORAGE_KEY)).toBeNull();
+  });
+
+  it('returns save failures instead of swallowing them', () => {
+    vi.spyOn(Storage.prototype, 'setItem').mockImplementation(() => {
+      throw new Error('quota exceeded');
+    });
+
+    expect(savePersistedWorkspaceState(persistedWorkspace)).toEqual({
+      message: 'quota exceeded',
+      operation: 'save',
+    });
   });
 });

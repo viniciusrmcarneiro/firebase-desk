@@ -66,7 +66,7 @@ import {
   Sun,
   X,
 } from 'lucide-react';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { type ActivityStore, useActivityController } from '../app-core/activity/index.ts';
 import { firestoreQueryDraftMetadata } from '../app-core/firestore/query/index.ts';
 import { useFirestoreWriteController } from '../app-core/firestore/write/index.ts';
@@ -76,6 +76,7 @@ import {
   removeProjectCommand,
   updateProjectCommand,
 } from '../app-core/workspace/projectCommands.ts';
+import { closeWorkspaceTabsCommand } from '../app-core/workspace/workspaceCommands.ts';
 import appIconUrl from '../assets/app-icon.png';
 import { AddProjectDialog } from './dialogs/AddProjectDialog.tsx';
 import { EditProjectDialog } from './dialogs/EditProjectDialog.tsx';
@@ -110,6 +111,7 @@ import {
   resolveProject,
   treeItemIdForTab,
 } from './workspaceModel.ts';
+import type { WorkspacePersistenceFailure } from './workspacePersistence.ts';
 
 interface DestructiveAction {
   readonly confirmLabel: string;
@@ -131,7 +133,6 @@ export function AppShell(
     initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH,
   }: AppShellProps,
 ) {
-  const persistedWorkspace = usePersistedWorkspaceState();
   const appearance = useAppearance();
   const repositories = useRepositories();
   const queryClient = useQueryClient();
@@ -148,6 +149,9 @@ export function AppShell(
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [credentialWarning, setCredentialWarning] = useState<string | null>(null);
   const [lastAction, setLastAction] = useState('Ready');
+  const [workspacePersistenceError, setWorkspacePersistenceError] = useState<
+    WorkspacePersistenceFailure | null
+  >(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [pendingDestructiveAction, setPendingDestructiveAction] = useState<
     DestructiveAction | null
@@ -160,6 +164,9 @@ export function AppShell(
     store: activityStore,
   });
   const recordActivity = activity.record;
+  const persistedWorkspace = usePersistedWorkspaceState({
+    onError: setWorkspacePersistenceError,
+  });
   const settings = useSettingsController({
     dataDirectoryApi: getDesktopAppApi(),
     onStatus: setLastAction,
@@ -228,7 +235,25 @@ export function AppShell(
   }), [authTab.authFilter, firestoreTab.drafts, jsTab.scripts, tabsState]);
 
   useDocumentDensity(density);
-  usePersistWorkspaceSnapshot(workspaceSnapshot, { enabled: persistedWorkspace.restored });
+  usePersistWorkspaceSnapshot(workspaceSnapshot, {
+    enabled: persistedWorkspace.restored,
+    onError: setWorkspacePersistenceError,
+  });
+  useEffect(() => {
+    if (!workspacePersistenceError) return;
+    setLastAction(`Workspace persistence failed: ${workspacePersistenceError.message}`);
+    void recordActivity({
+      action: workspacePersistenceError.operation === 'load'
+        ? 'Load workspace state'
+        : 'Save workspace state',
+      area: 'workspace',
+      error: { message: workspacePersistenceError.message },
+      metadata: { operation: workspacePersistenceError.operation },
+      status: 'failure',
+      summary: workspacePersistenceError.message,
+      target: { type: 'workspace' },
+    });
+  }, [recordActivity, workspacePersistenceError]);
 
   const tabModels = useMemo<ReadonlyArray<WorkspaceTabModel>>(
     () =>
@@ -339,7 +364,7 @@ export function AppShell(
         ? `Close ${tab.title}? The workspace will have no open tabs.`
         : `Close ${tab.title}? Unsaved tab state for this tab will be discarded.`,
       onConfirm: () => {
-        closeTabsWithCleanup([tab], () => tabActions.closeTab(tabId), `Closed ${tab.title}`);
+        closeTabsWithCleanup([tab], `Closed ${tab.title}`);
       },
       title: 'Close tab',
     });
@@ -356,11 +381,7 @@ export function AppShell(
       }? Their tab state will be discarded.`,
       onConfirm: () => {
         const tabsToClose = tabsState.tabs.filter((item) => item.id !== tabId);
-        closeTabsWithCleanup(
-          tabsToClose,
-          () => tabActions.closeOtherTabs(tabId),
-          `Closed other tabs around ${tab.title}`,
-        );
+        closeTabsWithCleanup(tabsToClose, `Closed other tabs around ${tab.title}`);
       },
       title: 'Close other tabs',
     });
@@ -376,11 +397,7 @@ export function AppShell(
       } to the left? Their tab state will be discarded.`,
       onConfirm: () => {
         const tabsToClose = tabsState.tabs.slice(0, index);
-        closeTabsWithCleanup(
-          tabsToClose,
-          () => tabActions.closeTabsToLeft(tabId),
-          'Closed tabs to left',
-        );
+        closeTabsWithCleanup(tabsToClose, 'Closed tabs to left');
       },
       title: 'Close tabs to left',
     });
@@ -397,11 +414,7 @@ export function AppShell(
       } to the right? Their tab state will be discarded.`,
       onConfirm: () => {
         const tabsToClose = tabsState.tabs.slice(index + 1);
-        closeTabsWithCleanup(
-          tabsToClose,
-          () => tabActions.closeTabsToRight(tabId),
-          'Closed tabs to right',
-        );
+        closeTabsWithCleanup(tabsToClose, 'Closed tabs to right');
       },
       title: 'Close tabs to right',
     });
@@ -415,7 +428,7 @@ export function AppShell(
         tabsState.tabs.length === 1 ? '' : 's'
       }? The workspace will have no open tabs.`,
       onConfirm: () => {
-        closeTabsWithCleanup(tabsState.tabs, tabActions.closeAllTabs, 'Closed all tabs');
+        closeTabsWithCleanup(tabsState.tabs, 'Closed all tabs');
       },
       title: 'Close all tabs',
     });
@@ -672,32 +685,20 @@ export function AppShell(
 
   function closeTabsWithCleanup(
     tabsToClose: ReadonlyArray<WorkspaceTab>,
-    closeAll: () => void,
     successLabel: string,
   ) {
-    const blockedTabs = tabsToClose.filter((tab) => tab.kind !== 'js-query' && isTabBusy(tab));
-    const blockedIds = new Set(blockedTabs.map((tab) => tab.id));
-    const closableTabs = tabsToClose.filter((tab) => !blockedIds.has(tab.id));
+    const busyTabIds = new Set(
+      tabsToClose.filter((tab) => tab.kind !== 'js-query' && isTabBusy(tab)).map((tab) => tab.id),
+    );
+    const result = closeWorkspaceTabsCommand(tabsStore.state, {
+      busyTabIds,
+      successLabel,
+      tabsToClose,
+    });
 
-    for (const tab of closableTabs) clearTabRuntimeState(tab);
-
-    if (!closableTabs.length) {
-      setLastAction(`Still loading ${blockedTabs[0]?.title ?? 'tab'}`);
-      return;
-    }
-
-    if (blockedTabs.length) {
-      for (const tab of closableTabs) tabActions.closeTab(tab.id);
-      setLastAction(
-        `${successLabel}; kept ${blockedTabs.length} busy tab${
-          blockedTabs.length === 1 ? '' : 's'
-        }`,
-      );
-      return;
-    }
-
-    closeAll();
-    setLastAction(successLabel);
+    for (const tab of result.tabsToCleanup) clearTabRuntimeState(tab);
+    tabsStore.setState(() => result.state);
+    setLastAction(result.lastAction);
   }
 
   function clearTabRuntimeState(tab: WorkspaceTab) {

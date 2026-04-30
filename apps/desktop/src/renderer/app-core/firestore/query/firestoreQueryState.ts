@@ -26,6 +26,7 @@ export interface FirestoreQueryRuntimeState {
   readonly pages: ReadonlyArray<FirestoreQueryPage>;
   readonly pendingPageReloads: Readonly<Record<string, number>>;
   readonly queryRequests: Readonly<Record<string, SubmittedFirestoreQuery | null>>;
+  readonly recordedQueryCompletions: Readonly<Record<string, true>>;
   readonly resultView: FirestoreResultView;
   readonly resultsStale: boolean;
   readonly selectedDocumentPaths: Readonly<Record<string, string>>;
@@ -48,6 +49,7 @@ export function createInitialFirestoreQueryRuntimeState(
     pages: [],
     pendingPageReloads: {},
     queryRequests: {},
+    recordedQueryCompletions: {},
     resultView: 'table',
     resultsStale: false,
     selectedDocumentPaths: {},

@@ -4,8 +4,9 @@ import { selectionActions } from '../stores/selectionStore.ts';
 import { tabActions, type TabsState } from '../stores/tabsStore.ts';
 import { treeItemIdForTab } from '../workspaceModel.ts';
 import {
-  loadPersistedWorkspaceState,
+  loadPersistedWorkspaceStateResult,
   savePersistedWorkspaceState,
+  type WorkspacePersistenceFailure,
 } from '../workspacePersistence.ts';
 
 export interface PersistedWorkspaceSnapshot {
@@ -26,12 +27,17 @@ export interface WorkspacePersistenceSnapshot {
   readonly tabsState: TabsState;
 }
 
-export function usePersistedWorkspaceState(): PersistedWorkspaceStateResult {
-  const [persistedWorkspace] = useState(loadPersistedWorkspaceState);
+export function usePersistedWorkspaceState(
+  options: { readonly onError?: (error: WorkspacePersistenceFailure) => void; } = {},
+): PersistedWorkspaceStateResult {
+  const onError = options.onError;
+  const [loadResult] = useState(loadPersistedWorkspaceStateResult);
+  const persistedWorkspace = loadResult.snapshot;
   const [restored, setRestored] = useState(() => !persistedWorkspace);
   const restoredRef = useRef(false);
 
   useEffect(() => {
+    if (loadResult.error) onError?.(loadResult.error);
     if (restoredRef.current) return;
     restoredRef.current = true;
     if (persistedWorkspace) {
@@ -44,17 +50,22 @@ export function usePersistedWorkspaceState(): PersistedWorkspaceStateResult {
       }
     }
     setRestored(true);
-  }, [persistedWorkspace]);
+  }, [loadResult.error, onError, persistedWorkspace]);
 
   return { restored, snapshot: persistedWorkspace };
 }
 
 export function usePersistWorkspaceSnapshot(
   snapshot: WorkspacePersistenceSnapshot,
-  options: { readonly enabled: boolean; },
+  options: {
+    readonly enabled: boolean;
+    readonly onError?: (error: WorkspacePersistenceFailure) => void;
+  },
 ): void {
+  const onError = options.onError;
   useEffect(() => {
     if (!options.enabled) return;
-    savePersistedWorkspaceState(snapshot);
-  }, [options.enabled, snapshot]);
+    const error = savePersistedWorkspaceState(snapshot);
+    if (error) onError?.(error);
+  }, [onError, options.enabled, snapshot]);
 }

@@ -180,6 +180,20 @@ export function firestorePendingPageReloadCleared(
   return { ...state, pendingPageReloads: omitKey(state.pendingPageReloads, tabId) };
 }
 
+export function firestoreQueryCompletionRecorded(
+  state: FirestoreQueryRuntimeState,
+  key: string,
+): FirestoreQueryRuntimeState {
+  if (state.recordedQueryCompletions[key]) return state;
+  return {
+    ...state,
+    recordedQueryCompletions: pruneRecordedQueryCompletions({
+      ...state.recordedQueryCompletions,
+      [key]: true,
+    }),
+  };
+}
+
 export function firestoreTabCleared(
   state: FirestoreQueryRuntimeState,
   tabId: string,
@@ -188,6 +202,10 @@ export function firestoreTabCleared(
     ...state,
     pendingPageReloads: omitKey(state.pendingPageReloads, tabId),
     queryRequests: omitKey(state.queryRequests, tabId),
+    recordedQueryCompletions: omitRecordedQueryCompletionsForTab(
+      state.recordedQueryCompletions,
+      tabId,
+    ),
     selectedDocumentPaths: omitKey(state.selectedDocumentPaths, tabId),
   };
 }
@@ -206,4 +224,29 @@ function omitKey<T>(
   if (!(key in record)) return record;
   const { [key]: _removed, ...rest } = record;
   return rest;
+}
+
+function omitRecordedQueryCompletionsForTab(
+  record: Readonly<Record<string, true>>,
+  tabId: string,
+): Readonly<Record<string, true>> {
+  const prefix = `${tabId}:`;
+  let changed = false;
+  const next: Record<string, true> = {};
+  for (const [key, value] of Object.entries(record)) {
+    if (key.startsWith(prefix)) {
+      changed = true;
+      continue;
+    }
+    next[key] = value;
+  }
+  return changed ? next : record;
+}
+
+function pruneRecordedQueryCompletions(
+  record: Readonly<Record<string, true>>,
+): Readonly<Record<string, true>> {
+  const entries = Object.entries(record);
+  if (entries.length <= 500) return record;
+  return Object.fromEntries(entries.slice(entries.length - 500)) as Record<string, true>;
 }

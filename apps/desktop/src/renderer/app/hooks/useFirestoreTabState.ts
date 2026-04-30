@@ -4,13 +4,13 @@ import type {
   FirestoreQueryDraft,
   ProjectSummary,
 } from '@firebase-desk/repo-contracts';
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useState } from 'react';
 import {
+  completeFirestoreQueryCommand,
+  continueFirestorePageReloadCommand,
   createInitialFirestoreQueryRuntimeState,
   firestoreDocumentSelected,
   firestoreDraftChanged,
-  firestorePendingPageReloadCleared,
-  firestoreQueryCompletionActivity,
   firestoreTabCleared,
   loadMoreFirestoreQueryCommand,
   openFirestoreDocumentInNewTabCommand,
@@ -72,7 +72,6 @@ export function useFirestoreTabState(
   const [queryState, setQueryState] = useState(() =>
     createInitialFirestoreQueryRuntimeState({ drafts: initialDrafts })
   );
-  const loggedQueryRuns = useRef<Set<string>>(new Set());
 
   const activeDraft = selectFirestoreActiveDraft(
     queryState,
@@ -123,24 +122,21 @@ export function useFirestoreTabState(
     : 0;
 
   useEffect(() => {
-    if (
-      !activeTab || activeTab.kind !== 'firestore-query' || queryRequestIsDocument
-      || pendingPageReloadCount === 0 || loadedPageCount === 0
-    ) {
-      return;
-    }
-    if (
-      pendingPageReloadCount <= 1 || loadedPageCount >= pendingPageReloadCount
-      || !queryResult.hasNextPage
-    ) {
-      setQueryState((current) => firestorePendingPageReloadCleared(current, activeTab.id));
-      return;
-    }
-    if (!queryResult.isFetchingNextPage) void queryResult.fetchNextPage();
+    const result = continueFirestorePageReloadCommand(queryState, {
+      hasNextPage: Boolean(queryResult.hasNextPage),
+      isDocumentQuery: queryRequestIsDocument,
+      isFetchingNextPage: Boolean(queryResult.isFetchingNextPage),
+      loadedPageCount,
+      pendingPageReloadCount,
+      tabId: activeTab?.kind === 'firestore-query' ? activeTab.id : null,
+    });
+    if (result.state !== queryState) setQueryState(result.state);
+    if (result.shouldFetchNextPage) void queryResult.fetchNextPage();
   }, [
     activeTab,
     loadedPageCount,
     pendingPageReloadCount,
+    queryState,
     queryRequestIsDocument,
     queryResult,
   ]);
@@ -155,21 +151,24 @@ export function useFirestoreTabState(
     const isLoading = queryRequestIsDocument
       ? queryDocumentResult.isLoading || queryDocumentResult.isFetching
       : queryResult.isLoading || queryResult.isFetching;
-    if (isLoading) return;
-    if (!queryRequestIsDocument && pendingPageReloadCount > 0) return;
 
     const runErrorMessage = queryRequestIsDocument
       ? messageFromError(queryDocumentResult.error)
       : messageFromError(queryResult.error);
-    const key = [activeTab.id, activeQueryRequest.runId].join(':');
-    if (!rememberQueryActivity(loggedQueryRuns.current, key)) return;
-    onQueryActivity(firestoreQueryCompletionActivity({
+    const result = completeFirestoreQueryCommand(queryState, {
       connectionId: activeTab.connectionId,
       draft: activeDraft,
       errorMessage: runErrorMessage,
+      isDocumentQuery: queryRequestIsDocument,
+      isLoading,
       loadedPages: activeLoadedPageCount,
+      pendingPageReloadCount,
       resultCount: queryRows.length,
-    }));
+      runId: activeQueryRequest.runId,
+      tabId: activeTab.id,
+    });
+    if (result.state !== queryState) setQueryState(result.state);
+    if (result.activity) onQueryActivity(result.activity);
   }, [
     activeDraft,
     activeLoadedPageCount,
@@ -177,6 +176,7 @@ export function useFirestoreTabState(
     activeTab,
     onQueryActivity,
     pendingPageReloadCount,
+    queryState,
     queryDocumentResult.error,
     queryDocumentResult.isFetching,
     queryDocumentResult.isLoading,
@@ -320,15 +320,4 @@ function messageFromError(error: unknown): string | null {
   if (!error) return null;
   if (error instanceof Error) return error.message;
   return 'Could not load Firestore data.';
-}
-
-function rememberQueryActivity(keys: Set<string>, key: string): boolean {
-  if (keys.has(key)) return false;
-  keys.add(key);
-  while (keys.size > 500) {
-    const oldestKey = keys.keys().next().value as string | undefined;
-    if (!oldestKey) break;
-    keys.delete(oldestKey);
-  }
-  return true;
 }

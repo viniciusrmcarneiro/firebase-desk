@@ -71,6 +71,7 @@ function renderShell(
     initialTab,
     repositories = createMockRepositories(),
     savedWorkspace,
+    savedWorkspaceRaw,
     strictMode = false,
   }: {
     readonly dataMode?: 'live' | 'mock';
@@ -78,10 +79,14 @@ function renderShell(
     readonly initialTab?: InitialTab;
     readonly repositories?: RepositorySet;
     readonly savedWorkspace?: PersistedWorkspaceState;
+    readonly savedWorkspaceRaw?: string;
     readonly strictMode?: boolean;
   } = {},
 ) {
   window.localStorage.clear();
+  if (savedWorkspaceRaw !== undefined) {
+    window.localStorage.setItem(WORKSPACE_STATE_STORAGE_KEY, savedWorkspaceRaw);
+  }
   if (savedWorkspace) {
     window.localStorage.setItem(WORKSPACE_STATE_STORAGE_KEY, JSON.stringify(savedWorkspace));
   }
@@ -196,6 +201,23 @@ describe('desktop AppShell', () => {
         }),
       )
     );
+  });
+
+  it('surfaces invalid saved workspace state', async () => {
+    const repositories = createMockRepositories();
+    const appendActivity = vi.spyOn(repositories.activity, 'append');
+    renderShell({ repositories, savedWorkspaceRaw: '{' });
+
+    await waitFor(() =>
+      expect(appendActivity).toHaveBeenCalledWith(
+        expect.objectContaining({
+          action: 'Load workspace state',
+          area: 'workspace',
+          status: 'failure',
+        }),
+      )
+    );
+    expect(await screen.findByText(/Workspace persistence failed/)).toBeTruthy();
   });
 
   it('shows real add account fields for service accounts and emulator profiles', async () => {
