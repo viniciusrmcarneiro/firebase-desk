@@ -43,6 +43,24 @@ export interface FirestoreQuery {
   readonly sorts?: ReadonlyArray<FirestoreSort>;
 }
 
+export interface FirestoreQueryDraft {
+  readonly filterField: string;
+  readonly filterOp: FirestoreFilterOp;
+  readonly filterValue: string;
+  readonly filters?: ReadonlyArray<FirestoreQueryFilterDraft>;
+  readonly limit: number;
+  readonly path: string;
+  readonly sortDirection: 'asc' | 'desc';
+  readonly sortField: string;
+}
+
+export interface FirestoreQueryFilterDraft {
+  readonly field: string;
+  readonly id: string;
+  readonly op: FirestoreFilterOp;
+  readonly value: string;
+}
+
 export interface FirestoreDocumentResult {
   readonly id: string;
   readonly path: string;

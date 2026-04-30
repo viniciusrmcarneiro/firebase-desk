@@ -16,13 +16,18 @@ describe('SettingsDialog', () => {
       })),
     );
     const settings = new MockSettingsRepository();
+    const onSettingsSaved = vi.fn();
     render(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} />
+        <SettingsDialog open onOpenChange={vi.fn()} onSettingsSaved={onSettingsSaved} />
       </AppearanceProvider>,
     );
     fireEvent.click(screen.getByRole('button', { name: 'dark' }));
     await waitFor(async () => expect((await settings.load()).theme).toBe('dark'));
+    expect(onSettingsSaved).toHaveBeenCalledWith(
+      { theme: 'dark' },
+      expect.objectContaining({ theme: 'dark' }),
+    );
   });
 
   it('notifies when the controlled dialog should close', () => {

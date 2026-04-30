@@ -1,5 +1,7 @@
-import type { AuthUser } from '@firebase-desk/repo-contracts';
-import { act, renderHook } from '@testing-library/react';
+// @vitest-environment jsdom
+
+import type { AuthUser, ProjectSummary } from '@firebase-desk/repo-contracts';
+import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceTab } from '../stores/tabsStore.ts';
 import { useAuthTabState } from './useAuthTabState.ts';
@@ -54,8 +56,9 @@ describe('useAuthTabState', () => {
   it('uses paged users until a search filter is present', () => {
     const { result } = renderHook(() =>
       useAuthTabState({
+        activeProject: project,
         activeTab: tab,
-        runtimeProjectId: 'demo-local',
+        recordActivity: vi.fn(),
         selectedUserId: 'u_grace',
       })
     );
@@ -67,7 +70,7 @@ describe('useAuthTabState', () => {
 
     expect(result.current.users).toEqual([ada]);
     expect(result.current.selectedUser).toBeNull();
-    expect(useSearchUsers).toHaveBeenLastCalledWith('demo-local', 'ada', true, 'tab-auth-1', 0);
+    expect(useSearchUsers).toHaveBeenLastCalledWith('emu', 'ada', true, 'tab-auth-1', 0);
   });
 
   it('loads more only when not searching and can clear the filter', () => {
@@ -75,9 +78,10 @@ describe('useAuthTabState', () => {
     vi.mocked(useUsers).mockReturnValue(usersResult([grace], fetchNextPage));
     const { result } = renderHook(() =>
       useAuthTabState({
+        activeProject: project,
         activeTab: tab,
         initialAuthFilter: 'ada',
-        runtimeProjectId: 'demo-local',
+        recordActivity: vi.fn(),
         selectedUserId: null,
       })
     );
@@ -91,18 +95,40 @@ describe('useAuthTabState', () => {
     expect(fetchNextPage).toHaveBeenCalledTimes(1);
   });
 
+  it('recreates the default store when the restored initial filter changes', () => {
+    let initialAuthFilter = 'ada';
+    const { rerender, result } = renderHook(() =>
+      useAuthTabState({
+        activeProject: project,
+        activeTab: tab,
+        initialAuthFilter,
+        recordActivity: vi.fn(),
+        selectedUserId: null,
+      })
+    );
+
+    expect(result.current.authFilter).toBe('ada');
+
+    initialAuthFilter = 'grace';
+    rerender();
+
+    expect(result.current.authFilter).toBe('grace');
+    expect(useSearchUsers).toHaveBeenLastCalledWith('emu', 'grace', true, 'tab-auth-1', 0);
+  });
+
   it('refreshes the current auth query from the first page', () => {
     const { result } = renderHook(() =>
       useAuthTabState({
+        activeProject: project,
         activeTab: tab,
-        runtimeProjectId: 'demo-local',
+        recordActivity: vi.fn(),
         selectedUserId: null,
       })
     );
 
     act(() => result.current.refetch());
 
-    expect(useUsers).toHaveBeenLastCalledWith('demo-local', 25, 'tab-auth-1', 1);
+    expect(useUsers).toHaveBeenLastCalledWith('emu', 25, 'tab-auth-1', 1);
   });
 
   it('saves claims and updates the selected user', async () => {
@@ -115,8 +141,9 @@ describe('useAuthTabState', () => {
     } as unknown as ReturnType<typeof useSetCustomClaims>);
     const { result } = renderHook(() =>
       useAuthTabState({
+        activeProject: project,
         activeTab: tab,
-        runtimeProjectId: 'demo-local',
+        recordActivity: vi.fn(),
         selectedUserId: 'u_grace',
       })
     );
@@ -127,12 +154,50 @@ describe('useAuthTabState', () => {
 
     expect(mutateAsync).toHaveBeenCalledWith({
       claims: { role: 'owner' },
-      projectId: 'demo-local',
+      projectId: 'emu',
       uid: 'u_grace',
     });
     expect(result.current.selectedUser?.customClaims).toEqual({ role: 'owner' });
   });
+
+  it('records load failures from the auth controller once per error', async () => {
+    const recordActivity = vi.fn();
+    vi.mocked(useUsers).mockReturnValue({
+      ...usersResult([]),
+      error: new Error('auth down'),
+    } as unknown as ReturnType<typeof useUsers>);
+
+    const { rerender } = renderHook(() =>
+      useAuthTabState({
+        activeProject: project,
+        activeTab: tab,
+        recordActivity,
+        selectedUserId: null,
+      })
+    );
+
+    await waitFor(() => expect(recordActivity).toHaveBeenCalledTimes(1));
+    rerender();
+
+    expect(recordActivity).toHaveBeenCalledTimes(1);
+    expect(recordActivity).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'Load users',
+      error: { message: 'auth down' },
+      status: 'failure',
+    }));
+  });
 });
+
+const project: ProjectSummary = {
+  id: 'emu',
+  name: 'Local Emulator',
+  projectId: 'emu',
+  target: 'emulator',
+  emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
+  hasCredential: false,
+  credentialEncrypted: null,
+  createdAt: '2026-04-27T00:00:00.000Z',
+};
 
 function usersResult(users: ReadonlyArray<AuthUser>, fetchNextPage = vi.fn()) {
   return {

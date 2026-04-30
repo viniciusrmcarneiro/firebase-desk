@@ -3,7 +3,6 @@ import {
   AccountTree,
   AppearanceProvider,
   AuthUsersSurface,
-  type FirestoreQueryDraft,
   FirestoreQuerySurface,
   JS_QUERY_SAMPLE_SOURCE,
   JsQuerySurface,
@@ -15,6 +14,7 @@ import type { Meta, StoryObj } from '@storybook/react';
 import { type ComponentProps, useState } from 'react';
 
 const settings = new MockSettingsRepository();
+type FirestoreQueryDraft = ComponentProps<typeof FirestoreQuerySurface>['draft'];
 const projects: ComponentProps<typeof WorkspaceTabStrip>['projects'] = [
   {
     id: 'emu',

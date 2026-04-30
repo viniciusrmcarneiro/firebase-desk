@@ -2,7 +2,13 @@ import { HotkeysProvider } from '@firebase-desk/hotkeys';
 import { AppearanceProvider } from '@firebase-desk/product-ui';
 import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { StrictMode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
+import {
+  type ActivityState,
+  createActivityStore,
+  createInitialActivityState,
+} from '../app-core/activity/index.ts';
 import { AppShell } from './AppShell.tsx';
 import { createAppQueryClient } from './queryClient.ts';
 import {
@@ -52,6 +58,7 @@ vi.mock('@monaco-editor/react', () => ({
 }));
 
 afterEach(() => {
+  vi.restoreAllMocks();
   vi.unstubAllGlobals();
 });
 
@@ -59,15 +66,19 @@ type InitialTab = Parameters<typeof tabActions.openTab>[0];
 
 function renderShell(
   {
+    activityState,
     dataMode = 'mock',
     initialTab,
     repositories = createMockRepositories(),
     savedWorkspace,
+    strictMode = false,
   }: {
     readonly dataMode?: 'live' | 'mock';
+    readonly activityState?: ActivityState | undefined;
     readonly initialTab?: InitialTab;
     readonly repositories?: RepositorySet;
     readonly savedWorkspace?: PersistedWorkspaceState;
+    readonly strictMode?: boolean;
   } = {},
 ) {
   window.localStorage.clear();
@@ -94,17 +105,36 @@ function renderShell(
     },
   );
   const queryClient = createAppQueryClient();
-  render(
+  const activityStore = activityState ? createActivityStore(activityState) : undefined;
+  const shell = (
     <RepositoryProvider repositories={repositories}>
       <QueryClientProvider client={queryClient}>
         <HotkeysProvider settings={repositories.settings}>
           <AppearanceProvider settings={repositories.settings}>
-            <AppShell dataMode={dataMode} />
+            <AppShell activityStore={activityStore} dataMode={dataMode} />
           </AppearanceProvider>
         </HotkeysProvider>
       </QueryClientProvider>
-    </RepositoryProvider>,
+    </RepositoryProvider>
   );
+  render(strictMode ? <StrictMode>{shell}</StrictMode> : shell);
+}
+
+async function waitForLocalEmulatorProject() {
+  await screen.findByText('demo-local');
+}
+
+function activityIssueState() {
+  return createInitialActivityState({
+    unreadIssue: {
+      action: 'Run query',
+      area: 'firestore',
+      id: 'activity-test-issue',
+      status: 'failure',
+      summary: 'Failed to load orders',
+      timestamp: '2026-04-29T00:00:00.000Z',
+    },
+  });
 }
 
 describe('desktop AppShell', () => {
@@ -126,14 +156,7 @@ describe('desktop AppShell', () => {
   });
 
   it('clears the activity issue indicator when Activity is opened', async () => {
-    const repositories = createMockRepositories();
-    await repositories.activity.append({
-      action: 'Run query',
-      area: 'firestore',
-      status: 'failure',
-      summary: 'Failed to load orders',
-    });
-    renderShell({ repositories });
+    renderShell({ activityState: activityIssueState() });
 
     const activityButton = await screen.findByRole('button', { name: /Activity.*failure/ });
     fireEvent.click(activityButton);
@@ -142,14 +165,9 @@ describe('desktop AppShell', () => {
   });
 
   it('keeps the activity issue indicator until Activity is opened', async () => {
-    const repositories = createMockRepositories();
-    await repositories.activity.append({
-      action: 'Run query',
-      area: 'firestore',
-      status: 'failure',
-      summary: 'Failed to load orders',
+    renderShell({
+      activityState: activityIssueState(),
     });
-    renderShell({ repositories });
 
     const activityButton = await screen.findByRole('button', { name: /Activity.*failure/ });
     fireEvent.click(screen.getByRole('button', { name: 'Dark theme' }));
@@ -166,6 +184,7 @@ describe('desktop AppShell', () => {
     const appendActivity = vi.spyOn(repositories.activity, 'append');
     renderShell({ initialTab: { kind: 'firestore-query', connectionId: 'emu' }, repositories });
 
+    await waitForLocalEmulatorProject();
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
 
     await waitFor(() =>
@@ -221,6 +240,7 @@ describe('desktop AppShell', () => {
     fireEvent.change(await screen.findByRole('textbox', { name: 'Query path' }), {
       target: { value: 'orders/ord_1024' },
     });
+    await waitForLocalEmulatorProject();
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
 
     await waitFor(() => expect(getDocument).toHaveBeenCalledWith('emu', 'orders/ord_1024'));
@@ -293,6 +313,7 @@ describe('desktop AppShell', () => {
       initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
+    await waitForLocalEmulatorProject();
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
     await waitFor(() => expect(runQuery).toHaveBeenCalledTimes(1));
 
@@ -362,6 +383,7 @@ describe('desktop AppShell', () => {
       initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
+    await waitForLocalEmulatorProject();
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
     await waitFor(() =>
       expect(runQuery).toHaveBeenCalledWith(
@@ -396,6 +418,7 @@ describe('desktop AppShell', () => {
       initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
+    await waitForLocalEmulatorProject();
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
     await waitFor(() => expect(runQuery).toHaveBeenCalledTimes(1));
 
@@ -420,6 +443,7 @@ describe('desktop AppShell', () => {
       initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
+    await waitForLocalEmulatorProject();
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
     await waitFor(() => expect(runQuery).toHaveBeenCalledTimes(1));
     await waitFor(() => expect(screen.getAllByText('25 docs').length).toBeGreaterThan(0));
@@ -489,6 +513,7 @@ describe('desktop AppShell', () => {
     expect(screen.getAllByText('0 docs').length).toBeGreaterThan(0);
     expect(runQuery).not.toHaveBeenCalled();
 
+    await waitForLocalEmulatorProject();
     fireEvent.click(screen.getByRole('button', { name: 'Run' }));
     await waitFor(() =>
       expect(runQuery).toHaveBeenCalledWith(
@@ -496,6 +521,57 @@ describe('desktop AppShell', () => {
         expect.objectContaining({ limit: 7 }),
       )
     );
+  });
+
+  it('restores persisted workspace once in StrictMode', async () => {
+    const tabId = 'tab-firestore-strict';
+    const savedWorkspace: PersistedWorkspaceState = {
+      version: 1,
+      authFilter: '',
+      scripts: {},
+      tabsState: {
+        activeTabId: tabId,
+        interactionHistory: [{
+          activeTabId: tabId,
+          path: 'customers',
+          selectedTreeItemId: 'collection:emu:customers',
+        }],
+        interactionHistoryIndex: 0,
+        tabs: [{
+          id: tabId,
+          kind: 'firestore-query',
+          title: 'customers',
+          connectionId: 'emu',
+          history: ['customers'],
+          historyIndex: 0,
+          inspectorWidth: 360,
+        }],
+      },
+      drafts: {
+        [tabId]: {
+          path: 'customers',
+          filters: [],
+          filterField: '',
+          filterOp: '==',
+          filterValue: '',
+          sortField: 'lastSeenAt',
+          sortDirection: 'desc',
+          limit: 7,
+        },
+      },
+    };
+    const restoreSpy = vi.spyOn(tabActions, 'restore');
+
+    renderShell({ savedWorkspace, strictMode: true });
+
+    const pathInput = await screen.findByRole('textbox', { name: 'Query path' });
+    expect((pathInput as HTMLInputElement).value).toBe('customers');
+    expect(restoreSpy).toHaveBeenCalledTimes(1);
+    await waitFor(() => {
+      const raw = window.localStorage.getItem(WORKSPACE_STATE_STORAGE_KEY) ?? '';
+      expect(raw).toContain('customers');
+      expect(raw).toContain('"limit":7');
+    });
   });
 
   it('persists user tab state without query results', async () => {
@@ -506,6 +582,7 @@ describe('desktop AppShell', () => {
       initialTab: { kind: 'firestore-query', connectionId: 'emu', path: 'orders' },
     });
 
+    await waitForLocalEmulatorProject();
     fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
     await waitFor(() => expect(runQuery).toHaveBeenCalledTimes(1));
 

@@ -1,13 +1,28 @@
-import type { AuthUser } from '@firebase-desk/repo-contracts';
-import { useState } from 'react';
+import type { AuthUser, ProjectSummary } from '@firebase-desk/repo-contracts';
+import { useEffect, useMemo } from 'react';
+import {
+  type AuthCommandEnvironment,
+  type AuthStore,
+  authUsersFailureActivityCommand,
+  clearAuthFilterCommand,
+  createAuthStore,
+  loadMoreAuthUsersCommand,
+  refreshAuthUsersCommand,
+  saveAuthCustomClaimsCommand,
+  selectAuthUsersModel,
+  setAuthFilterCommand,
+} from '../../app-core/auth/index.ts';
+import { useAppCoreSelector } from '../../app-core/shared/index.ts';
 import type { WorkspaceTab } from '../stores/tabsStore.ts';
 import { useSearchUsers, useSetCustomClaims, useUsers } from './useRepositoriesData.ts';
 
 interface UseAuthTabStateInput {
+  readonly activeProject: ProjectSummary | null;
   readonly activeTab: WorkspaceTab | undefined;
   readonly initialAuthFilter?: string | undefined;
-  readonly runtimeProjectId: string | null;
+  readonly recordActivity: AuthCommandEnvironment['recordActivity'];
   readonly selectedUserId: string | null;
+  readonly store?: AuthStore | undefined;
 }
 
 export interface AuthTabState {
@@ -26,109 +41,101 @@ export interface AuthTabState {
 }
 
 export function useAuthTabState(
-  { activeTab, initialAuthFilter = '', runtimeProjectId, selectedUserId }: UseAuthTabStateInput,
+  {
+    activeProject,
+    activeTab,
+    initialAuthFilter = '',
+    recordActivity,
+    selectedUserId,
+    store: inputStore,
+  }: UseAuthTabStateInput,
 ): AuthTabState {
-  const [authFilter, setAuthFilter] = useState(initialAuthFilter);
-  const [refreshRunId, setRefreshRunId] = useState(0);
-  const [updatedUsers, setUpdatedUsers] = useState<ReadonlyMap<string, AuthUser>>(
-    () => new Map(),
+  const store = useMemo(
+    () => inputStore ?? createAuthStore({ filter: initialAuthFilter }),
+    [initialAuthFilter, inputStore],
   );
-  const activeProjectId = activeTab?.kind === 'auth-users' ? runtimeProjectId : null;
+  const state = useAppCoreSelector(store, (snapshot) => snapshot);
+  const activeProjectId = activeTab?.kind === 'auth-users' ? activeProject?.id ?? null : null;
   const scopeId = activeTab?.kind === 'auth-users' ? activeTab.id : 'inactive';
-  const usersQuery = useUsers(activeProjectId, 25, scopeId, refreshRunId);
-  const authSearchText = authFilter.trim();
+  const usersQuery = useUsers(activeProjectId, 25, scopeId, state.refreshRunId);
+  const authSearchText = state.filter.trim();
   const usersSearchQuery = useSearchUsers(
     activeProjectId,
     authSearchText,
     Boolean(authSearchText),
     scopeId,
-    refreshRunId,
+    state.refreshRunId,
   );
-  const loadedUsers = authSearchText
-    ? usersSearchQuery.data ?? []
-    : usersQuery.data?.pages.flatMap((page) => page.items) ?? [];
-  const users = mergeUpdatedUsers(loadedUsers, activeProjectId, updatedUsers);
-  const selectedUser = selectedUserId
-    ? users.find((user) => user.uid === selectedUserId)
-      ?? userFromUpdates(activeProjectId, selectedUserId, updatedUsers)
-      ?? null
-    : null;
-  const errorMessage = authSearchText
-    ? messageFromError(usersSearchQuery.error)
-    : messageFromError(usersQuery.error);
+  const listUsers = usersQuery.data?.pages.flatMap((page) => page.items) ?? [];
+  const searchUsers = usersSearchQuery.data ?? [];
+  const model = selectAuthUsersModel(state, {
+    listError: usersQuery.error,
+    listHasMore: Boolean(usersQuery.hasNextPage),
+    listIsFetchingMore: usersQuery.isFetchingNextPage,
+    listIsLoading: usersQuery.isLoading,
+    listUsers,
+    projectId: activeProjectId,
+    searchError: usersSearchQuery.error,
+    searchIsLoading: usersSearchQuery.isLoading,
+    searchUsers,
+    selectedUserId,
+  });
   const setCustomClaims = useSetCustomClaims();
+  const env: AuthCommandEnvironment = {
+    now: Date.now,
+    recordActivity,
+    setCustomClaims: (projectId, uid, claims) =>
+      setCustomClaims.mutateAsync({ claims, projectId, uid }),
+  };
+
+  useEffect(() => {
+    const result = authUsersFailureActivityCommand(store.get(), {
+      errorMessage: model.errorMessage,
+      filter: state.filter,
+      tab: activeTab,
+    });
+    if (result.state !== store.get()) store.set(result.state);
+    if (result.activity) void recordActivity(result.activity);
+  }, [activeTab, model.errorMessage, recordActivity, state.filter, store]);
 
   function loadMore() {
-    if (!authSearchText) void usersQuery.fetchNextPage();
+    loadMoreAuthUsersCommand(env, {
+      connectionId: activeProject?.id,
+      fetchNextPage: () => void usersQuery.fetchNextPage(),
+      filter: state.filter,
+    });
   }
 
   function refetch() {
-    setUpdatedUsers((current) => removeProjectUpdates(current, activeProjectId));
-    setRefreshRunId((current) => current + 1);
+    refreshAuthUsersCommand(store, env, {
+      connectionId: activeProject?.id,
+      filter: state.filter,
+      projectId: activeProjectId,
+    });
   }
 
   async function saveCustomClaims(uid: string, claims: Record<string, unknown>): Promise<void> {
-    if (!activeProjectId) throw new Error('No Authentication project selected.');
-    const updated = await setCustomClaims.mutateAsync({ claims, projectId: activeProjectId, uid });
-    setUpdatedUsers((current) => {
-      const next = new Map(current);
-      next.set(userKey(activeProjectId, updated.uid), updated);
-      return next;
+    await saveAuthCustomClaimsCommand(store, env, {
+      claims,
+      project: activeProject
+        ? { connectionId: activeProject.id, projectId: activeProject.projectId }
+        : null,
+      uid,
     });
   }
 
   return {
-    authFilter,
-    errorMessage,
-    selectedUser,
-    users,
-    usersHasMore: !authSearchText && Boolean(usersQuery.hasNextPage),
-    usersIsFetchingMore: !authSearchText && usersQuery.isFetchingNextPage,
-    usersIsLoading: authSearchText ? usersSearchQuery.isLoading : usersQuery.isLoading,
-    clear: () => setAuthFilter(''),
+    authFilter: state.filter,
+    errorMessage: model.errorMessage,
+    selectedUser: model.selectedUser,
+    users: model.users,
+    usersHasMore: model.usersHasMore,
+    usersIsFetchingMore: model.usersIsFetchingMore,
+    usersIsLoading: model.usersIsLoading,
+    clear: () => store.update(clearAuthFilterCommand),
     loadMore,
     refetch,
     saveCustomClaims,
-    setAuthFilter,
+    setAuthFilter: (value) => store.update((current) => setAuthFilterCommand(current, value)),
   };
-}
-
-function mergeUpdatedUsers(
-  users: ReadonlyArray<AuthUser>,
-  projectId: string | null,
-  updatedUsers: ReadonlyMap<string, AuthUser>,
-): ReadonlyArray<AuthUser> {
-  if (!projectId) return users;
-  return users.map((user) => userFromUpdates(projectId, user.uid, updatedUsers) ?? user);
-}
-
-function userFromUpdates(
-  projectId: string | null,
-  uid: string,
-  updatedUsers: ReadonlyMap<string, AuthUser>,
-): AuthUser | undefined {
-  return projectId ? updatedUsers.get(userKey(projectId, uid)) : undefined;
-}
-
-function userKey(projectId: string, uid: string): string {
-  return `${projectId}:${uid}`;
-}
-
-function removeProjectUpdates(
-  updatedUsers: ReadonlyMap<string, AuthUser>,
-  projectId: string | null,
-): ReadonlyMap<string, AuthUser> {
-  if (!projectId) return updatedUsers;
-  const prefix = `${projectId}:`;
-  const next = new Map(updatedUsers);
-  for (const key of next.keys()) {
-    if (key.startsWith(prefix)) next.delete(key);
-  }
-  return next;
-}
-
-function messageFromError(error: unknown): string | null {
-  if (!error) return null;
-  if (error instanceof Error) return error.message;
-  return 'Could not load Authentication data.';
 }

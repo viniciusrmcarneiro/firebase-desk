@@ -33,6 +33,12 @@ The UI is split into generic primitives and product-aware components.
 - Firestore Query and JavaScript Query share the product-level Firestore result browser for Firestore-shaped results. Do not duplicate table/tree/json/inspector result browsers inside individual surfaces.
 - Feature surfaces should mostly orchestrate state and repository callbacks; reusable result browsing behavior should live in product-level components.
 
+## Renderer App Core
+
+New desktop app workflows should use the [App Core Pattern](app-core-pattern.md): UI-framework-agnostic feature state, pure transitions/selectors, explicit async commands, tiny stores, and thin React adapters.
+
+This is the default direction for `apps/desktop/src/renderer/app` refactors and new workflow work. React should render state and dispatch user intent. App-core commands should do IO and apply state transitions. Avoid adding more AppShell `useEffect` watchers that infer workflow events from unrelated state.
+
 ## Process Boundaries
 
 ### Main Process

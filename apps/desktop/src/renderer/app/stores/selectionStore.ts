@@ -1,30 +1,28 @@
 import { Store } from '@tanstack/react-store';
+import {
+  authUserSelected,
+  firestoreDocumentSelected,
+  initialSelectionState,
+  selectionReset,
+  type SelectionState,
+  treeItemSelected,
+} from '../../app-core/workspace/index.ts';
 
-export interface SelectionState {
-  readonly authUserId: string | null;
-  readonly firestoreDocumentPath: string | null;
-  readonly treeItemId: string | null;
-}
-
-const initialSelectionState: SelectionState = {
-  authUserId: null,
-  firestoreDocumentPath: null,
-  treeItemId: null,
-};
+export type { SelectionState };
 
 export const selectionStore = new Store<SelectionState>(initialSelectionState);
 
 export const selectionActions = {
   reset() {
-    selectionStore.setState(() => initialSelectionState);
+    selectionStore.setState(() => selectionReset());
   },
   selectTreeItem(treeItemId: string | null) {
-    selectionStore.setState((state) => ({ ...state, treeItemId }));
+    selectionStore.setState((state) => treeItemSelected(state, treeItemId));
   },
   selectDocument(path: string | null) {
-    selectionStore.setState((state) => ({ ...state, firestoreDocumentPath: path }));
+    selectionStore.setState((state) => firestoreDocumentSelected(state, path));
   },
   selectAuthUser(uid: string | null) {
-    selectionStore.setState((state) => ({ ...state, authUserId: uid }));
+    selectionStore.setState((state) => authUserSelected(state, uid));
   },
 };

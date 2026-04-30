@@ -6,6 +6,7 @@ import {
 import type {
   FirestoreCollectionNode,
   FirestoreDocumentResult,
+  FirestoreQueryDraft,
   ProjectSummary,
   ScriptRunResult,
 } from '@firebase-desk/repo-contracts';
@@ -16,10 +17,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppearanceProvider } from '../appearance/AppearanceProvider.tsx';
 import { AuthUsersSurface } from './auth/AuthUsersSurface.tsx';
 import { FirestoreDocumentBrowser } from './firestore/FirestoreDocumentBrowser.tsx';
-import {
-  type FirestoreQueryDraft,
-  FirestoreQuerySurface,
-} from './firestore/FirestoreQuerySurface.tsx';
+import { FirestoreQuerySurface } from './firestore/FirestoreQuerySurface.tsx';
 import { JS_QUERY_SAMPLE_SOURCE, JsQuerySurface } from './js-query/JsQuerySurface.tsx';
 import { AccountTree } from './projects/AccountTree.tsx';
 import { WorkspaceTabStrip } from './tabs/WorkspaceTabStrip.tsx';
