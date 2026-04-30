@@ -10,6 +10,7 @@ import type {
   ProjectSummary,
 } from '@firebase-desk/repo-contracts';
 import { useMemo } from 'react';
+import { messageFromError } from '../../shared/errors.ts';
 import { useAppCoreSelector } from '../../shared/index.ts';
 import {
   createFirestoreDocumentCommand,
@@ -196,8 +197,4 @@ export function useFirestoreWriteController(
     store,
     updateDocumentFields,
   };
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }

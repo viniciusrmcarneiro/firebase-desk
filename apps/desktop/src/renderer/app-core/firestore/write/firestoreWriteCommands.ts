@@ -9,6 +9,7 @@ import type {
   FirestoreUpdateDocumentFieldsOptions,
   FirestoreUpdateDocumentFieldsResult,
 } from '@firebase-desk/repo-contracts';
+import { messageFromError, toError } from '../../shared/errors.ts';
 import {
   type AppCoreCommandOptions,
   type AppCoreStore,
@@ -17,6 +18,7 @@ import {
   fieldPatchMetadata,
   shouldNotifyForCommandStatus,
 } from '../../shared/index.ts';
+import { elapsedMs } from '../../shared/time.ts';
 import { fieldPatchStatusLabel } from './firestoreWriteSelectors.ts';
 import type { FirestoreWriteState } from './firestoreWriteState.ts';
 import {
@@ -448,17 +450,4 @@ function firestoreDocumentTarget(
     projectId: project.projectId,
     type: 'firestore-document',
   };
-}
-
-function elapsedMs(startedAt: number, endedAt: number): number {
-  return Math.max(0, endedAt - startedAt);
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  if (error instanceof Error) return error.message;
-  return fallback;
-}
-
-function toError(error: unknown, message: string): Error {
-  return error instanceof Error ? error : new Error(message);
 }

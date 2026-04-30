@@ -1,23 +1,20 @@
+import { encode, type NativeValue } from '@firebase-desk/data-format';
 import {
-  encode,
-  FirestoreBytes,
-  FirestoreGeoPoint,
-  FirestoreReference,
-  FirestoreTimestamp,
-  type NativeValue,
-} from '@firebase-desk/data-format';
+  FIRESTORE_FIELD_PATH_SEGMENT_MAX_BYTES,
+  utf8ByteLength,
+} from '@firebase-desk/repo-contracts/firestore-field-patch';
+import {
+  editableTypeForValue as registryEditableTypeForValue,
+  FIRESTORE_EDITABLE_TYPES as REGISTRY_FIRESTORE_EDITABLE_TYPES,
+  type FirestoreEditableType as RegistryFirestoreEditableType,
+  isJsonEditableType,
+  isKnownEncodedFirestoreType,
+  isPlainObject,
+  labelForEditableType as registryLabelForEditableType,
+  nativeFirestoreValueType,
+} from './firestoreTypeRegistry.ts';
 
-export type FirestoreEditableType =
-  | 'array'
-  | 'boolean'
-  | 'bytes'
-  | 'geoPoint'
-  | 'map'
-  | 'null'
-  | 'number'
-  | 'reference'
-  | 'string'
-  | 'timestamp';
+export type FirestoreEditableType = RegistryFirestoreEditableType;
 
 export interface FieldEditTarget {
   readonly documentPath: string;
@@ -31,22 +28,12 @@ export interface FieldValueClassification {
   readonly type: FirestoreEditableType;
 }
 
-export const FIRESTORE_EDITABLE_TYPES: ReadonlyArray<FirestoreEditableType> = [
-  'string',
-  'number',
-  'boolean',
-  'null',
-  'array',
-  'map',
-  'timestamp',
-  'reference',
-  'bytes',
-  'geoPoint',
-];
+export const FIRESTORE_EDITABLE_TYPES: ReadonlyArray<FirestoreEditableType> =
+  REGISTRY_FIRESTORE_EDITABLE_TYPES;
 
 export function classifyFieldValue(value: unknown): FieldValueClassification {
   const type = editableTypeForValue(value);
-  const jsonMode = type === 'array' || type === 'map';
+  const jsonMode = isJsonEditableType(type);
   return {
     editLabel: jsonMode ? 'Edit JSON' : `Edit ${labelForEditableType(type)}`,
     jsonMode,
@@ -55,29 +42,11 @@ export function classifyFieldValue(value: unknown): FieldValueClassification {
 }
 
 export function labelForEditableType(type: FirestoreEditableType): string {
-  if (type === 'geoPoint') return 'geoPoint';
-  return type;
+  return registryLabelForEditableType(type);
 }
 
 export function editableTypeForValue(value: unknown): FirestoreEditableType {
-  if (value === null) return 'null';
-  if (Array.isArray(value)) return 'array';
-  const nativeType = nativeEditableType(value);
-  if (nativeType) return nativeType;
-  if (typeof value === 'string') return 'string';
-  if (typeof value === 'number') return 'number';
-  if (typeof value === 'boolean') return 'boolean';
-  if (isPlainObject(value)) {
-    const encodedType = value['__type__'];
-    if (encodedType === 'timestamp') return 'timestamp';
-    if (encodedType === 'reference') return 'reference';
-    if (encodedType === 'bytes') return 'bytes';
-    if (encodedType === 'geoPoint') return 'geoPoint';
-    if (encodedType === 'array') return 'array';
-    if (encodedType === 'map') return 'map';
-    return 'map';
-  }
-  return 'string';
+  return registryEditableTypeForValue(value);
 }
 
 export function defaultValueForType(
@@ -158,22 +127,16 @@ export function validateFirestoreValue(value: unknown, path: ReadonlyArray<strin
   validateFieldContainer(value, path);
 }
 
-function nativeEditableType(value: unknown): FirestoreEditableType | null {
-  if (value instanceof FirestoreTimestamp) return 'timestamp';
-  if (value instanceof FirestoreReference) return 'reference';
-  if (value instanceof FirestoreBytes) return 'bytes';
-  if (value instanceof FirestoreGeoPoint) return 'geoPoint';
-  return null;
-}
-
 function isNativeFirestoreScalar(value: unknown): boolean {
-  return nativeEditableType(value) !== null;
+  return nativeFirestoreValueType(value) !== null;
 }
 
 export function validateFieldName(name: string): void {
   if (!name) throw new Error('Field name is required.');
   if (/^__.*__$/.test(name)) throw new Error('Field name cannot match __.*__.');
-  if (utf8ByteLength(name) > 1500) throw new Error('Field name must be 1,500 bytes or less.');
+  if (utf8ByteLength(name) > FIRESTORE_FIELD_PATH_SEGMENT_MAX_BYTES) {
+    throw new Error('Field name must be 1,500 bytes or less.');
+  }
 }
 
 export function setNestedFieldValue(
@@ -250,10 +213,7 @@ function validateEncodedValue(
   value: Record<string, unknown>,
   path: ReadonlyArray<string>,
 ): void {
-  if (
-    encodedType !== 'timestamp' && encodedType !== 'geoPoint' && encodedType !== 'reference'
-    && encodedType !== 'bytes' && encodedType !== 'array' && encodedType !== 'map'
-  ) {
+  if (!isKnownEncodedFirestoreType(encodedType)) {
     throw new Error(`${fieldPathLabel(path)} has unknown __type__: ${encodedType}.`);
   }
   if (encodedType === 'timestamp') {
@@ -300,14 +260,6 @@ function assertFieldPath(fieldPath: ReadonlyArray<string>): void {
 
 function isEditableMap(value: unknown): value is Record<string, unknown> {
   return isPlainObject(value) && typeof value['__type__'] !== 'string';
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function utf8ByteLength(value: string): number {
-  return new TextEncoder().encode(value).length;
 }
 
 function isFiniteNumber(value: unknown): value is number {

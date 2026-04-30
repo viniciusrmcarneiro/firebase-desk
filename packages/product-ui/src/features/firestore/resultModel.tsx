@@ -176,11 +176,6 @@ export function isCollectionPath(path: string): boolean {
   return parts.length % 2 === 1;
 }
 
-export function messageFromError(error: unknown, fallback: string): string {
-  if (error instanceof Error) return error.message;
-  return fallback;
-}
-
 function appendDocumentTreeRows(
   flattened: ResultTreeRowModel[],
   row: FirestoreDocumentResult,

@@ -34,6 +34,7 @@ describe('IPC handler registry', () => {
   });
 
   it('registers every channel and validates request/response schemas', async () => {
+    const stderrWrite = vi.spyOn(process.stderr, 'write').mockImplementation(() => true);
     const registered = new Map<IpcChannel, (event: unknown, raw: unknown) => Promise<unknown>>();
     electronMocks.handle.mockImplementation((channel, handler) => {
       registered.set(channel, handler);
@@ -43,6 +44,7 @@ describe('IPC handler registry', () => {
 
     expect(sortedKeys(registered.keys())).toEqual(sortedKeys(Object.keys(IPC_CHANNELS)));
     await expect(registered.get('projects.get')?.({}, {})).rejects.toThrow();
+    expect(stderrWrite).toHaveBeenCalledWith(expect.stringContaining('[ipc] projects.get failed'));
     await expect(
       registered.get('health.check')?.({}, { ping: 'ping', sentAt: '2026-04-30T00:00:00.000Z' }),
     )
@@ -50,6 +52,7 @@ describe('IPC handler registry', () => {
         appVersion: '0.0.0',
         pong: 'pong',
       });
+    stderrWrite.mockRestore();
   });
 });
 

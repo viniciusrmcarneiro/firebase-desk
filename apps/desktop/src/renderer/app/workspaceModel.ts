@@ -36,6 +36,14 @@ export const MAX_SIDEBAR_WIDTH = 560;
 export const MIN_SIDEBAR_WIDTH = 280;
 export const MIN_WORKSPACE_WIDTH = 360;
 export const initialTreeCache: TreeCache = { roots: {}, tools: {} };
+const TREE_NODE_KIND = {
+  auth: 'auth',
+  collection: 'collection',
+  firestore: 'firestore',
+  project: 'project',
+  script: 'script',
+  status: 'status',
+} as const;
 export const DEFAULT_FIRESTORE_DRAFT: FirestoreQueryDraft = {
   path: 'orders',
   filters: [],
@@ -218,23 +226,23 @@ export function omitKey<T>(
 }
 
 export function projectNodeId(projectId: string): string {
-  return `project:${projectId}`;
+  return treeNodeId(TREE_NODE_KIND.project, projectId);
 }
 
 export function firestoreNodeId(projectId: string): string {
-  return `firestore:${projectId}`;
+  return treeNodeId(TREE_NODE_KIND.firestore, projectId);
 }
 
 export function authNodeId(projectId: string): string {
-  return `auth:${projectId}`;
+  return treeNodeId(TREE_NODE_KIND.auth, projectId);
 }
 
 export function scriptNodeId(projectId: string): string {
-  return `script:${projectId}`;
+  return treeNodeId(TREE_NODE_KIND.script, projectId);
 }
 
 export function collectionNodeId(projectId: string, path: string): string {
-  return `collection:${projectId}:${path}`;
+  return treeNodeId(TREE_NODE_KIND.collection, projectId, path);
 }
 
 export function parseTreeId(id: string): ParsedTreeId {
@@ -248,7 +256,8 @@ export function parseTreeId(id: string): ParsedTreeId {
 }
 
 export function parentIdForStatus(id: string): string | null {
-  return id.startsWith('status:') ? id.slice('status:'.length) : null;
+  const prefix = `${TREE_NODE_KIND.status}:`;
+  return id.startsWith(prefix) ? id.slice(prefix.length) : null;
 }
 
 export function actionLabelForTreeItem(kind: string, path?: string): string {
@@ -303,7 +312,7 @@ function appendEmptyRootState(
   depth: number,
 ) {
   items.push({
-    id: `status:${parentId}`,
+    id: treeNodeId(TREE_NODE_KIND.status, parentId),
     kind: 'status',
     label: 'No root collections',
     depth,
@@ -322,7 +331,7 @@ function appendStatus<T>(
 ) {
   if (state.status !== 'loading' && state.status !== 'error') return;
   items.push({
-    id: `status:${parentId}`,
+    id: treeNodeId(TREE_NODE_KIND.status, parentId),
     kind: 'status',
     label: state.status === 'loading' ? 'Loading' : 'Load failed',
     depth,
@@ -332,4 +341,8 @@ function appendStatus<T>(
     ...(state.errorMessage ? { secondary: state.errorMessage } : {}),
     status: state.status,
   });
+}
+
+function treeNodeId(kind: string, connectionId: string, path?: string): string {
+  return path === undefined ? `${kind}:${connectionId}` : `${kind}:${connectionId}:${path}`;
 }

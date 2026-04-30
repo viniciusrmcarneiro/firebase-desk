@@ -5,6 +5,10 @@ import {
   FirestoreTimestamp,
 } from '@firebase-desk/data-format';
 import { type ReactNode } from 'react';
+import {
+  firestoreValueType as registryFirestoreValueType,
+  isPlainObject,
+} from './firestoreTypeRegistry.ts';
 
 interface TypedValueSummary {
   readonly label: string;
@@ -55,12 +59,7 @@ export function formatFirestoreValue(value: unknown): string {
 }
 
 export function firestoreValueType(value: unknown): string {
-  if (value === null) return 'null';
-  if (Array.isArray(value)) return 'array';
-  const nativeType = nativeValueType(value);
-  if (nativeType) return nativeType;
-  if (isPlainObject(value) && typeof value['__type__'] === 'string') return value['__type__'];
-  return typeof value;
+  return registryFirestoreValueType(value);
 }
 
 export function isFirestoreTypedValue(value: unknown): boolean {
@@ -105,14 +104,6 @@ function typedValueSummary(value: unknown): TypedValueSummary | null {
       };
     }
   }
-}
-
-function nativeValueType(value: unknown): string | null {
-  if (value instanceof FirestoreTimestamp) return 'timestamp';
-  if (value instanceof FirestoreGeoPoint) return 'geoPoint';
-  if (value instanceof FirestoreReference) return 'reference';
-  if (value instanceof FirestoreBytes) return 'bytes';
-  return null;
 }
 
 function timestampSummary(value: Record<string, unknown>): TypedValueSummary {
@@ -215,10 +206,6 @@ function safeJson(value: unknown): string | undefined {
   } catch {
     return undefined;
   }
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
 }
 
 function compactJsonPreview(value: unknown): string {

@@ -1,6 +1,7 @@
 import { Button, Dialog, DialogContent, InlineAlert, Input } from '@firebase-desk/ui';
 import { useEffect, useRef, useState } from 'react';
 import { CodeEditor } from '../../code-editor/CodeEditor.tsx';
+import { messageFromError } from '../../shared/errors.ts';
 import { parseDocumentJson, validateFirestoreDocumentData } from './fieldEditModel.ts';
 
 export interface CreateDocumentModalProps {
@@ -181,9 +182,4 @@ function isValidCollectionPath(collectionPath: string): boolean {
 function validateDocumentId(documentId: string): void {
   if (!documentId) throw new Error('Document ID is required.');
   if (documentId.includes('/')) throw new Error('Document ID cannot contain /.');
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  if (error instanceof Error) return error.message;
-  return fallback;
 }

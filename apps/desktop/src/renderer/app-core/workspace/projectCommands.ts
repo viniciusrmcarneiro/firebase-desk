@@ -5,6 +5,8 @@ import type {
   ProjectSummary,
   ProjectUpdatePatch,
 } from '@firebase-desk/repo-contracts';
+import { messageFromError, toError } from '../shared/errors.ts';
+import { elapsedMs } from '../shared/time.ts';
 
 export interface ProjectCommandEnvironment {
   readonly invalidateProjects: () => Promise<void>;
@@ -158,16 +160,4 @@ export function projectTarget(project: ProjectSummary | null): ActivityLogAppend
 
 function changedProjectKeys(patch: ProjectUpdatePatch): string[] {
   return Object.keys(patch).filter((key) => key !== 'credentialJson');
-}
-
-function elapsedMs(startedAt: number, endedAt: number): number {
-  return Math.max(0, endedAt - startedAt);
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
-}
-
-function toError(error: unknown, message: string): Error {
-  return error instanceof Error ? error : new Error(message);
 }

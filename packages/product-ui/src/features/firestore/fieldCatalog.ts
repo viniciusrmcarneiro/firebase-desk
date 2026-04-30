@@ -1,9 +1,3 @@
-import {
-  FirestoreBytes,
-  FirestoreGeoPoint,
-  FirestoreReference,
-  FirestoreTimestamp,
-} from '@firebase-desk/data-format';
 import type {
   FirestoreDocumentResult,
   FirestoreFieldCatalogEntry,
@@ -13,6 +7,8 @@ import type {
   SettingsRepository,
 } from '@firebase-desk/repo-contracts';
 import { useEffect, useMemo, useState } from 'react';
+import { messageFromError } from '../../shared/errors.ts';
+import { isPlainObject, primitiveCatalogTypeForValue } from './firestoreTypeRegistry.ts';
 import { collectionLayoutKeyForPath } from './resultTableLayout.ts';
 
 export function fieldCatalogKeyForPath(path: string): string {
@@ -146,27 +142,7 @@ function addField(
 }
 
 function primitiveFieldType(value: unknown): FirestorePrimitiveFieldType | null {
-  if (value === null) return 'null';
-  if (value instanceof FirestoreTimestamp) return 'timestamp';
-  if (value instanceof FirestoreGeoPoint) return 'geoPoint';
-  if (value instanceof FirestoreReference) return 'reference';
-  if (value instanceof FirestoreBytes) return 'bytes';
-  if (typeof value === 'string') return 'string';
-  if (typeof value === 'number') return 'number';
-  if (typeof value === 'boolean') return 'boolean';
-  if (!isPlainObject(value)) return null;
-  switch (value['__type__']) {
-    case 'timestamp':
-      return 'timestamp';
-    case 'geoPoint':
-      return 'geoPoint';
-    case 'reference':
-      return 'reference';
-    case 'bytes':
-      return 'bytes';
-    default:
-      return null;
-  }
+  return primitiveCatalogTypeForValue(value);
 }
 
 function arrayFieldType(value: unknown): FirestoreFieldType | null {
@@ -231,12 +207,4 @@ function catalogEntriesEqual(
   right: ReadonlyArray<FirestoreFieldCatalogEntry>,
 ): boolean {
   return JSON.stringify(left) === JSON.stringify(right);
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }

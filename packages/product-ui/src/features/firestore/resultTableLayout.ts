@@ -5,6 +5,7 @@ import type {
 } from '@firebase-desk/repo-contracts';
 import { type DataTableColumn, sanitizeDataTableColumnLayout } from '@firebase-desk/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { messageFromError } from '../../shared/errors.ts';
 
 const SAVE_DELAY_MS = 250;
 
@@ -120,8 +121,4 @@ export function useResultTableLayout<TData>(
     resetLayout,
     saveLayout,
   };
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }

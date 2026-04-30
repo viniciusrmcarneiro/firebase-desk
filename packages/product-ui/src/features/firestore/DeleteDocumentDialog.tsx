@@ -1,6 +1,7 @@
 import type { FirestoreDocumentResult } from '@firebase-desk/repo-contracts';
 import { Button, Dialog, DialogContent, InlineAlert } from '@firebase-desk/ui';
 import { useEffect, useMemo, useState } from 'react';
+import { messageFromError } from '../../shared/errors.ts';
 import { buildDeleteDocumentOptions, type DeleteDocumentOptions } from './deleteDocumentModel.ts';
 
 export interface DeleteDocumentDialogProps {
@@ -114,8 +115,4 @@ export function DeleteDocumentDialog(
       </DialogContent>
     </Dialog>
   );
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }

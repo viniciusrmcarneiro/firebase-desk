@@ -1,11 +1,15 @@
 import { FIRESTORE_FIELD_STALE_BEHAVIORS } from '@firebase-desk/repo-contracts';
+import {
+  FIRESTORE_FIELD_PATH_SEGMENT_MAX_BYTES,
+  utf8ByteLength,
+} from '@firebase-desk/repo-contracts/firestore-field-patch';
 import { z } from 'zod';
 import { pageOf, PageRequestSchema } from './pagination.ts';
 
 const PathSegmentSchema = z.string().min(1);
 const FieldPathSegmentSchema = PathSegmentSchema.refine((value) => !/^__.*__$/.test(value), {
   message: 'Field path segments cannot match __.*__.',
-}).refine((value) => utf8ByteLength(value) <= 1500, {
+}).refine((value) => utf8ByteLength(value) <= FIRESTORE_FIELD_PATH_SEGMENT_MAX_BYTES, {
   message: 'Field path segments must be 1,500 bytes or less.',
 });
 export const DocumentPathSchema = z.string().refine((path) => isDocumentPath(path), {
@@ -240,17 +244,4 @@ function pathSegments(path: string): ReadonlyArray<string> {
 function isBase64(value: string): boolean {
   if (value === '') return true;
   return /^[A-Za-z0-9+/]+={0,2}$/.test(value) && value.length % 4 === 0;
-}
-
-function utf8ByteLength(value: string): number {
-  let bytes = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    const codePoint = value.codePointAt(index) ?? 0;
-    if (codePoint > 0xffff) index += 1;
-    if (codePoint <= 0x7f) bytes += 1;
-    else if (codePoint <= 0x7ff) bytes += 2;
-    else if (codePoint <= 0xffff) bytes += 3;
-    else bytes += 4;
-  }
-  return bytes;
 }

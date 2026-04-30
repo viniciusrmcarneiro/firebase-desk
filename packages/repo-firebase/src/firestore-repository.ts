@@ -17,6 +17,10 @@ import {
   type PageRequest,
 } from '@firebase-desk/repo-contracts';
 import {
+  fieldPatchHasChangedRemoteValue,
+  FIRESTORE_FIELD_PATH_SEGMENT_MAX_BYTES,
+} from '@firebase-desk/repo-contracts/firestore-field-patch';
+import {
   type CollectionReference,
   type DocumentSnapshot,
   FieldPath,
@@ -345,7 +349,10 @@ function assertFieldPatchOperations(
   for (const operation of operations) {
     if (!operation.fieldPath.length) throw new Error('Firestore field path is required.');
     for (const segment of operation.fieldPath) {
-      if (!segment || /^__.*__$/.test(segment) || Buffer.byteLength(segment, 'utf8') > 1500) {
+      if (
+        !segment || /^__.*__$/.test(segment)
+        || Buffer.byteLength(segment, 'utf8') > FIRESTORE_FIELD_PATH_SEGMENT_MAX_BYTES
+      ) {
         throw new Error(`Invalid Firestore field path segment: ${segment}`);
       }
     }
@@ -366,50 +373,6 @@ function assertDirectSubcollectionPath(documentPath: string, collectionPath: str
       `Invalid Firestore subcollection path ${collectionPath} for document ${documentPath}`,
     );
   }
-}
-
-function fieldPatchHasChangedRemoteValue(
-  remoteData: Record<string, unknown>,
-  operations: ReadonlyArray<FirestoreFieldPatchOperation>,
-): boolean {
-  return operations.some((operation) =>
-    !deepEqual(getNestedValue(remoteData, operation.fieldPath), operation.baseValue)
-  );
-}
-
-function getNestedValue(
-  data: Record<string, unknown>,
-  fieldPath: ReadonlyArray<string>,
-): unknown {
-  let current: unknown = data;
-  for (const segment of fieldPath) {
-    if (!current || typeof current !== 'object' || Array.isArray(current)) return undefined;
-    current = (current as Record<string, unknown>)[segment];
-  }
-  return current;
-}
-
-function deepEqual(left: unknown, right: unknown): boolean {
-  return JSON.stringify(sortJson(left)) === JSON.stringify(sortJson(right));
-}
-
-function sortJson(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortJson);
-  if (!value || typeof value !== 'object') return value;
-  return Object.fromEntries(
-    sortedEntriesByKey(value as Record<string, unknown>)
-      .map(([key, entry]) => [key, sortJson(entry)]),
-  );
-}
-
-function sortedEntriesByKey(value: Record<string, unknown>): ReadonlyArray<[string, unknown]> {
-  const sorted: Array<[string, unknown]> = [];
-  for (const entry of Object.entries(value)) {
-    const index = sorted.findIndex(([key]) => entry[0].localeCompare(key) < 0);
-    if (index < 0) sorted.push(entry);
-    else sorted.splice(index, 0, entry);
-  }
-  return sorted;
 }
 
 function firestoreOperationError(caught: unknown, config: FirebaseConnectionConfig): Error {

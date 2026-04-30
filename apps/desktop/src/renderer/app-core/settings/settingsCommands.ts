@@ -1,5 +1,7 @@
 import type { AppearanceMode } from '@firebase-desk/design-tokens';
 import type { ActivityLogAppendInput } from '@firebase-desk/repo-contracts';
+import { messageFromError } from '../shared/errors.ts';
+import { elapsedMs } from '../shared/time.ts';
 import { settingsPatchMetadata, settingsPatchSummary } from './settingsSelectors.ts';
 
 export interface SettingsCommandEnvironment {
@@ -83,12 +85,4 @@ export async function openDataDirectoryCommand(
   if (!api?.openDataDirectory) throw new Error('Data location is unavailable.');
   await api.openDataDirectory();
   env.onStatus?.('Opened data location');
-}
-
-function elapsedMs(startedAt: number, finishedAt: number): number {
-  return Math.max(0, finishedAt - startedAt);
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }

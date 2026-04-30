@@ -114,28 +114,29 @@ Acceptance criteria:
 
 ## Phase 5: Shared Firestore And Value Utilities
 
-- [ ] Extract shared field patch helpers used by live and mock repositories.
+- [x] Extract shared field patch helpers used by live and mock repositories.
   - Nested get/delete.
   - Remote-change detection.
   - Deep equality.
   - Stable JSON sorting/comparison.
-- [ ] Add `firestoreTypeRegistry` for value type labels, icons, scalar/editable classification, and encoded `__type__` handling.
-- [ ] Replace duplicated tree node ID builders with a parameterized helper.
-- [ ] Move repeated helpers to narrow shared modules.
+- [x] Add `firestoreTypeRegistry` for value type labels, icons, scalar/editable classification, and encoded `__type__` handling.
+- [x] Replace duplicated tree node ID builders with a parameterized helper.
+- [x] Move repeated helpers to narrow shared modules.
   - `messageFromError`.
   - `elapsedMs`.
   - `isPlainObject`.
   - path parts and UTF-8 byte length validation.
   - settings clone helpers.
-- [ ] Move shared default limits and common magic strings to typed constants.
-- [ ] Replace hand-rolled sorting with native sort where it is enough.
+- [x] Move shared default limits and common magic strings to typed constants.
+- [x] Consolidate duplicated stable sorting helpers.
+  - Native sort is not used where repo lint forbids `Array#sort()` and ES2022 output lacks `toSorted()`.
 
 Acceptance criteria:
 
-- [ ] Live and mock Firestore field-patch behavior uses the same helper implementation.
-- [ ] Product UI Firestore value rendering/editing uses one registry source.
-- [ ] Duplicate helper implementations listed in the findings are removed or intentionally documented.
-- [ ] Shared utilities have focused unit tests.
+- [x] Live and mock Firestore field-patch behavior uses the same helper implementation.
+- [x] Product UI Firestore value rendering/editing uses one registry source.
+- [x] Duplicate helper implementations listed in the findings are removed or intentionally documented.
+- [x] Shared utilities have focused unit tests.
 
 ## Phase 6: Tests, Build Output, And Accessibility
 

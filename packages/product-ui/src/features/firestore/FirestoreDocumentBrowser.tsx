@@ -6,11 +6,11 @@ import type {
 import { cn, ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@firebase-desk/ui';
 import { type ReactNode, useMemo, useState } from 'react';
 import { useMediaQuery } from '../../hooks/useMediaQuery.ts';
+import { messageFromError } from '../../shared/errors.ts';
 import { type FieldEditTarget } from './fieldEditModel.ts';
 import {
   findDocumentByPath,
   mergeLoadedSubcollections,
-  messageFromError,
   type SubcollectionLoadState,
 } from './resultModel.tsx';
 import { OverviewCollapseStrip, ResultContextPanel } from './ResultOverviewPanel.tsx';

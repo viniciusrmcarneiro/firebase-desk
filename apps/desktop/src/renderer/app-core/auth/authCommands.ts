@@ -1,10 +1,12 @@
 import type { ActivityLogAppendInput, AuthUser } from '@firebase-desk/repo-contracts';
+import { messageFromError, toError } from '../shared/errors.ts';
 import {
   type AppCoreCommandOptions,
   type AppCoreStore,
   commandActivityMetadata,
   documentDataMetadata,
 } from '../shared/index.ts';
+import { elapsedMs } from '../shared/time.ts';
 import type { AuthRuntimeState } from './authState.ts';
 import {
   authCustomClaimsSaveFailed,
@@ -200,17 +202,4 @@ function authUserTarget(
     type: 'auth-user',
     uid,
   };
-}
-
-function elapsedMs(startedAt: number, endedAt: number): number {
-  return Math.max(0, endedAt - startedAt);
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  if (error instanceof Error) return error.message;
-  return fallback;
-}
-
-function toError(error: unknown, message: string): Error {
-  return error instanceof Error ? error : new Error(message);
 }

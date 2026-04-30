@@ -12,6 +12,7 @@ import type {
 } from '@firebase-desk/repo-contracts';
 import { normalizeFirestoreWriteSettings } from '@firebase-desk/repo-contracts';
 import { useEffect, useState } from 'react';
+import { messageFromError } from '../../shared/errors.ts';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
 import { ConflictMergeModal } from './ConflictMergeModal.tsx';
 import { CreateDocumentModal } from './CreateDocumentModal.tsx';
@@ -568,9 +569,4 @@ function documentForTarget(
 ): FirestoreDocumentResult | null {
   return findDocumentByPath(rows, target.documentPath)
     ?? (selectedDocument?.path === target.documentPath ? selectedDocument : null);
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  if (error instanceof Error) return error.message;
-  return fallback;
 }

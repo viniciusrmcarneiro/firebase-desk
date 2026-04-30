@@ -11,6 +11,7 @@ import { Button, Dialog, DialogContent, InlineAlert, Input } from '@firebase-des
 import { FolderOpen } from 'lucide-react';
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { useAppearance } from '../appearance/AppearanceProvider.tsx';
+import { messageFromError } from '../shared/errors.ts';
 
 export interface SettingsDialogProps {
   readonly dataDirectoryPath?: string | null | undefined;
@@ -374,10 +375,6 @@ function DataLocationSettings(
       {state.error ? <InlineAlert variant='danger'>{state.error}</InlineAlert> : null}
     </div>
   );
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  return error instanceof Error ? error.message : fallback;
 }
 
 function SettingsSummary({ snapshot }: { readonly snapshot: SettingsSnapshot | null; }) {

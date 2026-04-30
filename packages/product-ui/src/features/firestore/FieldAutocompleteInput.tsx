@@ -21,6 +21,7 @@ import {
   useState,
 } from 'react';
 import { createPortal } from 'react-dom';
+import { type FirestoreTypeIcon, iconForFirestoreFieldType } from './firestoreTypeRegistry.ts';
 
 const MAX_SUGGESTIONS = 12;
 
@@ -143,14 +144,17 @@ function filterSuggestions(
 }
 
 function iconForTypes(types: ReadonlyArray<FirestoreFieldType>): ReactNode {
-  const type = types[0] ?? 'string';
-  if (type.startsWith('array<')) return <List size={14} aria-hidden='true' />;
+  return iconForType(iconForFirestoreFieldType(types[0] ?? 'string'));
+}
+
+function iconForType(type: FirestoreTypeIcon): ReactNode {
+  if (type === 'array') return <List size={14} aria-hidden='true' />;
   if (type === 'number') return <Hash size={14} aria-hidden='true' />;
   if (type === 'boolean') return <ToggleLeft size={14} aria-hidden='true' />;
   if (type === 'timestamp') return <CalendarClock size={14} aria-hidden='true' />;
   if (type === 'geoPoint') return <MapPin size={14} aria-hidden='true' />;
   if (type === 'reference') return <Link size={14} aria-hidden='true' />;
   if (type === 'bytes') return <Binary size={14} aria-hidden='true' />;
-  if (type === 'null') return <Braces size={14} aria-hidden='true' />;
+  if (type === 'null' || type === 'map') return <Braces size={14} aria-hidden='true' />;
   return <Type size={14} aria-hidden='true' />;
 }

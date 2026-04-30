@@ -1,6 +1,7 @@
 import { Button, Dialog, DialogContent, InlineAlert, Input } from '@firebase-desk/ui';
 import { useEffect, useMemo, useState } from 'react';
 import { CodeEditor } from '../../code-editor/CodeEditor.tsx';
+import { messageFromError } from '../../shared/errors.ts';
 import {
   classifyFieldValue,
   defaultValueForType,
@@ -324,9 +325,4 @@ function padDatePart(value: number): string {
 
 function localTimeZone(): string {
   return Intl.DateTimeFormat().resolvedOptions().timeZone || 'local';
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  if (error instanceof Error) return error.message;
-  return fallback;
 }
