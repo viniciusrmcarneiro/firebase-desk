@@ -3,6 +3,8 @@
 Date: 2026-04-30
 Scope: static review of repo structure, renderer/main flows, packages (~419 source files), tests, checks.
 
+Execution roadmap: [codebase-review-tasks.md](codebase-review-tasks.md).
+
 Severity:
 
 - P1: likely user-visible bug / leak / boundary risk.
@@ -75,19 +77,19 @@ Fix: reuse `CollectionPathSchema` / `DocumentPathSchema` for all Firestore IPC r
 
 ## Large files — concrete splits
 
-| LOC | File | Why split | Suggested split |
-|---:|---|---|---|
-| 1359 | `apps/desktop/src/renderer/app/AppShell.tsx` | Tab mgmt + project switching + dialogs + hotkeys + persistence + render | `useTabController`, `useProjectController`, `useAppHotkeys`, `<DialogCoordinator>`; AppShell ~400 lines layout |
-| 1057 | `packages/product-ui/src/features/feature-surfaces.test.tsx` | 5 surfaces, mocks 8+ UI components | Split: `auth-surfaces.test.tsx`, `firestore-surfaces.test.tsx`, `projects-surfaces.test.tsx`, `workspace-surfaces.test.tsx` |
-| 629 | `packages/repo-mocks/src/firestore.ts` | Path utils + comparison + field-patch + repo mixed | Extract `firestore-path-utils`, `firestore-comparison`, `firestore-field-patch` (shared with repo-firebase) |
-| 617 | `apps/desktop/src/renderer/app/AppShell.test.tsx` | Many workflows in one suite | Split by workflow |
-| 593 | `packages/product-ui/src/features/firestore/FirestoreQuerySurface.editing.test.tsx` | | Split by save/patch/delete/conflict |
-| 574 | `packages/product-ui/src/features/firestore/FirestoreQuerySurface.tsx` | UI + write workflow state, multiple modal state machines | `FirestoreQuerySurfaceView` + controller hooks per modal |
-| 548 | `e2e/specs/firestore-smoke.spec.ts` | | Split by workflow |
-| 448 | `apps/desktop/src/main/ipc/registry.ts` | 23 channels in one handlers map | `firestore-handlers.ts`, `auth-handlers.ts`, `script-runner-handlers.ts`, `activity-handlers.ts`, `projects-handlers.ts`, `settings-handlers.ts`; registry ~100 lines |
-| 441 | `packages/repo-firebase/src/firestore-repository.ts` | Shared validators/helpers candidate | See DRY section |
-| 431 | `apps/desktop/src/renderer/app-core/firestore/write/firestoreWriteCommands.ts` | 4 near-identical command bodies | `executeWriteCommand<T>()` helper handling start/success/failure + activity + invalidation; commands shrink ~40 lines each |
-| 408 | `packages/product-ui/src/features/firestore/resultModel.tsx` | Value classification + tree flattening + helpers | Split into 3 modules |
+|  LOC | File                                                                                | Why split                                                               | Suggested split                                                                                                                                                       |
+| ---: | ----------------------------------------------------------------------------------- | ----------------------------------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| 1359 | `apps/desktop/src/renderer/app/AppShell.tsx`                                        | Tab mgmt + project switching + dialogs + hotkeys + persistence + render | `useTabController`, `useProjectController`, `useAppHotkeys`, `<DialogCoordinator>`; AppShell ~400 lines layout                                                        |
+| 1057 | `packages/product-ui/src/features/feature-surfaces.test.tsx`                        | 5 surfaces, mocks 8+ UI components                                      | Split: `auth-surfaces.test.tsx`, `firestore-surfaces.test.tsx`, `projects-surfaces.test.tsx`, `workspace-surfaces.test.tsx`                                           |
+|  629 | `packages/repo-mocks/src/firestore.ts`                                              | Path utils + comparison + field-patch + repo mixed                      | Extract `firestore-path-utils`, `firestore-comparison`, `firestore-field-patch` (shared with repo-firebase)                                                           |
+|  617 | `apps/desktop/src/renderer/app/AppShell.test.tsx`                                   | Many workflows in one suite                                             | Split by workflow                                                                                                                                                     |
+|  593 | `packages/product-ui/src/features/firestore/FirestoreQuerySurface.editing.test.tsx` |                                                                         | Split by save/patch/delete/conflict                                                                                                                                   |
+|  574 | `packages/product-ui/src/features/firestore/FirestoreQuerySurface.tsx`              | UI + write workflow state, multiple modal state machines                | `FirestoreQuerySurfaceView` + controller hooks per modal                                                                                                              |
+|  548 | `e2e/specs/firestore-smoke.spec.ts`                                                 |                                                                         | Split by workflow                                                                                                                                                     |
+|  448 | `apps/desktop/src/main/ipc/registry.ts`                                             | 23 channels in one handlers map                                         | `firestore-handlers.ts`, `auth-handlers.ts`, `script-runner-handlers.ts`, `activity-handlers.ts`, `projects-handlers.ts`, `settings-handlers.ts`; registry ~100 lines |
+|  441 | `packages/repo-firebase/src/firestore-repository.ts`                                | Shared validators/helpers candidate                                     | See DRY section                                                                                                                                                       |
+|  431 | `apps/desktop/src/renderer/app-core/firestore/write/firestoreWriteCommands.ts`      | 4 near-identical command bodies                                         | `executeWriteCommand<T>()` helper handling start/success/failure + activity + invalidation; commands shrink ~40 lines each                                            |
+|  408 | `packages/product-ui/src/features/firestore/resultModel.tsx`                        | Value classification + tree flattening + helpers                        | Split into 3 modules                                                                                                                                                  |
 
 ---
 
@@ -156,7 +158,7 @@ Fix: catch, keep defaults, expose optional `onError`/activity hook; tests for fa
   - `isPlainObject`: data-format, repo-firebase, repo-mocks, script-runner, product-ui.
   - `pathParts`, field path validation, UTF-8 byte length: ipc-schemas, repo-firebase, repo-mocks, field edit model.
   - settings clone helpers: main settings repo/store, mock settings repo.
-  Move to narrow shared modules (`repo-contracts` / `data-format` / app-core shared).
+    Move to narrow shared modules (`repo-contracts` / `data-format` / app-core shared).
 - **`DEFAULT_LIMIT = 25`** duplicated in repo-firebase, repo-mocks, auth-repository → `repo-contracts`.
 - **Magic strings**: tree node kinds, IPC channel names, activity areas, result tree node kinds (`'branch'`, `'leaf'`, `'load-more'`) → const enums.
 - **Duplicate `useMediaQuery`**: shared at `product-ui/src/hooks/useMediaQuery.ts:1-20`; local copy in `AuthUsersSurface.tsx:420-436`.
