@@ -51,12 +51,12 @@ Use this inventory to decide extraction boundaries and to avoid adding more work
 
 This refactor is not complete. Several phases below created app-core state, transitions, and commands, but React adapters still own important workflow lifecycles.
 
-- Firestore query execution still depends on `useRunQuery`/`useGetDocument`; React effects continue page reloads and record completion Activity from hook state.
-- Auth list/search execution still depends on `useUsers`/`useSearchUsers`; React effects record success/failure Activity from hook state.
-- Workspace restore/save still uses React effects and renderer `localStorage`.
+- Firestore query execution no longer depends on `useRunQuery`/`useGetDocument` or React Query completion effects. Remaining work: the repository execution helper still lives in the React adapter instead of an app-core command callable by schedulers.
+- Auth list/search/load-more execution and Activity logging now live in app-core commands.
+- Workspace restore/save now uses `SettingsRepository`; restore normalization is app-core-owned. Remaining work: the settings load/save side effects still live in the React adapter, as expected for persistence IO.
 - Workspace tree loading, tab routing, selection, and interaction history are still mixed in `useWorkspaceTree`.
 - AppShell still owns some workflow Activity, tab cleanup, busy checks, and cross-feature callbacks.
-- Scheduler-ready read commands are incomplete because Firestore/Auth reads require mounted React hooks.
+- Scheduler-ready read commands are incomplete for Firestore reads because query execution is still adapter-owned.
 
 Initial app-core folder naming:
 
@@ -167,9 +167,9 @@ Extract query lifecycle before write lifecycle.
   - [x] refresh preserving loaded page count
   - [x] load subcollections
   - [x] open document in new tab intent
-- [ ] Finish moving query execution and completion Activity out of React hooks.
-  - Current state: app-core builds the completion Activity payload and dedupes by run id.
-  - Remaining work: repository execution, page reload continuation, and success/failure completion still depend on React query hooks/effects.
+- [ ] Finish moving query execution into an app-core command.
+  - Current state: React Query hooks/effects are gone; page reload continuation and completion Activity are no longer inferred from hook result state.
+  - Remaining work: repository execution still lives in `useFirestoreTabState`, so schedulers cannot call the same read command yet.
 - [x] Add pure tests for pagination, refresh, stale results, selection, and errors.
 - [x] Keep e2e smoke coverage unchanged.
 
@@ -237,9 +237,9 @@ Move write flows after query extraction.
   - [x] select user
   - [x] save custom claims
   - [x] refresh users
-- [ ] Finish moving Auth list/search execution and Activity logging into commands.
-  - Current state: app-core builds success/failure Activity payloads and dedupes them.
-  - Remaining work: list/search/load-more execution still depends on React query hooks/effects.
+- [x] Finish moving Auth list/search execution and Activity logging into commands.
+  - Auth list/search/load-more execution uses repository calls from app-core commands.
+  - Load/search/load-more success and failure Activity is recorded by the command path.
 - [x] Add pure tests for filter/search, selection, paging, claims save, and failure states.
 
 ## Phase 6: JavaScript Query Core
@@ -279,12 +279,12 @@ Move write flows after query extraction.
   - [x] Firestore document selection
 - [ ] Keep persistence explicit:
   - [x] serialize workspace state
-  - [ ] restore workspace state through app-core command/adapters instead of React effects
+  - [x] restore workspace state through app-core command/adapters instead of React effects
   - [x] do not persist loaded query result data
-  - [ ] replace renderer `localStorage` with app storage/settings path
+  - [x] replace renderer `localStorage` with app storage/settings path
 - [x] Add tests for tab and selection transitions without React.
 - [ ] Reduce AppShell tab/selection plumbing to adapter calls.
-  - Remaining work: tab cleanup, busy checks, tree selection, and interaction routing still live in AppShell/hooks.
+  - Remaining work: tree selection and interaction routing still live in AppShell/hooks.
 
 ## Phase 8: Settings And Appearance
 
@@ -309,8 +309,8 @@ Schedulers should call the same commands as UI actions.
 - [x] Defer hidden Firestore query execution until a background query runner exists.
 - [x] Ensure mutation commands can choose whether to notify only on failure/conflict.
 - [ ] Ensure Activity logging is shared between UI and scheduler commands.
-  - Current state: JS Query and mutations are closest.
-  - Remaining work: Firestore/Auth reads are not scheduler-ready.
+  - Current state: JS Query, Auth reads, and mutations are closest.
+  - Remaining work: Firestore reads are not scheduler-ready.
 - [x] Add command tests for scheduler source.
 - [x] Do not add scheduler-specific duplicate repository code.
 

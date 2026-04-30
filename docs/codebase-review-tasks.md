@@ -71,16 +71,20 @@ Acceptance criteria:
 
 ## Phase 3: App-Core Workflow Cleanup
 
-- [ ] Move Firestore page-reload watcher behavior out of hook-only effects.
-  - Current state: app-core decides whether another page should load, but a React effect still observes query state and calls `fetchNextPage`.
-- [ ] Move Activity completion recording into command paths where commands own completion.
-  - Current state: app-core builds/dedupes Firestore/Auth completion Activity, but React effects still infer completion from hook result state.
+- [x] Move Firestore page-reload watcher behavior out of hook-only effects.
+  - React Query pagination effects were removed from Firestore query tabs.
+  - Refresh reloads the same loaded page count from the direct query execution path.
+- [x] Move Activity completion recording into command paths where commands own completion.
+  - Firestore completion Activity is emitted from the query completion path, not a React result watcher.
+  - Auth load/search/load-more Activity is emitted from app-core commands.
 - [x] Track query activity dedupe in app-core state instead of hook refs.
 - [ ] Unify tab-close cleanup in one app-core path.
-  - Remaining work: AppShell still cancels query-client work and checks busy tabs directly.
+  - Current state: close decisions use `closeWorkspaceTabsCommand`; AppShell no longer cancels Firestore/Auth query-client work.
+  - Remaining work: AppShell still coordinates feature-specific runtime cleanup after the command result.
 - [x] Move Firestore write conflict/stale/create modal workflow state fully into app-core.
-- [ ] Replace durable workspace `localStorage` persistence with an app storage/settings path.
-  - Current state: failures are visible, but persistence still uses renderer `localStorage`.
+- [x] Replace durable workspace `localStorage` persistence with an app storage/settings path.
+  - Workspace state is stored through `SettingsRepository`.
+  - Restore normalization is routed through an app-core workspace command.
 
 Acceptance criteria:
 
