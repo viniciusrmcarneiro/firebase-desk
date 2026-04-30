@@ -59,7 +59,7 @@ describe('ActivityLogStore', () => {
     await expect(store.list()).resolves.toMatchObject([{ id: 'two' }]);
   });
 
-  it('skips invalid jsonl lines and clears', async () => {
+  it('surfaces invalid jsonl lines and still allows clearing', async () => {
     const dir = await makeTempDir();
     await writeFile(
       join(dir, 'activity-log.jsonl'),
@@ -68,7 +68,7 @@ describe('ActivityLogStore', () => {
     );
     const store = new ActivityLogStore(dir);
 
-    await expect(store.list()).resolves.toMatchObject([{ id: 'valid' }]);
+    await expect(store.list()).rejects.toThrow('Activity log contains 1 invalid entry.');
 
     await store.clear();
 

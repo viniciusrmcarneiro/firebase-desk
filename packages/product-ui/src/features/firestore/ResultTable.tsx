@@ -20,6 +20,7 @@ export interface ResultTableProps {
   readonly onLoadSubcollections?: ((documentPath: string) => Promise<void> | void) | undefined;
   readonly onOpenDocumentInNewTab?: ((documentPath: string) => void) | undefined;
   readonly onSelectDocument?: ((documentPath: string) => void) | undefined;
+  readonly onSettingsError?: ((message: string) => void) | undefined;
   readonly onSetFieldNull?: ((target: FieldEditTarget) => void) | undefined;
   readonly queryPath: string;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
@@ -42,6 +43,7 @@ export function ResultTable(
     onLoadSubcollections,
     onOpenDocumentInNewTab,
     onSelectDocument,
+    onSettingsError,
     onSetFieldNull,
     queryPath,
     rows,
@@ -121,6 +123,7 @@ export function ResultTable(
   );
   const { hasSavedLayout, layout, resetLayout, saveLayout } = useResultTableLayout({
     columns,
+    onSettingsError,
     queryPath,
     settings,
   });

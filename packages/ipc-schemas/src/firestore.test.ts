@@ -3,6 +3,10 @@ import {
   CreateDocumentRequestSchema,
   DeleteDocumentRequestSchema,
   GenerateDocumentIdRequestSchema,
+  GetDocumentRequestSchema,
+  ListDocumentsRequestSchema,
+  ListSubcollectionsRequestSchema,
+  RunQueryRequestSchema,
   SaveDocumentRequestSchema,
   UpdateDocumentFieldsRequestSchema,
 } from './firestore.ts';
@@ -67,6 +71,41 @@ describe('Firestore IPC schemas', () => {
         connectionId: 'emu',
         documentPath: 'orders/ord_1',
         data: { bad: { __type__: 'serverTimestamp' } },
+      })
+    ).toThrow();
+  });
+
+  it('rejects invalid query, list, get, and subcollection paths', () => {
+    expect(() =>
+      RunQueryRequestSchema.parse({
+        query: { connectionId: 'emu', path: 'orders' },
+      })
+    ).not.toThrow();
+
+    expect(() =>
+      RunQueryRequestSchema.parse({
+        query: { connectionId: 'emu', path: 'orders/ord_1' },
+      })
+    ).toThrow();
+
+    expect(() =>
+      ListDocumentsRequestSchema.parse({
+        connectionId: 'emu',
+        collectionPath: 'orders/ord_1',
+      })
+    ).toThrow();
+
+    expect(() =>
+      GetDocumentRequestSchema.parse({
+        connectionId: 'emu',
+        documentPath: '',
+      })
+    ).toThrow();
+
+    expect(() =>
+      ListSubcollectionsRequestSchema.parse({
+        connectionId: 'emu',
+        documentPath: 'orders',
       })
     ).toThrow();
   });

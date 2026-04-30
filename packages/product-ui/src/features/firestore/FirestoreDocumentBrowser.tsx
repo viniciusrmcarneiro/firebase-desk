@@ -41,6 +41,7 @@ export interface FirestoreDocumentBrowserProps {
   readonly onResultViewChange: (view: FirestoreResultView) => void;
   readonly onRefreshResults?: (() => void) | undefined;
   readonly onSelectDocument?: ((documentPath: string) => void) | undefined;
+  readonly onSettingsError?: ((message: string) => void) | undefined;
   readonly onSetFieldValue?: ((target: FieldEditTarget, value: unknown) => void) | undefined;
   readonly onSetFieldNull?: ((target: FieldEditTarget) => void) | undefined;
   readonly queryPath: string;
@@ -73,6 +74,7 @@ export function FirestoreDocumentBrowser(
     onResultViewChange,
     onRefreshResults,
     onSelectDocument,
+    onSettingsError,
     onSetFieldValue,
     onSetFieldNull,
     queryPath,
@@ -158,6 +160,7 @@ export function FirestoreDocumentBrowser(
         onResultViewChange={onResultViewChange}
         onRefreshResults={onRefreshResults}
         onSelectDocument={onSelectDocument}
+        onSettingsError={onSettingsError}
         onSetFieldNull={onSetFieldNull}
       />
     </div>

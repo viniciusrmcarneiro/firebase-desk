@@ -16,6 +16,12 @@ describe('script worker process', () => {
   beforeEach(() => {
     vi.clearAllMocks();
     process.exitCode = undefined;
+    vi.spyOn(process, 'exit').mockImplementation(
+      ((code?: string | number | null) => {
+        if (typeof code === 'number') process.exitCode = code;
+        return undefined as never;
+      }) as typeof process.exit,
+    );
   });
 
   afterEach(() => {
@@ -70,6 +76,38 @@ describe('script worker process', () => {
 
     expect(process.exitCode).toBe(0);
     expect(disconnect).toHaveBeenCalledTimes(1);
+    expect(process.exit).toHaveBeenCalledWith(0);
+    expect(disconnect.mock.invocationCallOrder[0]).toBeLessThan(
+      vi.mocked(process.exit).mock.invocationCallOrder[0]!,
+    );
+  });
+
+  it('exits with failure for invalid worker messages', async () => {
+    const completions: Array<() => void> = [];
+    const disconnect = vi.fn();
+    const send = vi.fn((_message: unknown, callback?: () => void) => {
+      completions.push(() => callback?.());
+      return true;
+    });
+    Object.defineProperty(process, 'connected', { configurable: true, value: true });
+    Object.defineProperty(process, 'disconnect', { configurable: true, value: disconnect });
+    Object.defineProperty(process, 'send', { configurable: true, value: send });
+
+    startScriptWorkerProcess();
+    emitProcessMessage({ type: 'invalid' });
+    await Promise.resolve();
+
+    expect(send).toHaveBeenCalledWith(
+      { type: 'error', error: 'Invalid script runner worker message.' },
+      expect.any(Function),
+    );
+    expect(process.exit).not.toHaveBeenCalled();
+
+    for (const complete of completions) complete();
+    await flushAsyncWork();
+
+    expect(disconnect).toHaveBeenCalledTimes(1);
+    expect(process.exit).toHaveBeenCalledWith(1);
   });
 });
 

@@ -47,7 +47,7 @@ export class SettingsStore {
       const raw = await readFile(this.filePath, 'utf8');
       const parsed = JSON.parse(raw) as unknown;
       const settingsFile = SettingsFileSchema.safeParse(parsed);
-      if (!settingsFile.success) return cloneSnapshot(DEFAULT_SETTINGS_SNAPSHOT);
+      if (!settingsFile.success) throw new Error('Settings file is invalid.');
       return cloneSnapshot(settingsFile.data.snapshot);
     } catch (error) {
       if (isNotFound(error)) return cloneSnapshot(DEFAULT_SETTINGS_SNAPSHOT);

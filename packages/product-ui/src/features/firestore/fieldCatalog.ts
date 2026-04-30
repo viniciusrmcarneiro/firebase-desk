@@ -47,10 +47,12 @@ export function mergeFieldCatalogEntries(
 
 export function useFirestoreFieldCatalog(
   {
+    onSettingsError,
     queryPath,
     rows,
     settings,
   }: {
+    readonly onSettingsError?: ((message: string) => void) | undefined;
     readonly queryPath: string;
     readonly rows: ReadonlyArray<FirestoreDocumentResult>;
     readonly settings?: SettingsRepository | undefined;
@@ -67,13 +69,16 @@ export function useFirestoreFieldCatalog(
     let cancelled = false;
     settings.load().then((snapshot) => {
       if (!cancelled) setCatalogs(snapshot.firestoreFieldCatalogs);
-    }).catch(() => {
-      if (!cancelled) setCatalogs({});
+    }).catch((error) => {
+      if (!cancelled) {
+        setCatalogs({});
+        onSettingsError?.(messageFromError(error, 'Could not load field catalog settings.'));
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [settings]);
+  }, [onSettingsError, settings]);
 
   useEffect(() => {
     if (!settings || rows.length === 0) return;
@@ -95,11 +100,15 @@ export function useFirestoreFieldCatalog(
       .then((snapshot) => {
         if (!cancelled) setCatalogs(snapshot.firestoreFieldCatalogs);
       })
-      .catch(() => undefined);
+      .catch((error) => {
+        if (!cancelled) {
+          onSettingsError?.(messageFromError(error, 'Could not save field catalog settings.'));
+        }
+      });
     return () => {
       cancelled = true;
     };
-  }, [key, rows, settings]);
+  }, [key, onSettingsError, rows, settings]);
 
   return catalogs[key] ?? [];
 }
@@ -226,4 +235,8 @@ function catalogEntriesEqual(
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null && !Array.isArray(value);
+}
+
+function messageFromError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }

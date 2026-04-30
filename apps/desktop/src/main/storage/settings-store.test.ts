@@ -31,7 +31,7 @@ describe('SettingsStore', () => {
     expect(typeof persisted.snapshot?.sidebarWidth).toBe('number');
   });
 
-  it('falls back to defaults when settings file values are invalid', async () => {
+  it('rejects invalid settings file values instead of silently resetting', async () => {
     const userDataPath = await makeTempDir();
     await writeFile(
       join(userDataPath, 'settings.json'),
@@ -47,8 +47,8 @@ describe('SettingsStore', () => {
       }),
     );
 
-    await expect(new SettingsStore(userDataPath).load()).resolves.toEqual(
-      DEFAULT_SETTINGS_SNAPSHOT,
+    await expect(new SettingsStore(userDataPath).load()).rejects.toThrow(
+      'Settings file is invalid.',
     );
   });
 

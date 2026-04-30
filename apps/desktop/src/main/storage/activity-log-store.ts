@@ -47,15 +47,26 @@ export class ActivityLogStore {
   private async readEntriesOldestFirst(): Promise<ReadonlyArray<ActivityLogEntry>> {
     try {
       const raw = await readFile(this.filePath, 'utf8');
-      return raw.split('\n').flatMap((line) => {
-        if (!line.trim()) return [];
+      const entries: ActivityLogEntry[] = [];
+      let invalidLineCount = 0;
+      for (const line of raw.split('\n')) {
+        if (!line.trim()) continue;
         try {
           const parsed = ActivityLogEntrySchema.safeParse(JSON.parse(line) as unknown);
-          return parsed.success ? [parsed.data] : [];
+          if (parsed.success) entries.push(parsed.data);
+          else invalidLineCount += 1;
         } catch {
-          return [];
+          invalidLineCount += 1;
         }
-      });
+      }
+      if (invalidLineCount > 0) {
+        throw new Error(
+          `Activity log contains ${invalidLineCount} invalid entr${
+            invalidLineCount === 1 ? 'y' : 'ies'
+          }.`,
+        );
+      }
+      return entries;
     } catch (error) {
       if (isNotFound(error)) return [];
       throw error;

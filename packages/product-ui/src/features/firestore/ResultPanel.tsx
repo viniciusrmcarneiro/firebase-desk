@@ -45,6 +45,7 @@ export interface ResultPanelProps {
   readonly onResultViewChange: (view: FirestoreResultView) => void;
   readonly onSelectDocument?: ((documentPath: string) => void) | undefined;
   readonly onRefreshResults?: (() => void) | undefined;
+  readonly onSettingsError?: ((message: string) => void) | undefined;
   readonly onSetFieldNull?: ((target: FieldEditTarget) => void) | undefined;
   readonly queryPath: string;
   readonly resultView: FirestoreResultView;
@@ -74,6 +75,7 @@ export function ResultPanel(
     onResultViewChange,
     onRefreshResults,
     onSelectDocument,
+    onSettingsError,
     onSetFieldNull,
     queryPath,
     resultView,
@@ -214,6 +216,7 @@ export function ResultPanel(
                 onLoadSubcollections={onLoadSubcollections}
                 onOpenDocumentInNewTab={onOpenDocumentInNewTab}
                 onSelectDocument={onSelectDocument}
+                onSettingsError={onSettingsError}
                 onSetFieldNull={onSetFieldNull}
               />
             </TabsContent>

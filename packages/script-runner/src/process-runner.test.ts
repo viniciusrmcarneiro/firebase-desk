@@ -176,6 +176,64 @@ describe('ProcessScriptRunnerRepository', () => {
     ]);
   });
 
+  it('kills and detaches the child after a final result', async () => {
+    const child = new FakeChildProcess();
+    const events: unknown[] = [];
+    const repo = new ProcessScriptRunnerRepository(
+      {
+        async resolveConnection(connectionId) {
+          return connectionFor(connectionId);
+        },
+      },
+      {
+        forkWorker: vi.fn(() => child as unknown as ChildProcess),
+        workerPath: '/worker.js',
+      },
+    );
+    repo.subscribe((event) => events.push(event));
+
+    const run = repo.run({
+      runId: 'run-complete',
+      connectionId: 'emu',
+      source: 'setInterval(() => {}, 1000); return 1;',
+    });
+    await Promise.resolve();
+    child.emit('message', {
+      type: 'result',
+      result: {
+        returnValue: 1,
+        stream: [],
+        logs: [],
+        errors: [],
+        durationMs: 3,
+      },
+    });
+
+    await expect(run).resolves.toMatchObject({ returnValue: 1 });
+    expect(child.killed).toBe(true);
+    expect(child.listenerCount('message')).toBe(0);
+    expect(child.listenerCount('error')).toBe(0);
+    expect(child.listenerCount('exit')).toBe(0);
+
+    child.emit('message', {
+      type: 'event',
+      event: {
+        type: 'log',
+        runId: 'run-complete',
+        log: { level: 'info', message: 'late', timestamp: '2026-04-28T00:00:00.000Z' },
+      },
+    });
+    child.emit('exit', 0, null);
+
+    expect(events).toEqual([
+      expect.objectContaining({
+        type: 'complete',
+        runId: 'run-complete',
+        result: expect.objectContaining({ returnValue: 1 }),
+      }),
+    ]);
+  });
+
   it('keeps emitting when a subscriber throws', async () => {
     const child = new FakeChildProcess();
     const events: unknown[] = [];

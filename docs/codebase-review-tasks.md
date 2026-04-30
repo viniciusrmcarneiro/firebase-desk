@@ -19,28 +19,28 @@ This document tracks implementation. The findings doc remains the evidence/sourc
 
 - [x] Create this task document.
 - [x] Link it from the findings document.
-- [ ] Keep this document updated as phases complete.
+- [x] Keep this document updated as phases complete.
 
 Acceptance criteria:
 
-- [ ] The task doc names every phase from the findings.
-- [ ] Each phase has concise acceptance criteria.
-- [ ] The findings doc links here.
+- [x] The task doc names every phase from the findings.
+- [x] Each phase has concise acceptance criteria.
+- [x] The findings doc links here.
 
 ## Phase 1: Reliability And Boundary Fixes
 
-- [ ] Fix script worker lifetime leaks.
+- [x] Fix script worker lifetime leaks.
   - Ensure scripts that return while timers are active do not leave child processes running.
   - Kill or exit workers after final result/error/cancel.
   - Clean up listeners on exit/error.
-- [ ] Add explicit app boot failure state.
+- [x] Add explicit app boot failure state.
   - Handle config load failure.
   - Handle settings load failure.
   - Show a recoverable error UI with retry.
-- [ ] Tighten Firestore IPC path validation.
+- [x] Tighten Firestore IPC path validation.
   - Use shared collection/document path schemas for query, list, get, and subcollection requests.
   - Keep repo-level validation as defense in depth.
-- [ ] Surface currently swallowed persistence/load failures.
+- [x] Surface currently swallowed persistence/load failures.
   - Settings corruption.
   - Activity JSONL corruption.
   - Product UI field catalog/table layout load/save failures.
@@ -48,11 +48,11 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- [ ] P1 findings have regression tests.
-- [ ] App boot never hangs forever after config/settings failure.
-- [ ] Script worker tests prove no lingering child after returned script with active interval.
-- [ ] Firestore IPC schemas reject invalid collection/document paths.
-- [ ] Persistence/load failures are visible via UI, status, or Activity.
+- [x] P1 findings have regression tests.
+- [x] App boot never hangs forever after config/settings failure.
+- [x] Script worker tests prove no lingering child after returned script with active interval.
+- [x] Firestore IPC schemas reject invalid collection/document paths.
+- [x] Persistence/load failures are visible via UI, status, or Activity.
 
 ## Phase 2: Mock And Live Contract Parity
 

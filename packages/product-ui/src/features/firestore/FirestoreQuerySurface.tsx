@@ -154,6 +154,7 @@ export function FirestoreQuerySurface(
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const [actionNoticeMessage, setActionNoticeMessage] = useState<string | null>(null);
   const fieldSuggestions = useFirestoreFieldCatalog({
+    onSettingsError: setActionErrorMessage,
     queryPath: draft.path,
     rows,
     settings,
@@ -444,6 +445,7 @@ export function FirestoreQuerySurface(
         onOpenDocumentInNewTab={onOpenDocumentInNewTab}
         onResultViewChange={setResultView}
         onRefreshResults={refreshResults}
+        onSettingsError={setActionErrorMessage}
         onCreateDocument={onCreateDocument && onGenerateDocumentId
           ? openCreateDocument
           : undefined}

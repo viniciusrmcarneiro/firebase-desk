@@ -8,10 +8,10 @@ const FieldPathSegmentSchema = PathSegmentSchema.refine((value) => !/^__.*__$/.t
 }).refine((value) => utf8ByteLength(value) <= 1500, {
   message: 'Field path segments must be 1,500 bytes or less.',
 });
-const DocumentPathSchema = z.string().refine((path) => isDocumentPath(path), {
+export const DocumentPathSchema = z.string().refine((path) => isDocumentPath(path), {
   message: 'Document path must have an even number of path segments.',
 });
-const CollectionPathSchema = z.string().refine((path) => isCollectionPath(path), {
+export const CollectionPathSchema = z.string().refine((path) => isCollectionPath(path), {
   message: 'Collection path must have an odd number of path segments.',
 });
 const DocumentIdSchema = z.string().refine(
@@ -93,7 +93,7 @@ export const FirestoreSortSchema = z.object({
 
 export const FirestoreQuerySchema = z.object({
   connectionId: z.string(),
-  path: z.string(),
+  path: CollectionPathSchema,
   filters: z.array(FirestoreFilterSchema).optional(),
   sorts: z.array(FirestoreSortSchema).optional(),
 });
@@ -167,8 +167,18 @@ export const FirestoreUpdateDocumentFieldsResultSchema = z.discriminatedUnion('s
 
 export const ListDocumentsRequestSchema = z.object({
   connectionId: z.string(),
-  collectionPath: z.string(),
+  collectionPath: CollectionPathSchema,
   request: PageRequestSchema.optional(),
+});
+
+export const ListSubcollectionsRequestSchema = z.object({
+  connectionId: z.string(),
+  documentPath: DocumentPathSchema,
+});
+
+export const GetDocumentRequestSchema = z.object({
+  connectionId: z.string(),
+  documentPath: DocumentPathSchema,
 });
 
 export const RunQueryRequestSchema = z.object({
