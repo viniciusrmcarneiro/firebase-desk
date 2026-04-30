@@ -128,7 +128,6 @@ function renderShell(
     readonly repositories?: RepositorySet;
   } = {},
 ) {
-  window.localStorage.clear();
   tabActions.reset();
   selectionActions.reset();
   tabActions.openTab({ kind: 'firestore-query', connectionId: 'emu', path: 'orders' });

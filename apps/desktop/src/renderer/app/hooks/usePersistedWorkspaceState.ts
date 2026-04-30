@@ -1,8 +1,9 @@
 import type { FirestoreQueryDraft } from '@firebase-desk/repo-contracts';
 import type { SettingsRepository } from '@firebase-desk/repo-contracts';
 import { useEffect, useRef, useState } from 'react';
+import { restoreWorkspaceTabsCommand } from '../../app-core/workspace/index.ts';
 import { selectionActions } from '../stores/selectionStore.ts';
-import { tabActions, type TabsState } from '../stores/tabsStore.ts';
+import { type TabsState, tabsStore } from '../stores/tabsStore.ts';
 import { treeItemIdForTab } from '../workspaceModel.ts';
 import {
   loadPersistedWorkspaceStateResult,
@@ -50,13 +51,9 @@ export function usePersistedWorkspaceState(
         restoredRef.current = true;
         const persistedWorkspace = loadResult.snapshot;
         if (persistedWorkspace) {
-          tabActions.restore(persistedWorkspace.tabsState);
-          const activeRestoredTab = persistedWorkspace.tabsState.tabs.find((tab) =>
-            tab.id === persistedWorkspace.tabsState.activeTabId
-          ) ?? persistedWorkspace.tabsState.tabs[0];
-          if (activeRestoredTab) {
-            selectionActions.selectTreeItem(treeItemIdForTab(activeRestoredTab));
-          }
+          const result = restoreWorkspaceTabsCommand(persistedWorkspace.tabsState);
+          tabsStore.setState(() => result.state);
+          if (result.activeTab) selectionActions.selectTreeItem(treeItemIdForTab(result.activeTab));
         }
       }
       setResult({ restored: true, snapshot: loadResult.snapshot });

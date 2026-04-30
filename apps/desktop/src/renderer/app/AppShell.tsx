@@ -663,17 +663,8 @@ export function AppShell(
   }
 
   function clearTabRuntimeState(tab: WorkspaceTab) {
-    cancelTabQueries(tab);
     firestoreTab.clearTab(tab.id);
     jsTab.clearTab(tab.id);
-  }
-
-  function cancelTabQueries(tab: WorkspaceTab) {
-    if (tab.kind === 'firestore-query') {
-      void queryClient.cancelQueries({ queryKey: ['firestore', 'query', tab.id] });
-      void queryClient.cancelQueries({ queryKey: ['firestore', 'document', tab.id] });
-    }
-    if (tab.kind === 'auth-users') void queryClient.cancelQueries({ queryKey: ['auth', tab.id] });
   }
 
   function isTabBusy(tab: WorkspaceTab): boolean {

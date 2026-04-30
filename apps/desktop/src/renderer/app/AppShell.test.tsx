@@ -17,7 +17,7 @@ import {
   type RepositorySet,
 } from './RepositoryProvider.tsx';
 import { selectionActions } from './stores/selectionStore.ts';
-import { tabActions } from './stores/tabsStore.ts';
+import { tabActions, tabsStore } from './stores/tabsStore.ts';
 import { type PersistedWorkspaceState } from './workspacePersistence.ts';
 
 vi.mock('@tanstack/react-virtual', () => ({
@@ -636,10 +636,11 @@ describe('desktop AppShell', () => {
         },
       },
     };
-    const restoreSpy = vi.spyOn(tabActions, 'restore');
+    const restoreSpy = vi.spyOn(tabsStore, 'setState');
 
     const repositories = createMockRepositories();
     renderShell({ repositories, savedWorkspace, strictMode: true });
+    restoreSpy.mockClear();
 
     const pathInput = await screen.findByRole('textbox', { name: 'Query path' });
     expect((pathInput as HTMLInputElement).value).toBe('customers');

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { closeWorkspaceTabsCommand } from './workspaceCommands.ts';
+import { closeWorkspaceTabsCommand, restoreWorkspaceTabsCommand } from './workspaceCommands.ts';
 import { createInitialTabsState } from './workspaceState.ts';
 import { tabOpened } from './workspaceTransitions.ts';
 
@@ -48,5 +48,26 @@ describe('workspace commands', () => {
     expect(result.state.tabs).toEqual([]);
     expect(result.state.interactionHistory).toEqual([]);
     expect(result.lastAction).toBe('Closed all tabs');
+  });
+
+  it('restores tabs, drops closed interaction history, and returns active tab', () => {
+    const state = createInitialTabsState('emu');
+    const result = restoreWorkspaceTabsCommand({
+      ...state,
+      activeTabId: 'tab-js',
+      interactionHistory: [
+        ...state.interactionHistory,
+        {
+          activeTabId: 'missing-tab',
+          path: 'missing',
+          selectedTreeItemId: 'collection:emu:missing',
+        },
+      ],
+      interactionHistoryIndex: 1,
+    });
+
+    expect(result.activeTab?.id).toBe('tab-js');
+    expect(result.state.interactionHistory).toHaveLength(1);
+    expect(result.state.interactionHistoryIndex).toBe(0);
   });
 });

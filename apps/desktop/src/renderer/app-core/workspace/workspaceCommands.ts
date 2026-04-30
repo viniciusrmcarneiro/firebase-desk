@@ -1,4 +1,4 @@
-import { allTabsClosed, tabClosed } from './workspaceTransitions.ts';
+import { allTabsClosed, tabClosed, tabsRestored } from './workspaceTransitions.ts';
 import type { TabsState, WorkspaceTab } from './workspaceTypes.ts';
 
 export interface CloseWorkspaceTabsCommandInput {
@@ -11,6 +11,11 @@ export interface CloseWorkspaceTabsCommandResult {
   readonly lastAction: string;
   readonly state: TabsState;
   readonly tabsToCleanup: ReadonlyArray<WorkspaceTab>;
+}
+
+export interface RestoreWorkspaceTabsCommandResult {
+  readonly activeTab: WorkspaceTab | null;
+  readonly state: TabsState;
 }
 
 export function closeWorkspaceTabsCommand(
@@ -41,6 +46,15 @@ export function closeWorkspaceTabsCommand(
       : input.successLabel,
     state: nextState,
     tabsToCleanup,
+  };
+}
+
+export function restoreWorkspaceTabsCommand(state: TabsState): RestoreWorkspaceTabsCommandResult {
+  const restored = tabsRestored(state);
+  return {
+    activeTab: restored.tabs.find((tab) => tab.id === restored.activeTabId) ?? restored.tabs[0]
+      ?? null,
+    state: restored,
   };
 }
 
