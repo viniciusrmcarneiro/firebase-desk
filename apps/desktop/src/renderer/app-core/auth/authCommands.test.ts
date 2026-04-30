@@ -5,6 +5,7 @@ import {
   authUsersFailureActivityCommand,
   authUsersSuccessActivityCommand,
   clearAuthFilterCommand,
+  loadAuthUsersCommand,
   loadMoreAuthUsersCommand,
   refreshAuthUsersCommand,
   saveAuthCustomClaimsCommand,
@@ -22,30 +23,90 @@ describe('auth commands', () => {
     expect(selectAuthUserCommand('u_ada')).toBe('u_ada');
   });
 
-  it('records load more and refresh activity', () => {
+  it('loads users, stores results, and records Activity', async () => {
     const context = commandContext();
-    const fetchNextPage = vi.fn();
 
-    loadMoreAuthUsersCommand(context.env, {
+    await loadAuthUsersCommand(context.store, context.env, {
       commandOptions: { source: 'scheduler', visible: false },
-      connectionId: 'emu',
-      fetchNextPage,
-      filter: '',
-    });
-    refreshAuthUsersCommand(context.store, context.env, {
-      connectionId: 'emu',
-      filter: 'ada',
-      projectId: 'emu',
+      project,
+      tab,
     });
 
-    expect(fetchNextPage).toHaveBeenCalledTimes(1);
-    expect(context.store.get().refreshRunId).toBe(1);
+    expect(context.listUsers).toHaveBeenCalledWith('emu', { limit: 25 });
+    expect(context.store.get().users).toEqual([expect.objectContaining({ uid: 'u_ada' })]);
+    expect(context.activity.at(-1)).toMatchObject({
+      action: 'Load users',
+      metadata: {
+        command: { source: 'scheduler', visible: false },
+        hasMore: true,
+        resultCount: 1,
+      },
+      status: 'success',
+    });
+  });
+
+  it('searches users from filter state and records Activity', async () => {
+    const context = commandContext();
+    context.store.update((state) => setAuthFilterCommand(state, 'ada'));
+
+    await loadAuthUsersCommand(context.store, context.env, {
+      project,
+      tab,
+    });
+
+    expect(context.searchUsers).toHaveBeenCalledWith('emu', 'ada');
+    expect(context.store.get().searchUsers).toEqual([expect.objectContaining({ uid: 'u_ada' })]);
+    expect(context.activity.at(-1)).toMatchObject({
+      action: 'Search users',
+      metadata: { filter: 'ada', resultCount: 1 },
+      status: 'success',
+    });
+  });
+
+  it('records load more and refresh activity', async () => {
+    const context = commandContext();
+
+    await loadAuthUsersCommand(context.store, context.env, {
+      project,
+      tab,
+    });
+    await loadMoreAuthUsersCommand(context.store, context.env, {
+      commandOptions: { source: 'scheduler', visible: false },
+      project,
+    });
+    await refreshAuthUsersCommand(context.store, context.env, {
+      project,
+      tab,
+    });
+
+    expect(context.listUsers).toHaveBeenCalledTimes(3);
+    expect(context.store.get().refreshRunId).toBe(3);
     expect(context.activity.map((entry) => entry.action)).toEqual([
+      'Load users',
       'Load more users',
       'Refresh users',
     ]);
-    expect(context.activity[0]?.metadata).toMatchObject({
+    expect(context.activity[1]?.metadata).toMatchObject({
       command: { source: 'scheduler', visible: false },
+    });
+  });
+
+  it('records load failures and keeps stale results untouched', async () => {
+    const context = commandContext({
+      listUsers: vi.fn().mockRejectedValue(new Error('auth down')),
+    });
+
+    await loadAuthUsersCommand(context.store, context.env, {
+      project,
+      tab,
+    });
+
+    expect(context.store.get().users).toEqual([]);
+    expect(context.store.get().errorMessage).toBe('auth down');
+    expect(context.activity.at(-1)).toMatchObject({
+      action: 'Load users',
+      error: { message: 'auth down' },
+      status: 'failure',
     });
   });
 
@@ -167,24 +228,43 @@ const project = {
   projectId: 'demo-local',
 };
 
+const tab = {
+  connectionId: 'emu',
+  id: 'tab-auth',
+  kind: 'auth-users',
+};
+
 function commandContext(
-  overrides: { readonly setCustomClaims?: AuthCommandEnvironment['setCustomClaims']; } = {},
+  overrides: {
+    readonly listUsers?: AuthCommandEnvironment['listUsers'];
+    readonly searchUsers?: AuthCommandEnvironment['searchUsers'];
+    readonly setCustomClaims?: AuthCommandEnvironment['setCustomClaims'];
+  } = {},
 ) {
   const activity: ActivityLogAppendInput[] = [];
   const store = createAuthStore();
+  const listUsers = overrides.listUsers
+    ?? vi.fn<AuthCommandEnvironment['listUsers']>().mockResolvedValue({
+      items: [user()],
+      nextCursor: { token: 'next' },
+    });
+  const searchUsers = overrides.searchUsers
+    ?? vi.fn<AuthCommandEnvironment['searchUsers']>().mockResolvedValue([user()]);
   const setCustomClaims = overrides.setCustomClaims
     ?? vi.fn<AuthCommandEnvironment['setCustomClaims']>().mockResolvedValue(
       user({ customClaims: { role: 'owner' } }),
     );
   let time = 1000;
   const env: AuthCommandEnvironment = {
+    listUsers,
     now: () => time += 5,
     recordActivity: (input: ActivityLogAppendInput) => {
       activity.push(input);
     },
+    searchUsers,
     setCustomClaims,
   };
-  return { activity, env, setCustomClaims, store };
+  return { activity, env, listUsers, searchUsers, setCustomClaims, store };
 }
 
 function user(patch: Partial<AuthUser> = {}): AuthUser {

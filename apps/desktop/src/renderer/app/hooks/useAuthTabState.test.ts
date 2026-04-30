@@ -3,14 +3,12 @@
 import type { AuthUser, ProjectSummary } from '@firebase-desk/repo-contracts';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { useRepositories } from '../RepositoryProvider.tsx';
 import type { WorkspaceTab } from '../stores/tabsStore.ts';
 import { useAuthTabState } from './useAuthTabState.ts';
-import { useSearchUsers, useSetCustomClaims, useUsers } from './useRepositoriesData.ts';
 
-vi.mock('./useRepositoriesData.ts', () => ({
-  useSearchUsers: vi.fn(),
-  useSetCustomClaims: vi.fn(),
-  useUsers: vi.fn(),
+vi.mock('../RepositoryProvider.tsx', () => ({
+  useRepositories: vi.fn(),
 }));
 
 const tab: WorkspaceTab = {
@@ -42,18 +40,27 @@ const grace: AuthUser = {
 };
 
 describe('useAuthTabState', () => {
+  let auth: {
+    listUsers: ReturnType<typeof vi.fn>;
+    searchUsers: ReturnType<typeof vi.fn>;
+    setCustomClaims: ReturnType<typeof vi.fn>;
+  };
+
   beforeEach(() => {
     vi.clearAllMocks();
-    vi.mocked(useUsers).mockReturnValue(usersResult([grace]));
-    vi.mocked(useSearchUsers).mockImplementation((_projectId, query) =>
-      searchResult(query ? [ada] : undefined)
-    );
-    vi.mocked(useSetCustomClaims).mockReturnValue({
-      mutateAsync: vi.fn(),
-    } as unknown as ReturnType<typeof useSetCustomClaims>);
+    auth = {
+      listUsers: vi.fn(async () => ({ items: [grace], nextCursor: { token: 'next' } })),
+      searchUsers: vi.fn(async (_projectId, query) => query ? [ada] : []),
+      setCustomClaims: vi.fn(async (_projectId, uid, claims) => ({
+        ...grace,
+        customClaims: claims,
+        uid,
+      })),
+    };
+    vi.mocked(useRepositories).mockReturnValue({ auth } as never);
   });
 
-  it('uses paged users until a search filter is present', () => {
+  it('uses paged users until a search filter is present', async () => {
     const { result } = renderHook(() =>
       useAuthTabState({
         activeProject: project,
@@ -63,19 +70,20 @@ describe('useAuthTabState', () => {
       })
     );
 
-    expect(result.current.users).toEqual([grace]);
+    await waitFor(() => expect(result.current.users).toEqual([grace]));
     expect(result.current.selectedUser).toEqual(grace);
 
     act(() => result.current.setAuthFilter('ada'));
 
-    expect(result.current.users).toEqual([ada]);
+    await waitFor(() => expect(result.current.users).toEqual([ada]));
     expect(result.current.selectedUser).toBeNull();
-    expect(useSearchUsers).toHaveBeenLastCalledWith('emu', 'ada', true, 'tab-auth-1', 0);
+    expect(auth.searchUsers).toHaveBeenLastCalledWith('emu', 'ada');
   });
 
-  it('loads more only when not searching and can clear the filter', () => {
-    const fetchNextPage = vi.fn();
-    vi.mocked(useUsers).mockReturnValue(usersResult([grace], fetchNextPage));
+  it('loads more only when not searching and can clear the filter', async () => {
+    auth.listUsers
+      .mockResolvedValueOnce({ items: [grace], nextCursor: { token: 'next' } })
+      .mockResolvedValueOnce({ items: [ada], nextCursor: null });
     const { result } = renderHook(() =>
       useAuthTabState({
         activeProject: project,
@@ -87,15 +95,20 @@ describe('useAuthTabState', () => {
     );
 
     act(() => result.current.loadMore());
-    expect(fetchNextPage).not.toHaveBeenCalled();
+    expect(auth.listUsers).not.toHaveBeenCalled();
 
     act(() => result.current.clear());
+    await waitFor(() => expect(auth.listUsers).toHaveBeenCalledTimes(1));
     act(() => result.current.loadMore());
 
-    expect(fetchNextPage).toHaveBeenCalledTimes(1);
+    await waitFor(() => expect(auth.listUsers).toHaveBeenCalledTimes(2));
+    expect(auth.listUsers).toHaveBeenLastCalledWith('emu', {
+      cursor: { token: 'next' },
+      limit: 25,
+    });
   });
 
-  it('recreates the default store when the restored initial filter changes', () => {
+  it('recreates the default store when the restored initial filter changes', async () => {
     let initialAuthFilter = 'ada';
     const { rerender, result } = renderHook(() =>
       useAuthTabState({
@@ -108,15 +121,16 @@ describe('useAuthTabState', () => {
     );
 
     expect(result.current.authFilter).toBe('ada');
+    await waitFor(() => expect(auth.searchUsers).toHaveBeenLastCalledWith('emu', 'ada'));
 
     initialAuthFilter = 'grace';
     rerender();
 
     expect(result.current.authFilter).toBe('grace');
-    expect(useSearchUsers).toHaveBeenLastCalledWith('emu', 'grace', true, 'tab-auth-1', 0);
+    await waitFor(() => expect(auth.searchUsers).toHaveBeenLastCalledWith('emu', 'grace'));
   });
 
-  it('refreshes the current auth query from the first page', () => {
+  it('refreshes the current auth query from the first page', async () => {
     const { result } = renderHook(() =>
       useAuthTabState({
         activeProject: project,
@@ -126,9 +140,11 @@ describe('useAuthTabState', () => {
       })
     );
 
+    await waitFor(() => expect(auth.listUsers).toHaveBeenCalledTimes(1));
     act(() => result.current.refetch());
 
-    expect(useUsers).toHaveBeenLastCalledWith('emu', 25, 'tab-auth-1', 1);
+    await waitFor(() => expect(auth.listUsers).toHaveBeenCalledTimes(2));
+    expect(auth.listUsers).toHaveBeenLastCalledWith('emu', { limit: 25 });
   });
 
   it('records successful initial user loads once', async () => {
@@ -177,13 +193,11 @@ describe('useAuthTabState', () => {
   });
 
   it('saves claims and updates the selected user', async () => {
-    const mutateAsync = vi.fn().mockResolvedValue({
+    const setCustomClaims = vi.fn().mockResolvedValue({
       ...grace,
       customClaims: { role: 'owner' },
     });
-    vi.mocked(useSetCustomClaims).mockReturnValue({
-      mutateAsync,
-    } as unknown as ReturnType<typeof useSetCustomClaims>);
+    auth.setCustomClaims = setCustomClaims;
     const { result } = renderHook(() =>
       useAuthTabState({
         activeProject: project,
@@ -197,20 +211,13 @@ describe('useAuthTabState', () => {
       await result.current.saveCustomClaims('u_grace', { role: 'owner' });
     });
 
-    expect(mutateAsync).toHaveBeenCalledWith({
-      claims: { role: 'owner' },
-      projectId: 'emu',
-      uid: 'u_grace',
-    });
+    expect(setCustomClaims).toHaveBeenCalledWith('emu', 'u_grace', { role: 'owner' });
     expect(result.current.selectedUser?.customClaims).toEqual({ role: 'owner' });
   });
 
   it('records load failures from the auth controller once per error', async () => {
     const recordActivity = vi.fn();
-    vi.mocked(useUsers).mockReturnValue({
-      ...usersResult([]),
-      error: new Error('auth down'),
-    } as unknown as ReturnType<typeof useUsers>);
+    auth.listUsers.mockRejectedValue(new Error('auth down'));
 
     const { rerender } = renderHook(() =>
       useAuthTabState({
@@ -243,21 +250,3 @@ const project: ProjectSummary = {
   credentialEncrypted: null,
   createdAt: '2026-04-27T00:00:00.000Z',
 };
-
-function usersResult(users: ReadonlyArray<AuthUser>, fetchNextPage = vi.fn()) {
-  return {
-    data: { pages: [{ items: users }] },
-    fetchNextPage,
-    hasNextPage: true,
-    isFetchingNextPage: false,
-    isLoading: false,
-    refetch: vi.fn(),
-  } as unknown as ReturnType<typeof useUsers>;
-}
-
-function searchResult(users: ReadonlyArray<AuthUser> | undefined) {
-  return {
-    data: users,
-    isLoading: false,
-  } as unknown as ReturnType<typeof useSearchUsers>;
-}

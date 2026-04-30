@@ -3,10 +3,9 @@ import { useEffect, useMemo } from 'react';
 import {
   type AuthCommandEnvironment,
   type AuthStore,
-  authUsersFailureActivityCommand,
-  authUsersSuccessActivityCommand,
   clearAuthFilterCommand,
   createAuthStore,
+  loadAuthUsersCommand,
   loadMoreAuthUsersCommand,
   refreshAuthUsersCommand,
   saveAuthCustomClaimsCommand,
@@ -14,8 +13,8 @@ import {
   setAuthFilterCommand,
 } from '../../app-core/auth/index.ts';
 import { useAppCoreSelector } from '../../app-core/shared/index.ts';
+import { useRepositories } from '../RepositoryProvider.tsx';
 import type { WorkspaceTab } from '../stores/tabsStore.ts';
-import { useSearchUsers, useSetCustomClaims, useUsers } from './useRepositoriesData.ts';
 
 interface UseAuthTabStateInput {
   readonly activeProject: ProjectSummary | null;
@@ -35,6 +34,7 @@ export interface AuthTabState {
   readonly usersIsFetchingMore: boolean;
   readonly usersIsLoading: boolean;
   readonly clear: () => void;
+  readonly isTabLoading: (tabId: string) => boolean;
   readonly loadMore: () => void;
   readonly refetch: () => void;
   readonly saveCustomClaims: (uid: string, claims: Record<string, unknown>) => Promise<void>;
@@ -57,84 +57,59 @@ export function useAuthTabState(
   );
   const state = useAppCoreSelector(store, (snapshot) => snapshot);
   const activeProjectId = activeTab?.kind === 'auth-users' ? activeProject?.id ?? null : null;
-  const scopeId = activeTab?.kind === 'auth-users' ? activeTab.id : 'inactive';
-  const usersQuery = useUsers(activeProjectId, 25, scopeId, state.refreshRunId);
-  const authSearchText = state.filter.trim();
-  const usersSearchQuery = useSearchUsers(
-    activeProjectId,
-    authSearchText,
-    Boolean(authSearchText),
-    scopeId,
-    state.refreshRunId,
-  );
-  const listUsers = usersQuery.data?.pages.flatMap((page) => page.items) ?? [];
-  const searchUsers = usersSearchQuery.data ?? [];
+  const repositories = useRepositories();
   const model = selectAuthUsersModel(state, {
-    listError: usersQuery.error,
-    listHasMore: Boolean(usersQuery.hasNextPage),
-    listIsFetchingMore: usersQuery.isFetchingNextPage,
-    listIsLoading: usersQuery.isLoading,
-    listUsers,
+    listError: state.errorMessage,
+    listHasMore: state.usersHasMore,
+    listIsFetchingMore: state.usersIsFetchingMore,
+    listIsLoading: state.usersIsLoading,
+    listUsers: activeProjectId ? state.users : [],
     projectId: activeProjectId,
-    searchError: usersSearchQuery.error,
-    searchIsLoading: usersSearchQuery.isLoading,
-    searchUsers,
+    searchError: state.errorMessage,
+    searchIsLoading: state.usersIsLoading,
+    searchUsers: activeProjectId ? state.searchUsers : [],
     selectedUserId,
   });
-  const setCustomClaims = useSetCustomClaims();
   const env: AuthCommandEnvironment = {
+    listUsers: (projectId, request) => repositories.auth.listUsers(projectId, request),
     now: Date.now,
     recordActivity,
+    searchUsers: (projectId, query) => repositories.auth.searchUsers(projectId, query),
     setCustomClaims: (projectId, uid, claims) =>
-      setCustomClaims.mutateAsync({ claims, projectId, uid }),
+      repositories.auth.setCustomClaims(projectId, uid, claims),
   };
 
   useEffect(() => {
-    const result = authUsersFailureActivityCommand(store.get(), {
-      errorMessage: model.errorMessage,
-      filter: state.filter,
+    void loadAuthUsersCommand(store, env, {
+      project: activeProject
+        ? { connectionId: activeProject.id, projectId: activeProject.projectId }
+        : null,
       tab: activeTab,
     });
-    if (result.state !== store.get()) store.set(result.state);
-    if (result.activity) void recordActivity(result.activity);
-  }, [activeTab, model.errorMessage, recordActivity, state.filter, store]);
-
-  useEffect(() => {
-    const result = authUsersSuccessActivityCommand(store.get(), {
-      errorMessage: model.errorMessage,
-      filter: state.filter,
-      hasMore: model.usersHasMore,
-      isLoading: model.usersIsLoading || model.usersIsFetchingMore,
-      resultCount: model.users.length,
-      tab: activeTab,
-    });
-    if (result.state !== store.get()) store.set(result.state);
-    if (result.activity) void recordActivity(result.activity);
   }, [
+    activeProject?.id,
+    activeProject?.projectId,
     activeTab,
-    model.errorMessage,
-    model.users.length,
-    model.usersHasMore,
-    model.usersIsFetchingMore,
-    model.usersIsLoading,
+    repositories.auth,
     recordActivity,
     state.filter,
     store,
   ]);
 
   function loadMore() {
-    loadMoreAuthUsersCommand(env, {
-      connectionId: activeProject?.id,
-      fetchNextPage: () => void usersQuery.fetchNextPage(),
-      filter: state.filter,
+    void loadMoreAuthUsersCommand(store, env, {
+      project: activeProject
+        ? { connectionId: activeProject.id, projectId: activeProject.projectId }
+        : null,
     });
   }
 
   function refetch() {
-    refreshAuthUsersCommand(store, env, {
-      connectionId: activeProject?.id,
-      filter: state.filter,
-      projectId: activeProjectId,
+    void refreshAuthUsersCommand(store, env, {
+      project: activeProject
+        ? { connectionId: activeProject.id, projectId: activeProject.projectId }
+        : null,
+      tab: activeTab,
     });
   }
 
@@ -157,6 +132,8 @@ export function useAuthTabState(
     usersIsFetchingMore: model.usersIsFetchingMore,
     usersIsLoading: model.usersIsLoading,
     clear: () => store.update(clearAuthFilterCommand),
+    isTabLoading: (tabId) =>
+      activeTab?.id === tabId && (state.usersIsLoading || state.usersIsFetchingMore),
     loadMore,
     refetch,
     saveCustomClaims,

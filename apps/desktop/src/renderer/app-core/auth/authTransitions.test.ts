@@ -11,6 +11,11 @@ import {
   authFilterChanged,
   authFilterCleared,
   authRefreshRequested,
+  authUsersLoadFailed,
+  authUsersLoadMoreStarted,
+  authUsersLoadMoreSucceeded,
+  authUsersLoadStarted,
+  authUsersLoadSucceeded,
 } from './authTransitions.ts';
 
 describe('auth transitions', () => {
@@ -41,6 +46,44 @@ describe('auth transitions', () => {
       status: 'failed',
       uid: 'u_ada',
     });
+  });
+
+  it('tracks users load and ignores stale completion', () => {
+    const request = { filter: '', projectId: 'emu', runId: 1 };
+    const loading = authUsersLoadStarted(createInitialAuthRuntimeState(), request);
+    const stale = authUsersLoadSucceeded(loading, {
+      nextCursor: null,
+      request: { ...request, runId: 0 },
+      users: [user({ uid: 'stale' })],
+    });
+    const loaded = authUsersLoadSucceeded(loading, {
+      nextCursor: { token: 'next' },
+      request,
+      users: [user()],
+    });
+
+    expect(stale.users).toEqual([]);
+    expect(loaded.users).toEqual([user()]);
+    expect(loaded.usersHasMore).toBe(true);
+    expect(loaded.usersLoadedKey).toBe('emu:');
+  });
+
+  it('tracks load more and load failures', () => {
+    const started = authUsersLoadMoreStarted(createInitialAuthRuntimeState());
+    const loaded = authUsersLoadMoreSucceeded(started, {
+      nextCursor: null,
+      users: [user()],
+    });
+    const request = { filter: '', projectId: 'emu', runId: 1 };
+    const failed = authUsersLoadFailed(
+      authUsersLoadStarted(createInitialAuthRuntimeState(), request),
+      { errorMessage: 'auth down', request },
+    );
+
+    expect(started.usersIsFetchingMore).toBe(true);
+    expect(loaded.users).toEqual([user()]);
+    expect(loaded.usersIsFetchingMore).toBe(false);
+    expect(failed.errorMessage).toBe('auth down');
   });
 
   it('dedupes failure keys', () => {

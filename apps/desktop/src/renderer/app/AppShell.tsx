@@ -682,7 +682,7 @@ export function AppShell(
       return firestoreTab.isTabLoading(tab.id);
     }
     if (tab.kind === 'auth-users') {
-      return queryClient.isFetching({ queryKey: ['auth', tab.id] }) > 0;
+      return authTab.isTabLoading(tab.id);
     }
     return false;
   }
