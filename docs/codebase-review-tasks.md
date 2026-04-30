@@ -71,17 +71,21 @@ Acceptance criteria:
 
 ## Phase 3: App-Core Workflow Cleanup
 
-- [x] Move Firestore page-reload watcher behavior out of hook-only effects.
-- [x] Move Activity completion recording into command paths where commands own completion.
+- [ ] Move Firestore page-reload watcher behavior out of hook-only effects.
+  - Current state: app-core decides whether another page should load, but a React effect still observes query state and calls `fetchNextPage`.
+- [ ] Move Activity completion recording into command paths where commands own completion.
+  - Current state: app-core builds/dedupes Firestore/Auth completion Activity, but React effects still infer completion from hook result state.
 - [x] Track query activity dedupe in app-core state instead of hook refs.
-- [x] Unify tab-close cleanup in one app-core path.
+- [ ] Unify tab-close cleanup in one app-core path.
+  - Remaining work: AppShell still cancels query-client work and checks busy tabs directly.
 - [x] Move Firestore write conflict/stale/create modal workflow state fully into app-core.
-- [x] Replace durable workspace `localStorage` persistence with an app storage/settings path or visible failure handling.
+- [ ] Replace durable workspace `localStorage` persistence with an app storage/settings path.
+  - Current state: failures are visible, but persistence still uses renderer `localStorage`.
 
 Acceptance criteria:
 
-- [x] React adapters render state and dispatch intent; workflow rules live in app-core.
-- [x] Page reload, Activity completion, tab close cleanup, and write conflict flows have app-core tests.
+- [ ] React adapters render state and dispatch intent; workflow rules live in app-core.
+- [ ] Page reload, Activity completion, tab close cleanup, and write conflict flows have app-core tests.
 - [x] Existing AppShell integration behavior is unchanged.
 - [x] Workspace persistence failures are not silently swallowed.
 
@@ -209,7 +213,7 @@ Manual checks when UI behavior changes:
 
 - [x] All P1 findings are fixed and tested.
 - [x] Mock/live contract drift has shared coverage.
-- [x] App-core owns workflow rules; React adapters stay thin.
+- [ ] App-core owns workflow rules; React adapters stay thin.
 - [x] Build/test output no longer includes avoidable generated noise.
 - [x] Major accessibility and security gaps are closed.
-- [x] Findings doc has no untracked actionable item without a task here.
+- [ ] Findings doc has no untracked actionable item without a task here.
