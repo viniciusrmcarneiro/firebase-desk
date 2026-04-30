@@ -286,6 +286,7 @@ describe('firestore query commands', () => {
       tab,
     }).state;
     const store = createAppCoreStore(submitted);
+    const recordActivity = vi.fn();
     const runQuery = vi.fn()
       .mockResolvedValueOnce({ items: [row('ord_1')], nextCursor: { token: 'page-2' } })
       .mockResolvedValueOnce({ items: [row('ord_2')], nextCursor: null });
@@ -305,6 +306,7 @@ describe('firestore query commands', () => {
 
     await executeFirestoreLoadMoreCommand(store, {
       getDocument: vi.fn(),
+      recordActivity,
       runQuery,
     }, {
       request: store.get().queryRequests[tab.id]!,
@@ -319,6 +321,11 @@ describe('firestore query commands', () => {
       'ord_1',
       'ord_2',
     ]);
+    expect(recordActivity).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'Load more results',
+      metadata: expect.objectContaining({ resultCount: 1 }),
+      status: 'success',
+    }));
   });
 
   it('merges loaded subcollections and returns document open intents', () => {

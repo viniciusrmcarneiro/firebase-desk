@@ -67,7 +67,6 @@ import {
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { type ActivityStore, useActivityController } from '../app-core/activity/index.ts';
-import { firestoreQueryDraftMetadata } from '../app-core/firestore/query/index.ts';
 import { useFirestoreWriteController } from '../app-core/firestore/write/index.ts';
 import { useSettingsController } from '../app-core/settings/index.ts';
 import { closeWorkspaceTabsCommand } from '../app-core/workspace/workspaceCommands.ts';
@@ -476,21 +475,8 @@ export function AppShell(
   }
 
   function handleLoadMoreFirestore() {
-    const startedAt = Date.now();
     firestoreTab.loadMore();
-    recordActivity({
-      action: 'Load more results',
-      area: 'firestore',
-      durationMs: elapsedMs(startedAt),
-      metadata: firestoreQueryDraftMetadata(firestoreTab.activeDraft),
-      status: 'success',
-      summary: `Requested more results from ${firestoreTab.activeDraft.path}`,
-      target: {
-        connectionId: activeTab?.connectionId,
-        path: firestoreTab.activeDraft.path,
-        type: 'firestore-query',
-      },
-    });
+    setLastAction(`Requested more results from ${firestoreTab.activeDraft.path}`);
   }
 
   function handleLoadMoreUsers() {
@@ -1315,8 +1301,4 @@ function persistSidebarWidth(repositories: RepositorySet, size: number) {
 function messageFromError(error: unknown, fallback: string): string {
   if (error instanceof Error) return error.message;
   return fallback;
-}
-
-function elapsedMs(startedAt: number): number {
-  return Math.max(0, Date.now() - startedAt);
 }
