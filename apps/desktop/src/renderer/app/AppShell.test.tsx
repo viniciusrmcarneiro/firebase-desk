@@ -546,6 +546,63 @@ describe('desktop AppShell', () => {
     );
   });
 
+  it('restores script tabs when saved interaction history mentions closed tabs', async () => {
+    const repositories = createMockRepositories();
+    const run = vi.spyOn(repositories.scriptRunner, 'run');
+    const savedWorkspace: PersistedWorkspaceState = {
+      version: 1,
+      authFilter: '',
+      scripts: { 'tab-js-9': 'yield 1;' },
+      tabsState: {
+        activeTabId: 'tab-js-9',
+        interactionHistory: [
+          {
+            activeTabId: 'tab-firestore-8',
+            path: 'orders',
+            selectedTreeItemId: 'collection:emu:orders',
+          },
+          {
+            activeTabId: 'closed-tab',
+            path: 'closed',
+            selectedTreeItemId: 'collection:emu:closed',
+          },
+        ],
+        interactionHistoryIndex: 1,
+        tabs: [
+          {
+            id: 'tab-firestore-8',
+            kind: 'firestore-query',
+            title: 'orders',
+            connectionId: 'emu',
+            history: ['orders'],
+            historyIndex: 0,
+            inspectorWidth: 360,
+          },
+          {
+            id: 'tab-js-9',
+            kind: 'js-query',
+            title: 'JS Query',
+            connectionId: 'emu',
+            history: ['scripts/default'],
+            historyIndex: 0,
+            inspectorWidth: 360,
+          },
+        ],
+      },
+      drafts: {},
+    };
+
+    renderShell({ repositories, savedWorkspace });
+
+    fireEvent.click(await screen.findByRole('button', { name: 'Run' }));
+    await waitFor(() =>
+      expect(run).toHaveBeenCalledWith(
+        expect.objectContaining({ connectionId: 'emu', source: 'yield 1;' }),
+      )
+    );
+    expect(screen.queryByText(/Workspace persistence failed/)).toBeNull();
+  });
+
   it('restores persisted workspace once in StrictMode', async () => {
     const tabId = 'tab-firestore-strict';
     const savedWorkspace: PersistedWorkspaceState = {

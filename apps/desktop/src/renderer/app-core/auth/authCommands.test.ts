@@ -3,6 +3,7 @@ import { describe, expect, it, vi } from 'vitest';
 import {
   type AuthCommandEnvironment,
   authUsersFailureActivityCommand,
+  authUsersSuccessActivityCommand,
   clearAuthFilterCommand,
   loadMoreAuthUsersCommand,
   refreshAuthUsersCommand,
@@ -117,6 +118,47 @@ describe('auth commands', () => {
       status: 'failure',
     });
     expect(second.activity).toBeNull();
+  });
+
+  it('builds deduped auth success activity for initial loads and searches', () => {
+    const store = createAuthStore();
+    const first = authUsersSuccessActivityCommand(store.get(), {
+      errorMessage: null,
+      filter: ' ',
+      hasMore: true,
+      isLoading: false,
+      resultCount: 25,
+      tab: { connectionId: 'emu', id: 'tab-auth', kind: 'auth-users' },
+    });
+    store.set(first.state);
+    const second = authUsersSuccessActivityCommand(store.get(), {
+      errorMessage: null,
+      filter: '',
+      hasMore: true,
+      isLoading: false,
+      resultCount: 25,
+      tab: { connectionId: 'emu', id: 'tab-auth', kind: 'auth-users' },
+    });
+    const search = authUsersSuccessActivityCommand(store.get(), {
+      errorMessage: null,
+      filter: ' ada ',
+      hasMore: false,
+      isLoading: false,
+      resultCount: 1,
+      tab: { connectionId: 'emu', id: 'tab-auth', kind: 'auth-users' },
+    });
+
+    expect(first.activity).toMatchObject({
+      action: 'Load users',
+      metadata: { filter: null, hasMore: true, resultCount: 25 },
+      status: 'success',
+    });
+    expect(second.activity).toBeNull();
+    expect(search.activity).toMatchObject({
+      action: 'Search users',
+      metadata: { filter: 'ada', hasMore: false, resultCount: 1 },
+      status: 'success',
+    });
   });
 });
 

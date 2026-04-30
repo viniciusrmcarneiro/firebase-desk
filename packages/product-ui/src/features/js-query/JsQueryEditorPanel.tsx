@@ -1,6 +1,7 @@
 import { Button, Panel, PanelBody, PanelHeader } from '@firebase-desk/ui';
 import { Play, Square } from 'lucide-react';
 import { CodeEditor } from '../../code-editor/CodeEditor.tsx';
+import { JS_QUERY_EDITOR_EXTRA_LIBS } from './editorTypes.ts';
 
 export interface JsQueryEditorPanelProps {
   readonly isRunning: boolean;
@@ -39,6 +40,7 @@ export function JsQueryEditorPanel(
       </PanelHeader>
       <PanelBody className='min-h-0 p-0'>
         <CodeEditor
+          extraLibs={JS_QUERY_EDITOR_EXTRA_LIBS}
           readOnly={isRunning}
           language='javascript'
           value={source}

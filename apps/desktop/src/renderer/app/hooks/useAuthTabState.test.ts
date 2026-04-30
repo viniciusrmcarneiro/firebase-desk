@@ -131,6 +131,51 @@ describe('useAuthTabState', () => {
     expect(useUsers).toHaveBeenLastCalledWith('emu', 25, 'tab-auth-1', 1);
   });
 
+  it('records successful initial user loads once', async () => {
+    const recordActivity = vi.fn();
+    const { rerender } = renderHook(() =>
+      useAuthTabState({
+        activeProject: project,
+        activeTab: tab,
+        recordActivity,
+        selectedUserId: null,
+      })
+    );
+
+    await waitFor(() => expect(recordActivity).toHaveBeenCalledTimes(1));
+    rerender();
+
+    expect(recordActivity).toHaveBeenCalledTimes(1);
+    expect(recordActivity).toHaveBeenCalledWith(expect.objectContaining({
+      action: 'Load users',
+      area: 'auth',
+      metadata: expect.objectContaining({ resultCount: 1 }),
+      status: 'success',
+    }));
+  });
+
+  it('records successful user searches once per filter result', async () => {
+    const recordActivity = vi.fn();
+    const { result } = renderHook(() =>
+      useAuthTabState({
+        activeProject: project,
+        activeTab: tab,
+        recordActivity,
+        selectedUserId: null,
+      })
+    );
+
+    await waitFor(() => expect(recordActivity).toHaveBeenCalledTimes(1));
+    act(() => result.current.setAuthFilter('ada'));
+
+    await waitFor(() => expect(recordActivity).toHaveBeenCalledTimes(2));
+    expect(recordActivity).toHaveBeenLastCalledWith(expect.objectContaining({
+      action: 'Search users',
+      metadata: expect.objectContaining({ filter: 'ada', resultCount: 1 }),
+      status: 'success',
+    }));
+  });
+
   it('saves claims and updates the selected user', async () => {
     const mutateAsync = vi.fn().mockResolvedValue({
       ...grace,

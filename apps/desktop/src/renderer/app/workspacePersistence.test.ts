@@ -99,6 +99,35 @@ describe('workspacePersistence', () => {
     expect(loadPersistedWorkspaceState()).toBeNull();
   });
 
+  it('restores workspace state with stale closed-tab interaction history', () => {
+    window.localStorage.setItem(
+      WORKSPACE_STATE_STORAGE_KEY,
+      JSON.stringify({
+        ...persistedWorkspace,
+        tabsState: {
+          ...persistedWorkspace.tabsState,
+          interactionHistory: [
+            ...persistedWorkspace.tabsState.interactionHistory,
+            {
+              activeTabId: 'closed-tab',
+              path: 'closed',
+              selectedTreeItemId: 'collection:emu:closed',
+            },
+          ],
+          interactionHistoryIndex: 1,
+        },
+      }),
+    );
+
+    expect(loadPersistedWorkspaceState()).toEqual({
+      ...persistedWorkspace,
+      tabsState: {
+        ...persistedWorkspace.tabsState,
+        interactionHistoryIndex: 0,
+      },
+    });
+  });
+
   it('does not restore invalid draft state', () => {
     window.localStorage.setItem(
       WORKSPACE_STATE_STORAGE_KEY,
@@ -135,6 +164,29 @@ describe('workspacePersistence', () => {
     expect(raw).not.toContain('closed-tab');
     expect(raw).not.toContain('queryRequests');
     expect(raw).not.toContain('scriptResults');
+  });
+
+  it('saves only open-tab interaction history', () => {
+    expect(savePersistedWorkspaceState({
+      ...persistedWorkspace,
+      tabsState: {
+        ...persistedWorkspace.tabsState,
+        interactionHistory: [
+          ...persistedWorkspace.tabsState.interactionHistory,
+          {
+            activeTabId: 'closed-tab',
+            path: 'closed',
+            selectedTreeItemId: 'collection:emu:closed',
+          },
+        ],
+        interactionHistoryIndex: 1,
+      },
+    })).toBeNull();
+
+    const raw = window.localStorage.getItem(WORKSPACE_STATE_STORAGE_KEY) ?? '';
+    expect(raw).toContain('tab-firestore-1');
+    expect(raw).not.toContain('closed-tab');
+    expect(loadPersistedWorkspaceState()?.tabsState.interactionHistoryIndex).toBe(0);
   });
 
   it('removes storage when no tabs are open', () => {

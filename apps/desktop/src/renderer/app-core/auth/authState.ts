@@ -11,6 +11,7 @@ export interface AuthRuntimeState {
   readonly customClaims: AuthCustomClaimsWorkflowState;
   readonly filter: string;
   readonly loggedFailureKeys: ReadonlyArray<string>;
+  readonly loggedSuccessKeys: ReadonlyArray<string>;
   readonly refreshRunId: number;
   readonly updatedUsers: ReadonlyMap<string, AuthUser>;
 }
@@ -26,6 +27,7 @@ export function createInitialAuthRuntimeState(
     customClaims: { status: 'idle' },
     filter: input.filter ?? '',
     loggedFailureKeys: [],
+    loggedSuccessKeys: [],
     refreshRunId: 0,
     updatedUsers: new Map(),
   };

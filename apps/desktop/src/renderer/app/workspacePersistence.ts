@@ -61,18 +61,7 @@ const TabsStateSchema = z.object({
   if (!tabIds.has(state.activeTabId)) {
     context.addIssue({ code: 'custom', message: 'Active tab is not open' });
   }
-  if (
-    state.interactionHistory.length > 0
-    && state.interactionHistoryIndex >= state.interactionHistory.length
-  ) {
-    context.addIssue({ code: 'custom', message: 'Interaction index out of range' });
-  }
-  for (const entry of state.interactionHistory) {
-    if (!tabIds.has(entry.activeTabId)) {
-      context.addIssue({ code: 'custom', message: 'Interaction tab is not open' });
-    }
-  }
-}).transform((state): TabsState => state);
+}).transform((state): TabsState => sanitizeTabsState(state));
 
 const FirestoreQueryFilterDraftSchema = z.object({
   id: z.string().min(1),
@@ -186,9 +175,32 @@ function persistWorkspaceState(
     authFilter: state.authFilter,
     drafts: pickTabRecord(state.drafts, tabIds),
     scripts: pickTabRecord(state.scripts, tabIds),
-    tabsState: state.tabsState,
+    tabsState: sanitizeTabsState(state.tabsState),
   });
   window.localStorage.setItem(WORKSPACE_STATE_STORAGE_KEY, JSON.stringify(payload));
+}
+
+function sanitizeTabsState(state: TabsState): TabsState {
+  const tabIds = new Set(state.tabs.map((tab) => tab.id));
+  const interactionHistory = state.interactionHistory.filter((entry) =>
+    tabIds.has(entry.activeTabId)
+  );
+  return {
+    ...state,
+    interactionHistory,
+    interactionHistoryIndex: clampInteractionHistoryIndex(
+      state.interactionHistoryIndex,
+      interactionHistory,
+    ),
+  };
+}
+
+function clampInteractionHistoryIndex(
+  index: number,
+  history: ReadonlyArray<InteractionHistoryEntry>,
+): number {
+  if (!history.length) return 0;
+  return Math.max(0, Math.min(index, history.length - 1));
 }
 
 function pickTabRecord<T>(

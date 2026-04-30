@@ -2,6 +2,7 @@ import type { AuthUser } from '@firebase-desk/repo-contracts';
 import type { AuthRuntimeState } from './authState.ts';
 
 const MAX_FAILURE_KEYS = 500;
+const MAX_SUCCESS_KEYS = 500;
 
 export function authFilterChanged(state: AuthRuntimeState, filter: string): AuthRuntimeState {
   return { ...state, filter };
@@ -62,6 +63,17 @@ export function authFailureLogged(
   return {
     ...state,
     loggedFailureKeys: [...state.loggedFailureKeys, key].slice(-MAX_FAILURE_KEYS),
+  };
+}
+
+export function authSuccessLogged(
+  state: AuthRuntimeState,
+  key: string,
+): AuthRuntimeState {
+  if (state.loggedSuccessKeys.includes(key)) return state;
+  return {
+    ...state,
+    loggedSuccessKeys: [...state.loggedSuccessKeys, key].slice(-MAX_SUCCESS_KEYS),
   };
 }
 

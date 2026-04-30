@@ -16,6 +16,7 @@ import {
   authFilterChanged,
   authFilterCleared,
   authRefreshRequested,
+  authSuccessLogged,
 } from './authTransitions.ts';
 
 export interface AuthProjectContext {
@@ -189,6 +190,51 @@ export function authUsersFailureActivityCommand(
       target: { connectionId: input.tab.connectionId, type: 'auth-user' },
     },
     state: authFailureLogged(state, key),
+  };
+}
+
+export function authUsersSuccessActivityCommand(
+  state: AuthRuntimeState,
+  input: {
+    readonly commandOptions?: AppCoreCommandOptions | undefined;
+    readonly errorMessage: string | null;
+    readonly filter: string;
+    readonly hasMore: boolean;
+    readonly isLoading: boolean;
+    readonly resultCount: number;
+    readonly tab: AuthTabLike | undefined;
+  },
+): { readonly activity: ActivityLogAppendInput | null; readonly state: AuthRuntimeState; } {
+  if (
+    !input.tab || input.tab.kind !== 'auth-users' || input.isLoading || input.errorMessage
+  ) {
+    return { activity: null, state };
+  }
+  const filter = input.filter.trim();
+  const key = [
+    input.tab.id,
+    filter,
+    input.resultCount,
+    input.hasMore ? 'more' : 'done',
+  ].join(':');
+  if (state.loggedSuccessKeys.includes(key)) return { activity: null, state };
+  return {
+    activity: {
+      action: filter ? 'Search users' : 'Load users',
+      area: 'auth',
+      metadata: {
+        filter: filter || null,
+        hasMore: input.hasMore,
+        resultCount: input.resultCount,
+        ...commandActivityMetadata(input.commandOptions),
+      },
+      status: 'success',
+      summary: filter
+        ? `Found ${input.resultCount} Authentication users`
+        : `Loaded ${input.resultCount} Authentication users`,
+      target: { connectionId: input.tab.connectionId, type: 'auth-user' },
+    },
+    state: authSuccessLogged(state, key),
   };
 }
 

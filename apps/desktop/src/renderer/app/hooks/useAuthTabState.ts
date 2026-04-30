@@ -4,6 +4,7 @@ import {
   type AuthCommandEnvironment,
   type AuthStore,
   authUsersFailureActivityCommand,
+  authUsersSuccessActivityCommand,
   clearAuthFilterCommand,
   createAuthStore,
   loadMoreAuthUsersCommand,
@@ -97,6 +98,29 @@ export function useAuthTabState(
     if (result.state !== store.get()) store.set(result.state);
     if (result.activity) void recordActivity(result.activity);
   }, [activeTab, model.errorMessage, recordActivity, state.filter, store]);
+
+  useEffect(() => {
+    const result = authUsersSuccessActivityCommand(store.get(), {
+      errorMessage: model.errorMessage,
+      filter: state.filter,
+      hasMore: model.usersHasMore,
+      isLoading: model.usersIsLoading || model.usersIsFetchingMore,
+      resultCount: model.users.length,
+      tab: activeTab,
+    });
+    if (result.state !== store.get()) store.set(result.state);
+    if (result.activity) void recordActivity(result.activity);
+  }, [
+    activeTab,
+    model.errorMessage,
+    model.users.length,
+    model.usersHasMore,
+    model.usersIsFetchingMore,
+    model.usersIsLoading,
+    recordActivity,
+    state.filter,
+    store,
+  ]);
 
   function loadMore() {
     loadMoreAuthUsersCommand(env, {
