@@ -31,25 +31,35 @@ describe('SettingsStore', () => {
     expect(typeof persisted.snapshot?.sidebarWidth).toBe('number');
   });
 
-  it('rejects invalid settings file values instead of silently resetting', async () => {
+  it('backs up invalid settings file values and recovers on the next load', async () => {
     const userDataPath = await makeTempDir();
+    const invalidSettings = JSON.stringify({
+      version: 1,
+      snapshot: {
+        sidebarWidth: 'wide',
+        inspectorWidth: 444,
+        theme: 123,
+        dataMode: 'other',
+        hotkeyOverrides: { bad: 42 },
+      },
+    });
     await writeFile(
       join(userDataPath, 'settings.json'),
-      JSON.stringify({
-        version: 1,
-        snapshot: {
-          sidebarWidth: 'wide',
-          inspectorWidth: 444,
-          theme: 123,
-          dataMode: 'other',
-          hotkeyOverrides: { bad: 42 },
-        },
-      }),
+      invalidSettings,
+    );
+    const store = new SettingsStore(userDataPath);
+
+    await expect(store.load()).rejects.toThrow(
+      /Settings file is invalid\. A backup was saved as settings\.invalid-.+\.json\./,
     );
 
-    await expect(new SettingsStore(userDataPath).load()).rejects.toThrow(
-      'Settings file is invalid.',
+    const files = await readdir(userDataPath);
+    const backupFile = files.find((file) => file.startsWith('settings.invalid-'));
+    expect(backupFile).toBeDefined();
+    await expect(readFile(join(userDataPath, backupFile!), 'utf8')).resolves.toBe(
+      invalidSettings,
     );
+    await expect(store.load()).resolves.toEqual(DEFAULT_SETTINGS_SNAPSHOT);
   });
 
   it('defaults table layouts for existing settings files', async () => {

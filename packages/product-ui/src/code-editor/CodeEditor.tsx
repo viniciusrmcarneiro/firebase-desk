@@ -2,13 +2,15 @@ import type { editor as MonacoEditorTypes } from 'monaco-editor';
 import { lazy, Suspense, useEffect, useRef } from 'react';
 import { useAppearance } from '../appearance/AppearanceProvider.tsx';
 
+type MonacoEditorApiModule = typeof import('monaco-editor');
+
 const MonacoEditor = lazy(async () => {
-  const module = await import('@monaco-editor/react');
+  const module = await loadMonacoReact();
   return { default: module.default };
 });
 
 const MonacoDiffEditor = lazy(async () => {
-  const module = await import('@monaco-editor/react');
+  const module = await loadMonacoReact();
   return { default: module.DiffEditor };
 });
 
@@ -34,6 +36,7 @@ export function CodeEditor(
   return (
     <Suspense fallback={<div role='status'>Loading editor</div>}>
       <MonacoEditor
+        beforeMount={exposeMonacoForDiagnostics}
         height={height}
         language={language}
         options={options}
@@ -74,6 +77,7 @@ export function DiffCodeEditor(
   return (
     <Suspense fallback={<div role='status'>Loading editor</div>}>
       <MonacoDiffEditor
+        beforeMount={exposeMonacoForDiagnostics}
         height={height}
         language={language}
         modified={modified}
@@ -95,4 +99,22 @@ export function DiffCodeEditor(
       />
     </Suspense>
   );
+}
+
+async function loadMonacoReact(): Promise<typeof import('@monaco-editor/react')> {
+  const [module, monaco] = await Promise.all([
+    import('@monaco-editor/react'),
+    // @ts-expect-error Monaco does not publish declarations for this ESM entry.
+    import('monaco-editor/esm/vs/editor/editor.api'),
+    // @ts-expect-error Monaco does not publish declarations for this ESM entry.
+    import('monaco-editor/esm/vs/language/json/monaco.contribution'),
+    // @ts-expect-error Monaco does not publish declarations for this ESM entry.
+    import('monaco-editor/esm/vs/language/typescript/monaco.contribution'),
+  ]);
+  module.loader.config({ monaco });
+  return module;
+}
+
+function exposeMonacoForDiagnostics(monaco: MonacoEditorApiModule): void {
+  (globalThis as typeof globalThis & { monaco?: MonacoEditorApiModule; }).monaco = monaco;
 }

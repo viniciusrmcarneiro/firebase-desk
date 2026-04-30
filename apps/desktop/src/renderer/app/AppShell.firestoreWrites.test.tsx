@@ -108,6 +108,7 @@ vi.mock('@monaco-editor/react', async () => {
           onChange?.(event.currentTarget.value),
         value,
       }),
+    loader: { config: vi.fn() },
   };
 });
 

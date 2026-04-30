@@ -1,5 +1,5 @@
 import type { ActivityLogEntry } from '@firebase-desk/repo-contracts';
-import { mkdtemp, readFile, rm, writeFile } from 'node:fs/promises';
+import { mkdtemp, readdir, readFile, rm, writeFile } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
 import { afterEach, describe, expect, it } from 'vitest';
@@ -59,7 +59,7 @@ describe('ActivityLogStore', () => {
     await expect(store.list()).resolves.toMatchObject([{ id: 'two' }]);
   });
 
-  it('surfaces invalid jsonl lines and still allows clearing', async () => {
+  it('backs up invalid jsonl lines, recovers valid entries, and still allows clearing', async () => {
     const dir = await makeTempDir();
     await writeFile(
       join(dir, 'activity-log.jsonl'),
@@ -68,7 +68,15 @@ describe('ActivityLogStore', () => {
     );
     const store = new ActivityLogStore(dir);
 
-    await expect(store.list()).rejects.toThrow('Activity log contains 1 invalid entry.');
+    await expect(store.list()).rejects.toThrow(
+      /Activity log contains 1 invalid entry\. A backup was saved as activity-log\.invalid-.+\.jsonl\./,
+    );
+
+    const files = await readdir(dir);
+    const backupFile = files.find((file) => file.startsWith('activity-log.invalid-'));
+    expect(backupFile).toBeDefined();
+    await expect(readFile(join(dir, backupFile!), 'utf8')).resolves.toContain('bad json');
+    await expect(store.list()).resolves.toMatchObject([{ id: 'valid' }]);
 
     await store.clear();
 

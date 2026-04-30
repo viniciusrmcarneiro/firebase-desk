@@ -1,7 +1,7 @@
 import { ActivityLogEntrySchema } from '@firebase-desk/ipc-schemas';
 import type { ActivityLogEntry } from '@firebase-desk/repo-contracts';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 export class ActivityLogStore {
   private readonly filePath: string;
@@ -60,10 +60,13 @@ export class ActivityLogStore {
         }
       }
       if (invalidLineCount > 0) {
+        const backupFileName = await backupInvalidLogFile(this.filePath, raw);
+        await this.writeEntries(entries);
+        const backupSuffix = backupFileName ? ` A backup was saved as ${backupFileName}.` : '';
         throw new Error(
           `Activity log contains ${invalidLineCount} invalid entr${
             invalidLineCount === 1 ? 'y' : 'ies'
-          }.`,
+          }.${backupSuffix}`,
         );
       }
       return entries;
@@ -115,6 +118,17 @@ function byteLength(value: string): number {
 
 function isNotFound(error: unknown): boolean {
   return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT');
+}
+
+async function backupInvalidLogFile(filePath: string, raw: string): Promise<string | null> {
+  const backupName = `activity-log.invalid-${new Date().toISOString().replaceAll(':', '-')}.jsonl`;
+  const backupPath = join(dirname(filePath), backupName);
+  try {
+    await writeFile(backupPath, raw, 'utf8');
+    return basename(backupPath);
+  } catch {
+    return null;
+  }
 }
 
 function reverseEntries(

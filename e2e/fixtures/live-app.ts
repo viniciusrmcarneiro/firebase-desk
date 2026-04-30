@@ -1,4 +1,5 @@
 import { type ElectronApplication, expect, type Page } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -83,5 +84,5 @@ export async function openJavaScriptQuery(page: Page): Promise<void> {
 }
 
 export function uniqueSmokeId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}-${randomUUID()}`;
 }

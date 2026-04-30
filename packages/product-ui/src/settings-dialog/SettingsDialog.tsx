@@ -303,10 +303,7 @@ export function SettingsDialog(
             />
           )
           : null}
-        <div className='grid gap-1 rounded-md border border-border-subtle bg-bg-subtle p-3 text-sm'>
-          <div className='font-medium text-text-primary'>Credential storage</div>
-          <div className='text-text-secondary'>Mock mode only. No credentials are read.</div>
-        </div>
+        <CredentialStorageSummary snapshot={settingsSnapshot} />
         <div className='grid gap-1 rounded-md border border-border-subtle bg-bg-subtle p-3 text-sm'>
           <div className='font-medium text-text-primary'>Data safety</div>
           <div className='text-text-secondary'>
@@ -406,6 +403,21 @@ function SettingsSummary({ snapshot }: { readonly snapshot: SettingsSnapshot | n
         label='Hotkeys'
         value={`${Object.keys(snapshot.hotkeyOverrides).length} overrides`}
       />
+    </div>
+  );
+}
+
+function CredentialStorageSummary({ snapshot }: { readonly snapshot: SettingsSnapshot | null; }) {
+  const dataMode = snapshot?.dataMode;
+  const copy = dataMode === 'live'
+    ? 'Live mode can read production service account files. Credentials are stored in the local data folder and encrypted when OS storage is available.'
+    : dataMode === 'mock'
+    ? 'Mock mode uses local fixtures. No Firebase credentials are read.'
+    : 'Loading credential storage details.';
+  return (
+    <div className='grid gap-1 rounded-md border border-border-subtle bg-bg-subtle p-3 text-sm'>
+      <div className='font-medium text-text-primary'>Credential storage</div>
+      <div className='text-text-secondary'>{copy}</div>
     </div>
   );
 }

@@ -7,37 +7,50 @@ import { CodeEditor, DiffCodeEditor } from './CodeEditor.tsx';
 
 const monacoMock = vi.hoisted(() => ({
   diffContentListener: null as (() => void) | null,
+  loaderConfig: vi.fn(),
+  monacoApi: { editor: {}, languages: {} },
   modifiedValue: '',
 }));
+
+vi.mock('monaco-editor/esm/vs/editor/editor.api', () => monacoMock.monacoApi);
 
 vi.mock('@monaco-editor/react', async () => {
   const React = await vi.importActual<typeof import('react')>('react');
   return {
     default: (
       {
+        beforeMount,
         options,
         theme,
         value,
       }: {
+        readonly beforeMount?: (monaco: typeof monacoMock.monacoApi) => void;
         readonly options?: { readonly ariaLabel?: string; };
         readonly theme: string;
         readonly value: string;
       },
-    ) => (
-      <textarea
-        aria-label={options?.ariaLabel}
-        data-testid='monaco'
-        data-theme={theme}
-        readOnly
-        value={value}
-      />
-    ),
+    ) => {
+      React.useEffect(() => {
+        beforeMount?.(monacoMock.monacoApi);
+      }, [beforeMount]);
+      return (
+        <textarea
+          aria-label={options?.ariaLabel}
+          data-testid='monaco'
+          data-theme={theme}
+          readOnly
+          value={value}
+        />
+      );
+    },
     DiffEditor: (
       {
         modified,
+        beforeMount,
         onMount,
         theme,
       }: {
+        readonly beforeMount?: (monaco: typeof monacoMock.monacoApi) => void;
         readonly modified: string;
         readonly onMount?: (editor: MonacoEditorTypes.IStandaloneDiffEditor) => void;
         readonly theme: string;
@@ -48,6 +61,7 @@ vi.mock('@monaco-editor/react', async () => {
       React.useEffect(() => {
         if (mounted.current) return;
         mounted.current = true;
+        beforeMount?.(monacoMock.monacoApi);
         onMount?.({
           getModifiedEditor: () => ({
             getValue: () => monacoMock.modifiedValue,
@@ -66,10 +80,39 @@ vi.mock('@monaco-editor/react', async () => {
       }, []);
       return <textarea data-testid='monaco-diff' data-theme={theme} readOnly value={modified} />;
     },
+    loader: { config: monacoMock.loaderConfig },
   };
 });
 
 describe('CodeEditor', () => {
+  it('configures Monaco to use the bundled editor package', async () => {
+    render(
+      <AppearanceProvider settings={new MockSettingsRepository()}>
+        <CodeEditor language='json' value='{}' />
+      </AppearanceProvider>,
+    );
+    await screen.findByTestId('monaco');
+
+    expect(monacoMock.loaderConfig).toHaveBeenCalledWith({
+      monaco: monacoMock.monacoApi,
+    });
+  });
+
+  it('exposes Monaco when mounted for integration diagnostics', async () => {
+    delete (globalThis as typeof globalThis & { monaco?: unknown; }).monaco;
+    render(
+      <AppearanceProvider settings={new MockSettingsRepository()}>
+        <CodeEditor language='json' value='{}' />
+      </AppearanceProvider>,
+    );
+    await screen.findByTestId('monaco');
+
+    expect((globalThis as typeof globalThis & { monaco?: unknown; }).monaco).toBe(
+      monacoMock.monacoApi,
+    );
+    delete (globalThis as typeof globalThis & { monaco?: unknown; }).monaco;
+  });
+
   it('passes resolved appearance to Monaco', async () => {
     vi.stubGlobal(
       'matchMedia',

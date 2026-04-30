@@ -46,6 +46,7 @@ vi.mock('@monaco-editor/react', () => ({
       onChange={(event) => onChange?.(event.currentTarget.value)}
     />
   ),
+  loader: { config: vi.fn() },
 }));
 
 describe('real feature surface integrations', () => {

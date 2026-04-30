@@ -160,12 +160,12 @@ Acceptance criteria:
 
 ## Phase 7: UI, Security, Storage, And Boundary Polish
 
-- [ ] Fix Settings dialog credential copy for live mode.
-- [ ] Add renderer CSP compatible with production build and Monaco.
-- [ ] Add package dependency-boundary checks.
-- [ ] Improve corrupted settings recovery.
-- [ ] Improve corrupted Activity log recovery/export.
-- [ ] Address smaller smells when adjacent to touched code.
+- [x] Fix Settings dialog credential copy for live mode.
+- [x] Add renderer CSP compatible with production build and Monaco.
+- [x] Add package dependency-boundary checks.
+- [x] Improve corrupted settings recovery.
+- [x] Improve corrupted Activity log recovery/export.
+- [x] Address smaller smells when adjacent to touched code.
   - `deepEqual` circular guard or safer equality.
   - `process-runner` send/listener cleanup.
   - native form labels.
@@ -174,25 +174,25 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- [ ] Settings credential copy matches mock/live state.
-- [ ] Production renderer has an explicit CSP.
-- [ ] Package boundary tests prevent `ui` and `repo-contracts` dependency drift.
-- [ ] Corrupt settings/activity files are backed up or recoverable with visible user feedback.
-- [ ] Smaller smells are fixed with tests or left as documented follow-up.
+- [x] Settings credential copy matches mock/live state.
+- [x] Production renderer has an explicit CSP.
+- [x] Package boundary tests prevent `ui` and `repo-contracts` dependency drift.
+- [x] Corrupt settings/activity files are backed up or recoverable with visible user feedback.
+- [x] Smaller smells are fixed with tests or left as documented follow-up.
 
 ## Verification Gates
 
 Every phase:
 
-- [ ] `pnpm format:check`
-- [ ] `pnpm lint`
-- [ ] `pnpm typecheck`
-- [ ] `pnpm test`
-- [ ] `pnpm build`
+- [x] `pnpm format:check`
+- [x] `pnpm lint`
+- [x] `pnpm typecheck`
+- [x] `pnpm test`
+- [x] `pnpm build`
 
 Emulator-facing phases:
 
-- [ ] `pnpm --dir e2e test:withEmulators`
+- [x] `pnpm --dir e2e test:withEmulators`
 
 Docs-only phases:
 
@@ -200,16 +200,16 @@ Docs-only phases:
 
 Manual checks when UI behavior changes:
 
-- [ ] Run the app.
+- [x] Run the app.
 - [ ] Exercise changed workflow in mock mode where applicable.
-- [ ] Exercise changed workflow in live emulator mode where applicable.
-- [ ] Verify Activity/status/error behavior.
+- [x] Exercise changed workflow in live emulator mode where applicable.
+- [x] Verify Activity/status/error behavior.
 
 ## Completion Criteria
 
-- [ ] All P1 findings are fixed and tested.
-- [ ] Mock/live contract drift has shared coverage.
-- [ ] App-core owns workflow rules; React adapters stay thin.
-- [ ] Build/test output no longer includes avoidable generated noise.
-- [ ] Major accessibility and security gaps are closed.
-- [ ] Findings doc has no untracked actionable item without a task here.
+- [x] All P1 findings are fixed and tested.
+- [x] Mock/live contract drift has shared coverage.
+- [x] App-core owns workflow rules; React adapters stay thin.
+- [x] Build/test output no longer includes avoidable generated noise.
+- [x] Major accessibility and security gaps are closed.
+- [x] Findings doc has no untracked actionable item without a task here.
