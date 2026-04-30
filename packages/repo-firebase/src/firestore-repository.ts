@@ -1,16 +1,20 @@
-import type {
-  FirestoreCollectionNode,
-  FirestoreDeleteDocumentOptions,
-  FirestoreDocumentNode,
-  FirestoreDocumentResult,
-  FirestoreFieldPatchOperation,
-  FirestoreRepository,
-  FirestoreSaveDocumentOptions,
-  FirestoreSaveDocumentResult,
-  FirestoreUpdateDocumentFieldsOptions,
-  FirestoreUpdateDocumentFieldsResult,
-  Page,
-  PageRequest,
+import {
+  assertFirestoreCollectionPath,
+  assertFirestoreDocumentPath,
+  DEFAULT_PAGE_LIMIT,
+  type FirestoreCollectionNode,
+  type FirestoreDeleteDocumentOptions,
+  type FirestoreDocumentNode,
+  type FirestoreDocumentResult,
+  type FirestoreFieldPatchOperation,
+  firestorePathParts,
+  type FirestoreRepository,
+  type FirestoreSaveDocumentOptions,
+  type FirestoreSaveDocumentResult,
+  type FirestoreUpdateDocumentFieldsOptions,
+  type FirestoreUpdateDocumentFieldsResult,
+  type Page,
+  type PageRequest,
 } from '@firebase-desk/repo-contracts';
 import {
   type CollectionReference,
@@ -30,7 +34,6 @@ import type {
 import { FirestoreCursorCache } from './cursor-cache.ts';
 import { decodeAdminData, decodeFilterValue, encodeAdminData } from './value-codec.ts';
 
-const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 250;
 
 export class FirebaseFirestoreRepository implements FirestoreRepository {
@@ -317,22 +320,16 @@ function applyCursor(
 }
 
 function limitFor(request?: PageRequest): number {
-  const value = request?.limit ?? DEFAULT_LIMIT;
+  const value = request?.limit ?? DEFAULT_PAGE_LIMIT;
   return Math.max(1, Math.min(MAX_LIMIT, value));
 }
 
 function assertCollectionPath(path: string): void {
-  const parts = pathParts(path);
-  if (parts.length === 0 || parts.length % 2 === 0) {
-    throw new Error(`Invalid Firestore collection path: ${path}`);
-  }
+  assertFirestoreCollectionPath(path);
 }
 
 function assertDocumentPath(path: string): void {
-  const parts = pathParts(path);
-  if (parts.length === 0 || parts.length % 2 !== 0) {
-    throw new Error(`Invalid Firestore document path: ${path}`);
-  }
+  assertFirestoreDocumentPath(path);
 }
 
 function assertDocumentId(id: string): void {
@@ -363,17 +360,12 @@ function assertDirectSubcollectionPath(documentPath: string, collectionPath: str
       `Invalid Firestore subcollection path ${collectionPath} for document ${documentPath}`,
     );
   }
-  const remainingParts = pathParts(collectionPath.slice(parentPrefix.length));
+  const remainingParts = firestorePathParts(collectionPath.slice(parentPrefix.length));
   if (remainingParts.length !== 1) {
     throw new Error(
       `Invalid Firestore subcollection path ${collectionPath} for document ${documentPath}`,
     );
   }
-}
-
-function pathParts(path: string): ReadonlyArray<string> {
-  const parts = path.split('/');
-  return parts.some((part) => part.length === 0) ? [] : parts;
 }
 
 function fieldPatchHasChangedRemoteValue(

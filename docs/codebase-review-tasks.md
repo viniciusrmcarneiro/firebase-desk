@@ -56,18 +56,18 @@ Acceptance criteria:
 
 ## Phase 2: Mock And Live Contract Parity
 
-- [ ] Share or align Firestore path validation between live and mock repositories.
-- [ ] Align Auth default pagination between live and mock repositories.
-- [ ] Align mock project add validation with main repository behavior.
-- [ ] Add shared contract tests where practical.
-- [ ] Cover custom claims shape, cursor expiry, deep subcollection validation, and missing nested delete paths.
+- [x] Share or align Firestore path validation between live and mock repositories.
+- [x] Align Auth default pagination between live and mock repositories.
+- [x] Align mock project add validation with main repository behavior.
+- [x] Add shared contract tests where practical.
+- [x] Cover custom claims shape, cursor expiry, deep subcollection validation, and missing nested delete paths.
 
 Acceptance criteria:
 
-- [ ] Mock and live repositories accept/reject the same core Firestore paths.
-- [ ] `listUsers(projectId)` has the same default limit in live and mock.
-- [ ] Mock project add rejects invalid production inputs.
-- [ ] Contract tests fail against old behavior and pass against new behavior.
+- [x] Mock and live repositories accept/reject the same core Firestore paths.
+- [x] `listUsers(projectId)` has the same default limit in live and mock.
+- [x] Mock project add rejects invalid production inputs.
+- [x] Contract tests fail against old behavior and pass against new behavior.
 
 ## Phase 3: App-Core Workflow Cleanup
 

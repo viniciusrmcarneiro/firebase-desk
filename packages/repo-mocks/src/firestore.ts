@@ -1,20 +1,24 @@
 import { decode, encode } from '@firebase-desk/data-format';
-import type {
-  FirestoreCollectionNode,
-  FirestoreDeleteDocumentOptions,
-  FirestoreDocumentNode,
-  FirestoreDocumentResult,
-  FirestoreFieldPatchOperation,
-  FirestoreFilter,
-  FirestoreQuery,
-  FirestoreRepository,
-  FirestoreSaveDocumentOptions,
-  FirestoreSaveDocumentResult,
-  FirestoreSort,
-  FirestoreUpdateDocumentFieldsOptions,
-  FirestoreUpdateDocumentFieldsResult,
-  Page,
-  PageRequest,
+import {
+  DEFAULT_PAGE_LIMIT,
+  type FirestoreCollectionNode,
+  type FirestoreDeleteDocumentOptions,
+  type FirestoreDocumentNode,
+  type FirestoreDocumentResult,
+  type FirestoreFieldPatchOperation,
+  type FirestoreFilter,
+  firestorePathParts,
+  type FirestoreQuery,
+  type FirestoreRepository,
+  type FirestoreSaveDocumentOptions,
+  type FirestoreSaveDocumentResult,
+  type FirestoreSort,
+  type FirestoreUpdateDocumentFieldsOptions,
+  type FirestoreUpdateDocumentFieldsResult,
+  isFirestoreCollectionPath,
+  isFirestoreDocumentPath,
+  type Page,
+  type PageRequest,
 } from '@firebase-desk/repo-contracts';
 import { COLLECTIONS, MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID } from './fixtures/index.ts';
 
@@ -22,7 +26,7 @@ type FixtureDoc = (typeof COLLECTIONS)[number]['docs'][number];
 type FixtureCollection = (typeof COLLECTIONS)[number];
 type UpdateTimeLookup = (documentPath: string) => string;
 
-const DEFAULT_LIMIT = 25;
+const MAX_LIMIT = 250;
 const MOCK_UPDATE_TIME_EPOCH = Date.UTC(2026, 0, 1);
 
 export class MockFirebaseError extends Error {
@@ -59,6 +63,7 @@ export class MockFirestoreRepository implements FirestoreRepository {
     request?: PageRequest,
   ): Promise<Page<FirestoreDocumentNode>> {
     assertConnectionAvailable(connectionId);
+    assertCollectionPath(collectionPath);
     const collection = this.collections.find((c) => c.path === collectionPath);
     const docs = collection?.docs ?? [];
     return pageDocuments(this.collections, collectionPath, docs, request);
@@ -69,6 +74,7 @@ export class MockFirestoreRepository implements FirestoreRepository {
     documentPath: string,
   ): Promise<ReadonlyArray<FirestoreCollectionNode>> {
     assertConnectionAvailable(connectionId);
+    assertDocumentPath(documentPath);
     return subcollectionsFor(this.collections, documentPath, (path) => this.updateTimeFor(path));
   }
 
@@ -77,6 +83,7 @@ export class MockFirestoreRepository implements FirestoreRepository {
     request?: PageRequest,
   ): Promise<Page<FirestoreDocumentResult>> {
     assertConnectionAvailable(query.connectionId);
+    assertCollectionPath(query.path);
     const collection = this.collections.find((c) => c.path === query.path);
     const docs = sortDocs(filterDocs(collection?.docs ?? [], query.filters), query.sorts);
     return pageResults(
@@ -93,7 +100,8 @@ export class MockFirestoreRepository implements FirestoreRepository {
     documentPath: string,
   ): Promise<FirestoreDocumentResult | null> {
     assertConnectionAvailable(connectionId);
-    const parts = documentPath.split('/');
+    assertDocumentPath(documentPath);
+    const parts = firestorePathParts(documentPath);
     const docId = parts.at(-1);
     const collectionPath = parts.slice(0, -1).join('/');
     const collection = this.collections.find((c) => c.path === collectionPath);
@@ -328,13 +336,37 @@ function pageResults(
 }
 
 function pageSlice<T>(items: ReadonlyArray<T>, request?: PageRequest): Page<T> {
-  const offset = Number.parseInt(request?.cursor?.token ?? '0', 10) || 0;
-  const limit = request?.limit ?? DEFAULT_LIMIT;
+  const offset = offsetFor(items.length, request);
+  const limit = limitFor(request);
   const nextOffset = offset + limit;
   return {
     items: items.slice(offset, nextOffset),
     nextCursor: nextOffset < items.length ? { token: String(nextOffset) } : null,
   };
+}
+
+function offsetFor(itemCount: number, request?: PageRequest): number {
+  if (!request?.cursor) return 0;
+  const token = request.cursor.token;
+  if (!/^\d+$/.test(token)) {
+    throw new MockFirebaseError(
+      'invalid-argument',
+      'Firestore pagination cursor expired. Run the query again.',
+    );
+  }
+  const offset = Number.parseInt(token, 10);
+  if (offset < 0 || offset > itemCount) {
+    throw new MockFirebaseError(
+      'invalid-argument',
+      'Firestore pagination cursor expired. Run the query again.',
+    );
+  }
+  return offset;
+}
+
+function limitFor(request?: PageRequest): number {
+  const value = request?.limit ?? DEFAULT_PAGE_LIMIT;
+  return Math.max(1, Math.min(MAX_LIMIT, value));
 }
 
 function hasSubcollections(
@@ -449,8 +481,8 @@ function assertConnectionAvailable(connectionId: string) {
 }
 
 function splitDocumentPath(documentPath: string) {
-  const parts = pathParts(documentPath);
-  if (parts.length === 0 || parts.length % 2 !== 0) {
+  const parts = firestorePathParts(documentPath);
+  if (!isFirestoreDocumentPath(documentPath)) {
     throw new MockFirebaseError('invalid-argument', `Invalid document path: ${documentPath}`);
   }
   return {
@@ -460,9 +492,14 @@ function splitDocumentPath(documentPath: string) {
 }
 
 function assertCollectionPath(collectionPath: string) {
-  const parts = pathParts(collectionPath);
-  if (parts.length === 0 || parts.length % 2 === 0) {
+  if (!isFirestoreCollectionPath(collectionPath)) {
     throw new MockFirebaseError('invalid-argument', `Invalid collection path: ${collectionPath}`);
+  }
+}
+
+function assertDocumentPath(documentPath: string) {
+  if (!isFirestoreDocumentPath(documentPath)) {
+    throw new MockFirebaseError('invalid-argument', `Invalid document path: ${documentPath}`);
   }
 }
 
@@ -489,9 +526,9 @@ function assertFieldPatchOperations(operations: ReadonlyArray<FirestoreFieldPatc
 }
 
 function assertDirectSubcollectionPath(documentPath: string, collectionPath: string) {
-  const documentParts = pathParts(documentPath);
-  const collectionParts = pathParts(collectionPath);
-  if (collectionParts.length === 0 || collectionParts.length % 2 === 0) {
+  const documentParts = firestorePathParts(documentPath);
+  const collectionParts = firestorePathParts(collectionPath);
+  if (!isFirestoreCollectionPath(collectionPath)) {
     throw new MockFirebaseError('invalid-argument', `Invalid collection path: ${collectionPath}`);
   }
   if (
@@ -503,11 +540,6 @@ function assertDirectSubcollectionPath(documentPath: string, collectionPath: str
       `Invalid subcollection path ${collectionPath} for document ${documentPath}`,
     );
   }
-}
-
-function pathParts(path: string): ReadonlyArray<string> {
-  const parts = path.split('/');
-  return parts.some((part) => part.length === 0) ? [] : parts;
 }
 
 function decodeDocumentData(data: Record<string, unknown>): Record<string, unknown> {
