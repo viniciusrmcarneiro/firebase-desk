@@ -1,6 +1,11 @@
 import type { FirestoreCollectionNode, ProjectSummary } from '@firebase-desk/repo-contracts';
 import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
+import {
+  openWorkspaceTreeItemCommand,
+  selectWorkspaceTreeItemCommand,
+  type WorkspaceTreeTarget,
+} from '../../app-core/workspace/index.ts';
 import { useRepositories } from '../RepositoryProvider.tsx';
 import { selectionActions } from '../stores/selectionStore.ts';
 import {
@@ -11,7 +16,6 @@ import {
   type WorkspaceTabKind,
 } from '../stores/tabsStore.ts';
 import {
-  actionLabelForTreeItem,
   buildTreeItems,
   initialTreeCache,
   type LoadState,
@@ -126,54 +130,20 @@ export function useWorkspaceTree(
     }
     const parsed = parseTreeId(id);
     selectionActions.selectTreeItem(id);
-    if (parsed.kind === 'status') return;
-    let nextTabId = activeTab?.id ?? tabsStore.state.activeTabId;
-    let nextPath = activeTab ? activePath(activeTab) : undefined;
-    if (parsed.kind === 'auth' && parsed.connectionId) {
-      nextTabId = openToolTab('auth-users', parsed.connectionId);
-      nextPath = 'auth/users';
-    }
-    if (parsed.kind === 'script' && parsed.connectionId) {
-      nextTabId = openToolTab('js-query', parsed.connectionId);
-      nextPath = 'scripts/default';
-    }
-    if (parsed.kind === 'collection' && parsed.connectionId && parsed.path) {
-      nextTabId = openFirestoreTab(parsed.connectionId, parsed.path);
-      nextPath = parsed.path;
-    }
-    if (nextTabId) {
-      tabActions.recordInteraction({
-        activeTabId: nextTabId,
-        selectedTreeItemId: id,
-        ...(nextPath === undefined ? {} : { path: nextPath }),
-      });
-    }
-    setLastAction(actionLabelForTreeItem(parsed.kind, parsed.path));
+    const result = selectWorkspaceTreeItemCommand({
+      activeTab: activeTab
+        ? { id: activeTab.id, path: activePath(activeTab) }
+        : { id: tabsStore.state.activeTabId },
+      item: parsed,
+      selectedTreeItemId: id,
+    });
+    recordTreeTarget(result.target, id);
+    setLastAction(result.lastAction);
   }
 
   function handleOpenItem(id: string) {
     const parsed = parseTreeId(id);
-    if (parsed.kind === 'auth' && parsed.connectionId) {
-      const tabId = openToolTab('auth-users', parsed.connectionId);
-      tabActions.recordInteraction({
-        activeTabId: tabId,
-        path: 'auth/users',
-        selectedTreeItemId: id,
-      });
-      return;
-    }
-    if (parsed.kind === 'script' && parsed.connectionId) {
-      const tabId = openJsTabInNewTab(parsed.connectionId);
-      tabActions.recordInteraction({
-        activeTabId: tabId,
-        path: 'scripts/default',
-        selectedTreeItemId: id,
-      });
-      return;
-    }
-    if (!parsed.connectionId || !parsed.path) return;
-    const tabId = openFirestoreTabInNewTab(parsed.connectionId, parsed.path);
-    tabActions.recordInteraction({ activeTabId: tabId, path: parsed.path, selectedTreeItemId: id });
+    recordTreeTarget(openWorkspaceTreeItemCommand(parsed).target, id);
   }
 
   function setRootState(key: string, state: LoadState<FirestoreCollectionNode>) {
@@ -182,6 +152,35 @@ export function useWorkspaceTree(
 
   function setToolState(key: string, state: LoadState<'tools'>) {
     setTreeCache((current) => ({ ...current, tools: { ...current.tools, [key]: state } }));
+  }
+
+  function recordTreeTarget(target: WorkspaceTreeTarget | null, targetTreeItemId: string) {
+    if (!target) return;
+    const opened = openTreeTarget(target);
+    if (!opened.tabId) return;
+    tabActions.recordInteraction({
+      activeTabId: opened.tabId,
+      selectedTreeItemId: targetTreeItemId,
+      ...(opened.path === undefined ? {} : { path: opened.path }),
+    });
+  }
+
+  function openTreeTarget(
+    target: WorkspaceTreeTarget,
+  ): { readonly path?: string | undefined; readonly tabId: string | null; } {
+    if (target.type === 'current') return { path: target.path, tabId: target.activeTabId };
+    if (target.type === 'open-firestore') {
+      return {
+        path: target.path,
+        tabId: target.newTab
+          ? openFirestoreTabInNewTab(target.connectionId, target.path)
+          : openFirestoreTab(target.connectionId, target.path),
+      };
+    }
+    if (target.kind === 'js-query' && target.newTab) {
+      return { path: target.path, tabId: openJsTabInNewTab(target.connectionId) };
+    }
+    return { path: target.path, tabId: openToolTab(target.kind, target.connectionId) };
   }
 
   return {
