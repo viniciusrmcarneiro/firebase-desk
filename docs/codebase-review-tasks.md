@@ -78,9 +78,8 @@ Acceptance criteria:
   - Firestore completion Activity is emitted from the query completion path, not a React result watcher.
   - Auth load/search/load-more Activity is emitted from app-core commands.
 - [x] Track query activity dedupe in app-core state instead of hook refs.
-- [ ] Unify tab-close cleanup in one app-core path.
-  - Current state: close decisions use `closeWorkspaceTabsCommand`; AppShell no longer cancels Firestore/Auth query-client work.
-  - Remaining work: AppShell still coordinates feature-specific runtime cleanup after the command result.
+- [x] Unify tab-close cleanup in one app-core path.
+  - Close decisions use `closeWorkspaceTabsCommand`; AppShell applies returned cleanup intents to feature adapters.
 - [x] Move Firestore write conflict/stale/create modal workflow state fully into app-core.
 - [x] Replace durable workspace `localStorage` persistence with an app storage/settings path.
   - Workspace state is stored through `SettingsRepository`.
@@ -88,8 +87,8 @@ Acceptance criteria:
 
 Acceptance criteria:
 
-- [ ] React adapters render state and dispatch intent; workflow rules live in app-core.
-- [ ] Page reload, Activity completion, tab close cleanup, and write conflict flows have app-core tests.
+- [x] React adapters render state and dispatch intent; workflow rules live in app-core.
+- [x] Page reload, Activity completion, tab close cleanup, and write conflict flows have app-core tests.
 - [x] Existing AppShell integration behavior is unchanged.
 - [x] Workspace persistence failures are not silently swallowed.
 
@@ -204,12 +203,12 @@ Emulator-facing phases:
 
 Docs-only phases:
 
-- [ ] `pnpm format:check`
+- [x] `pnpm format:check`
 
 Manual checks when UI behavior changes:
 
 - [x] Run the app.
-- [ ] Exercise changed workflow in mock mode where applicable.
+- [x] Exercise changed workflow in mock mode where applicable.
 - [x] Exercise changed workflow in live emulator mode where applicable.
 - [x] Verify Activity/status/error behavior.
 
@@ -217,7 +216,7 @@ Manual checks when UI behavior changes:
 
 - [x] All P1 findings are fixed and tested.
 - [x] Mock/live contract drift has shared coverage.
-- [ ] App-core owns workflow rules; React adapters stay thin.
+- [x] App-core owns workflow rules; React adapters stay thin.
 - [x] Build/test output no longer includes avoidable generated noise.
 - [x] Major accessibility and security gaps are closed.
-- [ ] Findings doc has no untracked actionable item without a task here.
+- [x] Findings doc has no untracked actionable item without a task here.

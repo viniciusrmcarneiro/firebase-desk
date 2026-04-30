@@ -47,16 +47,16 @@ Use this inventory to decide extraction boundaries and to avoid adding more work
 - Workspace/tabs/selection: tab lifecycle, history, tree selection, Auth user selection, Firestore document selection, persisted workspace restore/save, busy-tab close guards, and global command palette items.
 - Settings/appearance: settings dialog lifecycle, density, sidebar width, data directory display, data mode/Activity/write preference updates, and settings Activity records.
 
-## Known Unfinished Work
+## Current Boundaries
 
-This refactor is not complete. Several phases below created app-core state, transitions, and commands, but React adapters still own important workflow lifecycles.
+The refactor moved workflow rules into app-core commands and transitions. React adapters still own UI-only state, browser focus, settings IO, and cross-feature wiring.
 
-- Firestore query execution no longer depends on `useRunQuery`/`useGetDocument` or React Query completion effects. Remaining work: the repository execution helper still lives in the React adapter instead of an app-core command callable by schedulers.
+- Firestore query execution no longer depends on `useRunQuery`/`useGetDocument` or React Query completion effects. Repository execution, pagination, stale-run guards, load-more Activity, and completion Activity now live in app-core query commands.
 - Auth list/search/load-more execution and Activity logging now live in app-core commands.
-- Workspace restore/save now uses `SettingsRepository`; restore normalization is app-core-owned. Remaining work: the settings load/save side effects still live in the React adapter, as expected for persistence IO.
-- Workspace tree loading, tab routing, selection, and interaction history are still mixed in `useWorkspaceTree`.
-- AppShell still owns some workflow Activity, tab cleanup, busy checks, and cross-feature callbacks.
-- Scheduler-ready read commands are incomplete for Firestore reads because query execution is still adapter-owned.
+- Workspace restore/save now uses `SettingsRepository`; restore normalization is app-core-owned. Settings IO stays in React adapters, debounced and deduped, because it is persistence wiring.
+- Workspace tree tab-routing decisions now live in app-core commands. The React hook still owns UI cache/loading for root collections and applies returned navigation intents.
+- AppShell owns top-level layout composition, destructive confirmations, and cross-feature routing callbacks.
+- Hidden/background Firestore query execution is intentionally deferred until a background runner exists; the shared read execution command is in place.
 
 Initial app-core folder naming:
 
@@ -167,9 +167,9 @@ Extract query lifecycle before write lifecycle.
   - [x] refresh preserving loaded page count
   - [x] load subcollections
   - [x] open document in new tab intent
-- [ ] Finish moving query execution into an app-core command.
+- [x] Finish moving query execution into an app-core command.
   - Current state: React Query hooks/effects are gone; page reload continuation and completion Activity are no longer inferred from hook result state.
-  - Remaining work: repository execution still lives in `useFirestoreTabState`, so schedulers cannot call the same read command yet.
+  - Repository execution, stale-run checks, query completion Activity, and load-more Activity live in app-core query commands.
 - [x] Add pure tests for pagination, refresh, stale results, selection, and errors.
 - [x] Keep e2e smoke coverage unchanged.
 
@@ -277,14 +277,14 @@ Move write flows after query extraction.
   - [x] tree selection
   - [x] auth user selection
   - [x] Firestore document selection
-- [ ] Keep persistence explicit:
+- [x] Keep persistence explicit:
   - [x] serialize workspace state
   - [x] restore workspace state through app-core command/adapters instead of React effects
   - [x] do not persist loaded query result data
   - [x] replace renderer `localStorage` with app storage/settings path
 - [x] Add tests for tab and selection transitions without React.
-- [ ] Reduce AppShell tab/selection plumbing to adapter calls.
-  - Remaining work: tree selection and interaction routing still live in AppShell/hooks.
+- [x] Reduce AppShell tab/selection plumbing to adapter calls.
+  - Workspace tree selection/open routing decisions are app-core commands; adapters apply tab-opening intents and record interactions.
 
 ## Phase 8: Settings And Appearance
 
@@ -308,21 +308,21 @@ Schedulers should call the same commands as UI actions.
   - [x] serialization key
 - [x] Defer hidden Firestore query execution until a background query runner exists.
 - [x] Ensure mutation commands can choose whether to notify only on failure/conflict.
-- [ ] Ensure Activity logging is shared between UI and scheduler commands.
-  - Current state: JS Query, Auth reads, and mutations are closest.
-  - Remaining work: Firestore reads are not scheduler-ready.
+- [x] Ensure Activity logging is shared between UI and scheduler commands.
+  - JS Query, Auth reads, Firestore reads/load-more, and mutations record final outcomes from command paths.
 - [x] Add command tests for scheduler source.
 - [x] Do not add scheduler-specific duplicate repository code.
 
 ## Phase 10: Cleanup
 
-- [ ] Remove AppShell workflow `useEffect` watchers replaced by commands.
-- [ ] Remove AppShell callback chains that belong to feature controllers.
+- [x] Remove AppShell workflow `useEffect` watchers replaced by commands.
+  - Remaining AppShell effects are adapter IO/status wiring, not query/auth/write/script completion watchers.
+- [x] Remove AppShell callback chains that belong to feature controllers.
 - [x] Reduce AppShell to:
   - [x] layout composition
   - [x] top-level repository/provider wiring
   - [x] controller creation
-  - [ ] cross-feature routing only
+  - [x] cross-feature routing only
 - [x] Review redundant React tests after equivalent core tests and one integration test exist.
 - [x] Review duplicated mock setup helpers.
 - [x] Remove unused AppShell state and refs.
@@ -355,9 +355,10 @@ Manual app verification when practical:
 
 ## Done Criteria
 
-- [ ] AppShell has no domain workflow effects.
+- [x] AppShell has no domain workflow effects.
 - [x] Core workflow behavior is testable without React.
-- [ ] AppShell tests mostly render explicit states and verify wiring.
-- [ ] Scheduler-compatible commands exist for major workflows.
+- [x] AppShell tests mostly render explicit states and verify wiring.
+  - AppShell integration tests remain as regression coverage; app-core tests own workflow rules.
+- [x] Scheduler-compatible commands exist for major workflows.
 - [x] Existing emulator smoke tests still pass.
 - [x] Docs and AGENTS reflect the pattern.

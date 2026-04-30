@@ -5,6 +5,8 @@ Scope: static review of repo structure, renderer/main flows, packages (~419 sour
 
 Execution roadmap: [codebase-review-tasks.md](codebase-review-tasks.md).
 
+Status: actionable items are tracked and completed in the roadmap. Findings below are retained as original review evidence and may reference pre-fix code.
+
 Severity:
 
 - P1: likely user-visible bug / leak / boundary risk.
