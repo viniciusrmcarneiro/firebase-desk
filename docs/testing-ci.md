@@ -31,7 +31,7 @@
 
 - `ci.yml`: install (pnpm), run `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:coverage`, publish the coverage summary, then `pnpm build`.
 - `e2e.yml`: install, build affected workspaces, start Firebase emulators, seed data, run `pnpm test:e2e`, upload traces/screenshots on failure.
-- `release.yml`: on PR, merge to `main`, tag, or ad-hoc dispatch, run CI checks and `pnpm package` for the desktop app. PRs always package Linux, and package macOS/Windows when the PR has the `package-all` label or touches package-sensitive paths (`apps/desktop/**`, `e2e/**`, release workflows, package scripts, or lockfile). PR and ad-hoc runs upload temporary workflow artifacts with retention. Merges to `main` create or update the rolling published prerelease `latest` with release assets and SHA-256 checksums. Version tags create published prereleases with release assets and SHA-256 checksums.
+- `release.yml`: on PR, merge to `main`, tag, or ad-hoc dispatch, run CI checks and `pnpm package` for the desktop app. PRs always package Linux, and package macOS/Windows when the PR has the `package-all` label or touches package-sensitive paths (`apps/desktop/**`, `e2e/**`, release workflows, package scripts, or lockfile). Linux, macOS, and Windows all run the packaged smoke check against the built app. PR and ad-hoc runs upload temporary workflow artifacts with retention. Merges to `main` create or update the rolling published prerelease `latest` with release assets and SHA-256 checksums. Version tags create published prereleases with release assets and SHA-256 checksums.
 
 ### Required Scripts (root `package.json`, delegated via turbo/pnpm filters)
 
@@ -39,11 +39,16 @@
 - `pnpm format:check`
 - `pnpm lint`
 - `pnpm typecheck`
+- `pnpm typecheck:scripts`
 - `pnpm test`
+- `pnpm test:boundaries`
+- `pnpm test:desktop-packaging`
 - `pnpm test:coverage`
 - `pnpm test:e2e`
 - `pnpm build`
 - `pnpm package`
+- `pnpm test:packaged` to launch the most recently built packaged app on the current OS and fail if it exits early.
+- `pnpm package:smoke` to build the desktop app for the current OS and immediately run the packaged smoke check.
 - `pnpm package:linux:docker` for local Docker reproduction of the Linux release package smoke. The wrapper uses `linux/amd64` and the Docker capability required by Chromium's sandbox.
 - `pnpm dev` (parallel: desktop + wireframe)
 
@@ -52,8 +57,11 @@
 - Workspace packages in `apps/desktop/package.json` must be listed in `apps/desktop/src/main/packaging/main-externalize-deps.ts`.
 - `@firebase-desk/*` packages export TypeScript source for development. Packaged Electron must bundle them into main/preload/renderer output and must not load them from `node_modules`.
 - `apps/desktop/electron-builder.yml` excludes `node_modules/@firebase-desk/**` from `app.asar`; do not rely on workspace package files being present at runtime.
-- Main-process third-party runtime deps must be direct `apps/desktop` dependencies. Add them to `mainExternalizeDeps.include` only when they should stay external, like `firebase-admin`.
-- `apps/desktop/src/main/packaging/electron-vite-config.test.ts` guards new desktop workspace deps.
+- Main-process third-party runtime deps must be direct `apps/desktop` dependencies.
+- `firebase-admin` is bundled into the main-process output because the packaged pnpm layout does not preserve its transitive runtime dependency resolution when it is kept external in `app.asar/node_modules`.
+- `scripts/check-package-boundaries.ts` is a repo-level architecture guard for low-level workspace package imports; keep it out of app-scoped test folders.
+- `scripts/check-desktop-packaging-contract.ts` is a repo-level guard for the desktop packaging dependency contract.
+- `scripts/tsconfig.json` keeps repo-level TypeScript scripts typechecked without pushing those invariants back into app test suites.
 
 ### Policy
 

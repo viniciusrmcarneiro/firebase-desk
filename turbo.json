@@ -21,6 +21,10 @@
       "cache": false,
       "outputs": []
     },
+    "//#typecheck:scripts": {
+      "cache": false,
+      "outputs": []
+    },
     "typecheck": {
       "dependsOn": [
         "^typecheck"
@@ -28,6 +32,10 @@
       "outputs": [
         "**/*.tsbuildinfo"
       ]
+    },
+    "//#test:repo-invariants": {
+      "cache": false,
+      "outputs": []
     },
     "test": {
       "dependsOn": [

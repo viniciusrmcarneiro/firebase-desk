@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { join, relative } from 'node:path';
-import { describe, expect, it } from 'vitest';
+import { fileURLToPath } from 'node:url';
 
 interface BoundaryRule {
   readonly forbiddenPackages: ReadonlyArray<string>;
@@ -8,7 +8,7 @@ interface BoundaryRule {
   readonly root: string;
 }
 
-const workspaceRoot = join(process.cwd(), '../..');
+const workspaceRoot = fileURLToPath(new URL('..', import.meta.url));
 
 const rules: ReadonlyArray<BoundaryRule> = [
   {
@@ -41,11 +41,13 @@ const rules: ReadonlyArray<BoundaryRule> = [
   },
 ];
 
-describe('package dependency boundaries', () => {
-  it.each(rules)('$label has no forbidden workspace imports', async (rule) => {
-    const files = await sourceFiles(join(workspaceRoot, rule.root));
-    const violations: string[] = [];
+void main();
 
+async function main(): Promise<void> {
+  const violations: string[] = [];
+
+  for (const rule of rules) {
+    const files = await sourceFiles(join(workspaceRoot, rule.root));
     const sources = await Promise.all(
       files.map(async (filePath) => ({ filePath, source: await readFile(filePath, 'utf8') })),
     );
@@ -55,19 +57,26 @@ describe('package dependency boundaries', () => {
         const forbiddenPackage = rule.forbiddenPackages.find((packageName) =>
           specifier === packageName || specifier.startsWith(`${packageName}/`)
         );
-        if (forbiddenPackage) {
-          violations.push(
-            `${
-              relative(workspaceRoot, filePath)
-            } imports ${specifier} (forbidden by ${rule.label})`,
-          );
-        }
+
+        if (!forbiddenPackage) continue;
+
+        violations.push(
+          `${relative(workspaceRoot, filePath)} imports ${specifier} (forbidden by ${rule.label})`,
+        );
       }
     }
+  }
 
-    expect(violations).toEqual([]);
-  });
-});
+  if (violations.length > 0) {
+    console.error('Package dependency boundary violations found:\n');
+    for (const violation of violations) {
+      console.error(`- ${violation}`);
+    }
+    process.exit(1);
+  }
+
+  console.log('Package dependency boundaries OK.');
+}
 
 async function sourceFiles(dir: string): Promise<ReadonlyArray<string>> {
   const entries = await readdir(dir, { withFileTypes: true });
@@ -75,9 +84,7 @@ async function sourceFiles(dir: string): Promise<ReadonlyArray<string>> {
     .filter((entry) => entry.isFile() && isProductionTypeScript(entry.name))
     .map((entry) => join(dir, entry.name));
   const nestedFiles = await Promise.all(
-    entries.filter((entry) => entry.isDirectory()).map((entry) =>
-      sourceFiles(join(dir, entry.name))
-    ),
+    entries.filter((entry) => entry.isDirectory()).map((entry) => sourceFiles(join(dir, entry.name))),
   );
   return files.concat(...nestedFiles);
 }
@@ -97,9 +104,11 @@ function importSpecifiers(source: string): ReadonlyArray<string> {
   const specifiers: string[] = [];
   const importPattern =
     /import\s+(?:type\s+)?(?:[^'"]+\s+from\s+)?['"]([^'"]+)['"]|export\s+(?:type\s+)?(?:[^'"]+\s+from\s+)['"]([^'"]+)['"]/g;
+
   for (const match of source.matchAll(importPattern)) {
     const specifier = match[1] ?? match[2];
     if (specifier?.startsWith('@firebase-desk/')) specifiers.push(specifier);
   }
+
   return specifiers;
 }

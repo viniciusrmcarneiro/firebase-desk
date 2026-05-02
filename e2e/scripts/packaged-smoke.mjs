@@ -63,6 +63,27 @@ function resolvePackagedExecutable() {
   throw new Error(`Could not find packaged Firebase Desk executable under ${releaseDirectory}`);
 }
 
+function resolvePackagedResourcesDirectory(executablePath) {
+  if (process.platform === 'darwin') {
+    return resolve(dirname(executablePath), '..', 'Resources');
+  }
+
+  return resolve(dirname(executablePath), 'resources');
+}
+
+function assertPackagedResources(executablePath) {
+  const resourcesDirectory = resolvePackagedResourcesDirectory(executablePath);
+  const appArchivePath = resolve(resourcesDirectory, 'app.asar');
+
+  if (!existsSync(resourcesDirectory) || !statSync(resourcesDirectory).isDirectory()) {
+    throw new Error(`Packaged resources directory is missing: ${resourcesDirectory}`);
+  }
+
+  if (!existsSync(appArchivePath) || !statSync(appArchivePath).isFile()) {
+    throw new Error(`Packaged app archive is missing: ${appArchivePath}`);
+  }
+}
+
 function createSmokeEnvironment() {
   return {
     ...process.env,
@@ -97,6 +118,7 @@ function stopProcess(childProcess) {
 
 async function runSmoke() {
   const executablePath = resolvePackagedExecutable();
+  assertPackagedResources(executablePath);
   console.log(`Launching packaged app: ${executablePath}`);
 
   let stderrOutput = '';
