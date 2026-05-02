@@ -11,6 +11,10 @@ import { messageFromError } from '../../shared/errors.ts';
 import { isPlainObject, primitiveCatalogTypeForValue } from './firestoreTypeRegistry.ts';
 import { collectionLayoutKeyForPath } from './resultTableLayout.ts';
 
+const FIELD_CATALOG_FIELD_LIMIT = 1_000;
+const FIELD_CATALOG_VISIT_LIMIT = 2_000;
+const FIELD_CATALOG_DEPTH_LIMIT = 3;
+
 export function fieldCatalogKeyForPath(path: string): string {
   return collectionLayoutKeyForPath(path);
 }
@@ -19,8 +23,10 @@ export function fieldCatalogFromRows(
   rows: ReadonlyArray<FirestoreDocumentResult>,
 ): FirestoreFieldCatalogEntry[] {
   const fields = new Map<string, { count: number; types: Set<FirestoreFieldType>; }>();
+  const budget = { visits: 0 };
   for (const row of rows) {
-    collectFields(row.data, '', fields);
+    collectFields(row.data, '', fields, budget, 0);
+    if (catalogBudgetExhausted(fields, budget)) break;
   }
   return sortedEntries(fields);
 }
@@ -113,8 +119,15 @@ function collectFields(
   value: Record<string, unknown>,
   prefix: string,
   fields: Map<string, { count: number; types: Set<FirestoreFieldType>; }>,
+  budget: { visits: number; },
+  depth: number,
 ) {
-  for (const [key, entry] of Object.entries(value)) {
+  if (depth > FIELD_CATALOG_DEPTH_LIMIT) return;
+  for (const key in value) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+    if (catalogBudgetExhausted(fields, budget)) return;
+    budget.visits += 1;
+    const entry = value[key];
     const field = prefix ? `${prefix}.${key}` : key;
     const primitiveType = primitiveFieldType(entry);
     if (primitiveType) {
@@ -127,8 +140,15 @@ function collectFields(
       continue;
     }
     const nested = nestedRecord(entry);
-    if (nested) collectFields(nested, field, fields);
+    if (nested) collectFields(nested, field, fields, budget, depth + 1);
   }
+}
+
+function catalogBudgetExhausted(
+  fields: ReadonlyMap<string, unknown>,
+  budget: { readonly visits: number; },
+): boolean {
+  return fields.size >= FIELD_CATALOG_FIELD_LIMIT || budget.visits >= FIELD_CATALOG_VISIT_LIMIT;
 }
 
 function addField(
@@ -175,18 +195,49 @@ function nestedRecord(value: unknown): Record<string, unknown> | null {
 function sortedEntries(
   fields: ReadonlyMap<string, { count: number; types: ReadonlySet<FirestoreFieldType>; }>,
 ): FirestoreFieldCatalogEntry[] {
-  return sortedBy(
+  return mergeSortCatalogEntries(
     Array.from(fields, ([field, value]) => ({
       count: value.count,
       field,
       types: sortedTypes(value.types),
     })),
-    (a, b) => a.field.localeCompare(b.field),
   );
 }
 
 function sortedTypes(types: ReadonlySet<FirestoreFieldType>): FirestoreFieldType[] {
   return sortedBy(types, (a, b) => a.localeCompare(b));
+}
+
+function mergeSortCatalogEntries(
+  entries: ReadonlyArray<FirestoreFieldCatalogEntry>,
+): FirestoreFieldCatalogEntry[] {
+  if (entries.length < 2) return [...entries];
+  const midpoint = Math.floor(entries.length / 2);
+  return mergeCatalogEntries(
+    mergeSortCatalogEntries(entries.slice(0, midpoint)),
+    mergeSortCatalogEntries(entries.slice(midpoint)),
+  );
+}
+
+function mergeCatalogEntries(
+  left: ReadonlyArray<FirestoreFieldCatalogEntry>,
+  right: ReadonlyArray<FirestoreFieldCatalogEntry>,
+): FirestoreFieldCatalogEntry[] {
+  const merged: FirestoreFieldCatalogEntry[] = [];
+  let leftIndex = 0;
+  let rightIndex = 0;
+  while (leftIndex < left.length && rightIndex < right.length) {
+    const leftEntry = left[leftIndex]!;
+    const rightEntry = right[rightIndex]!;
+    if (leftEntry.field.localeCompare(rightEntry.field) <= 0) {
+      merged.push(leftEntry);
+      leftIndex += 1;
+    } else {
+      merged.push(rightEntry);
+      rightIndex += 1;
+    }
+  }
+  return merged.concat(left.slice(leftIndex), right.slice(rightIndex));
 }
 
 function sortedBy<T>(items: Iterable<T>, compare: (left: T, right: T) => number): T[] {
@@ -206,5 +257,16 @@ function catalogEntriesEqual(
   left: ReadonlyArray<FirestoreFieldCatalogEntry>,
   right: ReadonlyArray<FirestoreFieldCatalogEntry>,
 ): boolean {
-  return JSON.stringify(left) === JSON.stringify(right);
+  if (left === right) return true;
+  if (left.length !== right.length) return false;
+  for (let i = 0; i < left.length; i += 1) {
+    const l = left[i]!;
+    const r = right[i]!;
+    if (l.field !== r.field || l.count !== r.count) return false;
+    if (l.types.length !== r.types.length) return false;
+    for (let j = 0; j < l.types.length; j += 1) {
+      if (l.types[j] !== r.types[j]) return false;
+    }
+  }
+  return true;
 }

@@ -31,6 +31,9 @@ export interface ResultTableProps {
 
 type ResultTableRow = { readonly kind: 'document'; readonly document: FirestoreDocumentResult; };
 
+const MAX_RESULT_TABLE_FIELD_COLUMNS = 200;
+const FIELD_OVERFLOW_COLUMN_ID = '__field_overflow__';
+
 export function ResultTable(
   {
     hasMore,
@@ -52,14 +55,20 @@ export function ResultTable(
     subcollectionStates,
   }: ResultTableProps,
 ) {
+  const fieldCatalog = useMemo(() => fieldCatalogForRows(rows), [rows]);
   const fieldColumns = useMemo(
-    () => fieldCatalogForRows(rows).map((field) => field.field),
+    () => fieldCatalog.slice(0, MAX_RESULT_TABLE_FIELD_COLUMNS).map((field) => field.field),
+    [fieldCatalog],
+  );
+  const hiddenFieldColumnCount = Math.max(0, fieldCatalog.length - fieldColumns.length);
+  const visibleFields = useMemo(
+    () => new Set(fieldColumns),
+    [fieldColumns],
+  );
+  const tableRows = useMemo<ReadonlyArray<ResultTableRow>>(
+    () => rows.map((document) => ({ kind: 'document', document })),
     [rows],
   );
-  const tableRows: ReadonlyArray<ResultTableRow> = rows.map((document) => ({
-    kind: 'document',
-    document,
-  }));
   const showSubcollections = rows.some((row) =>
     row.hasSubcollections || (row.subcollections?.length ?? 0) > 0
   );
@@ -91,6 +100,21 @@ export function ResultTable(
             : '';
         },
       } satisfies DataTableColumn<ResultTableRow>)),
+      ...(hiddenFieldColumnCount > 0
+        ? [
+          {
+            id: FIELD_OVERFLOW_COLUMN_ID,
+            header: `+${hiddenFieldColumnCount} fields`,
+            width: 180,
+            minWidth: 140,
+            cell: ({ row }) => {
+              const hiddenCount = Object.keys(row.original.document.data)
+                .filter((field) => !visibleFields.has(field)).length;
+              return hiddenCount > 0 ? `${hiddenCount} fields hidden` : '';
+            },
+          } satisfies DataTableColumn<ResultTableRow>,
+        ]
+        : []),
       ...(showSubcollections
         ? [
           {
@@ -112,6 +136,7 @@ export function ResultTable(
     ],
     [
       fieldColumns,
+      hiddenFieldColumnCount,
       onDeleteField,
       onEditField,
       onLoadSubcollections,
@@ -119,6 +144,7 @@ export function ResultTable(
       onSetFieldNull,
       showSubcollections,
       subcollectionStates,
+      visibleFields,
     ],
   );
   const { hasSavedLayout, layout, resetLayout, saveLayout } = useResultTableLayout({

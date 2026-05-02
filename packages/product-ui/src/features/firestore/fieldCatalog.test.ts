@@ -90,6 +90,37 @@ describe('fieldCatalog', () => {
     ]);
   });
 
+  it('caps field catalog metadata scans for one huge nested document', () => {
+    const metadata = Object.fromEntries(
+      Array.from(
+        { length: 5_000 },
+        (_, index) => [`field_${String(index).padStart(4, '0')}`, index],
+      ),
+    );
+
+    const catalog = fieldCatalogFromRows([{
+      id: 'doc_1',
+      path: 'items/doc_1',
+      hasSubcollections: false,
+      data: { metadata },
+    }]);
+
+    expect(catalog).toHaveLength(1_000);
+    expect(catalog[0]?.field).toBe('metadata.field_0000');
+    expect(catalog.at(-1)?.field).toBe('metadata.field_0999');
+  });
+
+  it('does not catalog fields deeper than the metadata depth budget', () => {
+    expect(
+      fieldCatalogFromRows([{
+        id: 'doc_1',
+        path: 'items/doc_1',
+        hasSubcollections: false,
+        data: { a: { b: { c: { d: { e: 1 } } } } },
+      }]),
+    ).toEqual([]);
+  });
+
   it('merges counts and dedupes types', () => {
     expect(
       mergeFieldCatalogEntries(

@@ -35,7 +35,9 @@ export function FirestoreValueCell({ value }: { readonly value: unknown; }): Rea
       <span className='shrink-0 rounded border border-border-subtle bg-bg-subtle px-1 py-0.5 font-mono text-[10px] leading-none text-text-muted'>
         {typed.label}
       </span>
-      <span className='min-w-0 truncate font-mono text-xs text-text-primary'>{typed.value}</span>
+      <span className='min-w-0 truncate font-mono text-xs text-text-primary'>
+        {truncateFieldDisplayValue(typed.value)}
+      </span>
     </span>
   );
 }
@@ -53,9 +55,9 @@ function plainValueSummary(
 export function formatFirestoreValue(value: unknown): string {
   if (value === null || value === undefined) return String(value);
   const typed = typedValueSummary(value);
-  if (typed) return typed.value;
+  if (typed) return truncateFieldDisplayValue(typed.value);
   if (Array.isArray(value) || typeof value === 'object') return compactJsonPreview(value);
-  return String(value);
+  return truncateFieldDisplayValue(String(value));
 }
 
 export function firestoreValueType(value: unknown): string {
@@ -95,6 +97,8 @@ function typedValueSummary(value: unknown): TypedValueSummary | null {
       return encodedArraySummary(value);
     case 'map':
       return encodedMapSummary(value);
+    case 'truncated':
+      return truncatedSummary(value);
     default: {
       const title = safeJson(value);
       return {
@@ -164,6 +168,29 @@ function encodedMapSummary(value: Record<string, unknown>): TypedValueSummary {
   };
 }
 
+function truncatedSummary(value: Record<string, unknown>): TypedValueSummary {
+  const sizeBytes = typeof value['sizeBytes'] === 'number' ? value['sizeBytes'] : 0;
+  const valueType = typeof value['valueType'] === 'string' ? value['valueType'] : 'value';
+  const formatted = formatBytes(sizeBytes);
+  return {
+    label: 'trunc',
+    title: `${valueType} value omitted (${formatted}). Reload the document to view it.`,
+    value: `… ${valueType} ${formatted}`,
+  };
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
+}
+
 function formatUserTimestamp(value: string): string {
   if (!value) return 'Invalid timestamp';
   const date = new Date(value);
@@ -200,7 +227,20 @@ function shortLabel(value: string): string {
   return value.length > 8 ? `${value.slice(0, 8)}...` : value;
 }
 
+const FIELD_VALUE_PREVIEW_LIMIT = 255;
+const TITLE_LIMIT = 4096;
+
+const previewCache = new WeakMap<object, string>();
+const titleCache = new WeakMap<object, string>();
+
 function safeJson(value: unknown): string | undefined {
+  if (typeof value === 'object' && value !== null) {
+    const cached = titleCache.get(value);
+    if (cached !== undefined) return cached;
+    const { text } = boundedStringify(value, TITLE_LIMIT);
+    titleCache.set(value, text);
+    return text;
+  }
   try {
     return JSON.stringify(value);
   } catch {
@@ -209,7 +249,89 @@ function safeJson(value: unknown): string | undefined {
 }
 
 function compactJsonPreview(value: unknown): string {
+  if (typeof value === 'object' && value !== null) {
+    const cached = previewCache.get(value);
+    if (cached !== undefined) return cached;
+    const { text, truncated } = boundedStringify(value, FIELD_VALUE_PREVIEW_LIMIT);
+    const result = truncated || text.length > FIELD_VALUE_PREVIEW_LIMIT
+      ? `${text.slice(0, FIELD_VALUE_PREVIEW_LIMIT - 3)}...`
+      : text;
+    previewCache.set(value, result);
+    return result;
+  }
   const json = safeJson(value);
   if (!json) return String(value);
-  return json.length > 120 ? `${json.slice(0, 117)}...` : json;
+  return truncateFieldDisplayValue(json);
+}
+
+function truncateFieldDisplayValue(value: string): string {
+  return value.length > FIELD_VALUE_PREVIEW_LIMIT
+    ? `${value.slice(0, FIELD_VALUE_PREVIEW_LIMIT - 3)}...`
+    : value;
+}
+
+// Serializes a value to JSON with an early-stop budget. Returns the partial text plus a
+// `truncated` flag indicating whether the budget was hit and walking stopped early.
+function boundedStringify(
+  value: unknown,
+  limit: number,
+): { text: string; truncated: boolean; } {
+  let out = '';
+  let truncated = false;
+  const seen = new WeakSet<object>();
+  function append(chunk: string): boolean {
+    if (out.length >= limit) {
+      truncated = true;
+      return false;
+    }
+    out += chunk;
+    if (out.length >= limit) {
+      truncated = true;
+      return false;
+    }
+    return true;
+  }
+  function write(node: unknown): boolean {
+    if (out.length >= limit) {
+      truncated = true;
+      return false;
+    }
+    if (node === null || node === undefined) return append('null');
+    const t = typeof node;
+    if (t === 'string') return append(JSON.stringify(node as string));
+    if (t === 'number' || t === 'boolean') return append(String(node));
+    if (Array.isArray(node)) {
+      if (seen.has(node)) return append('null');
+      seen.add(node);
+      if (!append('[')) return false;
+      for (let i = 0; i < node.length; i += 1) {
+        if (i > 0 && !append(',')) return false;
+        if (!write(node[i])) return false;
+      }
+      return append(']');
+    }
+    if (t === 'object') {
+      const obj = node as Record<string, unknown>;
+      if (seen.has(obj)) return append('{}');
+      seen.add(obj);
+      if (!append('{')) return false;
+      let first = true;
+      for (const key in obj) {
+        if (!Object.prototype.hasOwnProperty.call(obj, key)) continue;
+        if (!first && !append(',')) return false;
+        first = false;
+        if (!append(JSON.stringify(key))) return false;
+        if (!append(':')) return false;
+        if (!write(obj[key])) return false;
+      }
+      return append('}');
+    }
+    try {
+      return append(JSON.stringify(node));
+    } catch {
+      return append('null');
+    }
+  }
+  write(value);
+  return { text: out, truncated };
 }

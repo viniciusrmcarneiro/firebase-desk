@@ -213,6 +213,12 @@ function validateEncodedValue(
   value: Record<string, unknown>,
   path: ReadonlyArray<string>,
 ): void {
+  if (encodedType === 'truncated') {
+    throw new Error(
+      `${fieldPathLabel(path)} value was omitted from the result for performance. `
+        + `Reload the document before saving.`,
+    );
+  }
   if (!isKnownEncodedFirestoreType(encodedType)) {
     throw new Error(`${fieldPathLabel(path)} has unknown __type__: ${encodedType}.`);
   }

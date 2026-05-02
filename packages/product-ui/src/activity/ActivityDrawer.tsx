@@ -198,14 +198,112 @@ function ActivityDetail({ label, value }: { readonly label: string; readonly val
 }
 
 function JsonBlock({ label, value }: { readonly label: string; readonly value: unknown; }) {
+  const { text, truncated } = boundedPrettyJson(value, JSON_PREVIEW_LIMIT);
   return (
     <div className='grid gap-1'>
-      <span className='text-text-muted'>{label}</span>
+      <span className='text-text-muted'>
+        {label}
+        {truncated
+          ? (
+            <span className='ml-2 text-text-muted'>
+              · truncated for display (&gt;{formatBytes(JSON_PREVIEW_LIMIT)})
+            </span>
+          )
+          : null}
+      </span>
       <pre className='max-h-32 overflow-auto rounded-md border border-border-subtle bg-bg-panel p-2 font-mono text-xs text-text-secondary'>
-        {JSON.stringify(value, null, 2)}
+        {text}
+        {truncated ? '\n… (truncated)' : null}
       </pre>
     </div>
   );
+}
+
+const JSON_PREVIEW_LIMIT = 8 * 1024;
+
+function jsonIndent(depth: number): string {
+  return '  '.repeat(depth);
+}
+
+// Pretty-prints JSON with a character budget. Stops walking once the budget is exceeded so large
+// document payloads do not freeze the activity drawer when expanded.
+function boundedPrettyJson(
+  value: unknown,
+  limit: number,
+): { text: string; truncated: boolean; } {
+  let out = '';
+  let truncated = false;
+  const seen = new WeakSet<object>();
+  function append(chunk: string): boolean {
+    if (out.length >= limit) {
+      truncated = true;
+      return false;
+    }
+    out += chunk;
+    if (out.length >= limit) {
+      truncated = true;
+      return false;
+    }
+    return true;
+  }
+  function write(node: unknown, depth: number): boolean {
+    if (out.length >= limit) {
+      truncated = true;
+      return false;
+    }
+    if (node === null || node === undefined) return append('null');
+    const t = typeof node;
+    if (t === 'string') return append(JSON.stringify(node as string));
+    if (t === 'number' || t === 'boolean') return append(String(node));
+    if (Array.isArray(node)) {
+      if (seen.has(node)) return append('null');
+      seen.add(node);
+      if (node.length === 0) return append('[]');
+      if (!append('[\n')) return false;
+      for (let i = 0; i < node.length; i += 1) {
+        if (!append(jsonIndent(depth + 1))) return false;
+        if (!write(node[i], depth + 1)) return false;
+        if (i < node.length - 1 && !append(',')) return false;
+        if (!append('\n')) return false;
+      }
+      return append(`${jsonIndent(depth)}]`);
+    }
+    if (t === 'object') {
+      const obj = node as Record<string, unknown>;
+      if (seen.has(obj)) return append('{}');
+      seen.add(obj);
+      const keys = Object.keys(obj);
+      if (keys.length === 0) return append('{}');
+      if (!append('{\n')) return false;
+      for (let i = 0; i < keys.length; i += 1) {
+        const key = keys[i]!;
+        if (!append(`${jsonIndent(depth + 1)}${JSON.stringify(key)}: `)) return false;
+        if (!write(obj[key], depth + 1)) return false;
+        if (i < keys.length - 1 && !append(',')) return false;
+        if (!append('\n')) return false;
+      }
+      return append(`${jsonIndent(depth)}}`);
+    }
+    try {
+      return append(JSON.stringify(node));
+    } catch {
+      return append('null');
+    }
+  }
+  write(value, 0);
+  return { text: out, truncated };
+}
+
+function formatBytes(bytes: number): string {
+  if (!Number.isFinite(bytes) || bytes <= 0) return '0 B';
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unit = 0;
+  while (value >= 1024 && unit < units.length - 1) {
+    value /= 1024;
+    unit += 1;
+  }
+  return `${value < 10 ? value.toFixed(1) : Math.round(value)} ${units[unit]}`;
 }
 
 function badgeVariant(status: ActivityLogStatus): 'danger' | 'neutral' | 'success' | 'warning' {

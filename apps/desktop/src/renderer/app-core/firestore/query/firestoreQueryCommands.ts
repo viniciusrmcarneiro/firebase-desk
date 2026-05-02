@@ -14,6 +14,7 @@ import {
   commandActivityMetadata,
   normalizeCommandOptions,
 } from '../../shared/index.ts';
+import { elapsedMs } from '../../shared/time.ts';
 import {
   firestoreQueryDraftMetadata,
   firestoreQueryMetadata,
@@ -49,6 +50,7 @@ export interface FirestoreQueryExecutionEnvironment {
     connectionId: string,
     path: string,
   ) => Promise<FirestoreDocumentResult | null>;
+  readonly now: () => number;
   readonly recordActivity?: ((input: ActivityLogAppendInput) => Promise<void> | void) | undefined;
   readonly runQuery: (
     query: FirestoreQuery,
@@ -79,6 +81,7 @@ export interface FirestoreQueryCompletionInput {
   readonly commandOptions?: AppCoreCommandOptions | undefined;
   readonly connectionId: string;
   readonly draft: FirestoreQueryDraft;
+  readonly durationMs?: number | undefined;
   readonly errorMessage: string | null;
   readonly loadedPages: number;
   readonly resultCount: number;
@@ -164,6 +167,7 @@ export async function executeFirestoreQueryCommand(
 ): Promise<void> {
   const { query, limit, runId } = input.request;
   const isDocumentQuery = isFirestoreDocumentPath(query.path);
+  const startedAt = env.now();
   try {
     const pages = isDocumentQuery
       ? await loadDocumentPage(env, query.connectionId, query.path)
@@ -176,6 +180,7 @@ export async function executeFirestoreQueryCommand(
     completeExecutedFirestoreQuery(store, env, {
       commandOptions: input.commandOptions,
       draft: input.draft,
+      durationMs: elapsedMs(startedAt, env.now()),
       errorMessage: null,
       isDocumentQuery,
       loadedPages: selectFirestoreLoadedPageCount(pages, isDocumentQuery, pages.length > 0),
@@ -189,6 +194,7 @@ export async function executeFirestoreQueryCommand(
     completeExecutedFirestoreQuery(store, env, {
       commandOptions: input.commandOptions,
       draft: input.draft,
+      durationMs: elapsedMs(startedAt, env.now()),
       errorMessage: loadErrorMessage,
       isDocumentQuery,
       loadedPages: 0,
@@ -215,6 +221,7 @@ export async function executeFirestoreLoadMoreCommand(
     store.update((state) => firestoreLoadMoreSucceeded(state, { items: [] }, false));
     return;
   }
+  const startedAt = env.now();
   try {
     const page = await env.runQuery(input.request.query, pageRequest(cursor, input.request.limit));
     let currentRun = false;
@@ -230,6 +237,7 @@ export async function executeFirestoreLoadMoreCommand(
     if (currentRun) {
       void env.recordActivity?.(firestoreLoadMoreActivity({
         commandOptions: input.commandOptions,
+        durationMs: elapsedMs(startedAt, env.now()),
         errorMessage: null,
         hasMore: Boolean(page.nextCursor),
         request: input.request,
@@ -248,6 +256,7 @@ export async function executeFirestoreLoadMoreCommand(
     if (currentRun) {
       void env.recordActivity?.(firestoreLoadMoreActivity({
         commandOptions: input.commandOptions,
+        durationMs: elapsedMs(startedAt, env.now()),
         errorMessage: moreErrorMessage,
         hasMore: false,
         request: input.request,
@@ -322,6 +331,7 @@ function completeExecutedFirestoreQuery(
   input: {
     readonly commandOptions?: AppCoreCommandOptions | undefined;
     readonly draft: FirestoreQueryDraft;
+    readonly durationMs?: number | undefined;
     readonly errorMessage: string | null;
     readonly isDocumentQuery: boolean;
     readonly loadedPages: number;
@@ -338,6 +348,7 @@ function completeExecutedFirestoreQuery(
     commandOptions: input.commandOptions,
     connectionId: input.tab.connectionId,
     draft: input.draft,
+    durationMs: input.durationMs,
     errorMessage: input.errorMessage,
     isDocumentQuery: input.isDocumentQuery,
     isLoading: false,
@@ -399,6 +410,7 @@ function firestoreQueryPage(
 function firestoreLoadMoreActivity(
   input: {
     readonly commandOptions?: AppCoreCommandOptions | undefined;
+    readonly durationMs?: number | undefined;
     readonly errorMessage: string | null;
     readonly hasMore: boolean;
     readonly request: NonNullable<FirestoreQueryRuntimeState['queryRequests'][string]>;
@@ -409,6 +421,7 @@ function firestoreLoadMoreActivity(
   return {
     action: 'Load more results',
     area: 'firestore',
+    ...(input.durationMs === undefined ? {} : { durationMs: input.durationMs }),
     ...(input.errorMessage ? { error: { message: input.errorMessage } } : {}),
     metadata: {
       hasMore: input.hasMore,
@@ -437,6 +450,7 @@ export function firestoreQueryCompletionActivity(
   return {
     action: isDocument ? 'Read document' : 'Run query',
     area: 'firestore',
+    ...(input.durationMs === undefined ? {} : { durationMs: input.durationMs }),
     ...(input.errorMessage ? { error: { message: input.errorMessage } } : {}),
     metadata: {
       isDocument,

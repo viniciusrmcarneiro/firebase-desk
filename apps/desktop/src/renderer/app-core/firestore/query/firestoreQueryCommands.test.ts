@@ -213,12 +213,14 @@ describe('firestore query commands', () => {
     }).state;
     const store = createAppCoreStore(submitted);
     const recordActivity = vi.fn();
+    const now = vi.fn().mockReturnValueOnce(100).mockReturnValueOnce(145);
     const runQuery = vi.fn()
       .mockResolvedValueOnce({ items: [row('ord_1')], nextCursor: { token: 'page-2' } })
       .mockResolvedValueOnce({ items: [row('ord_2')], nextCursor: null });
 
     await executeFirestoreQueryCommand(store, {
       getDocument: vi.fn(),
+      now,
       recordActivity,
       runQuery,
     }, {
@@ -237,6 +239,7 @@ describe('firestore query commands', () => {
     expect(store.get().pages).toHaveLength(2);
     expect(recordActivity).toHaveBeenCalledTimes(1);
     expect(recordActivity).toHaveBeenCalledWith(expect.objectContaining({
+      durationMs: 45,
       metadata: expect.objectContaining({ loadedPages: 2, resultCount: 2 }),
       status: 'success',
     }));
@@ -262,6 +265,7 @@ describe('firestore query commands', () => {
 
     await executeFirestoreQueryCommand(store, {
       getDocument: vi.fn(),
+      now: vi.fn(() => 0),
       recordActivity,
       runQuery: vi.fn(async () => ({ items: [row('ord_1')], nextCursor: null })),
     }, {
@@ -287,12 +291,18 @@ describe('firestore query commands', () => {
     }).state;
     const store = createAppCoreStore(submitted);
     const recordActivity = vi.fn();
+    const now = vi.fn()
+      .mockReturnValueOnce(10)
+      .mockReturnValueOnce(15)
+      .mockReturnValueOnce(30)
+      .mockReturnValueOnce(54);
     const runQuery = vi.fn()
       .mockResolvedValueOnce({ items: [row('ord_1')], nextCursor: { token: 'page-2' } })
       .mockResolvedValueOnce({ items: [row('ord_2')], nextCursor: null });
 
     await executeFirestoreQueryCommand(store, {
       getDocument: vi.fn(),
+      now,
       runQuery,
     }, {
       draft: draft('orders'),
@@ -306,6 +316,7 @@ describe('firestore query commands', () => {
 
     await executeFirestoreLoadMoreCommand(store, {
       getDocument: vi.fn(),
+      now,
       recordActivity,
       runQuery,
     }, {
@@ -323,6 +334,7 @@ describe('firestore query commands', () => {
     ]);
     expect(recordActivity).toHaveBeenCalledWith(expect.objectContaining({
       action: 'Load more results',
+      durationMs: 24,
       metadata: expect.objectContaining({ resultCount: 1 }),
       status: 'success',
     }));
@@ -367,11 +379,13 @@ describe('firestore query commands', () => {
       commandOptions: { source: 'scheduler', visible: false },
       connectionId: 'emu',
       draft: draft('orders'),
+      durationMs: 12,
       errorMessage: null,
       loadedPages: 2,
       resultCount: 5,
     })).toMatchObject({
       action: 'Run query',
+      durationMs: 12,
       metadata: {
         command: expect.objectContaining({ source: 'scheduler', visible: false }),
         isDocument: false,

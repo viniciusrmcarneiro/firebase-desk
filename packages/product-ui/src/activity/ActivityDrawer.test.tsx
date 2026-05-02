@@ -125,6 +125,42 @@ describe('ActivityDrawer', () => {
 
     expect(onExpandedChange).toHaveBeenCalledWith(false);
   });
+
+  it('truncates very large payloads instead of freezing on JSON.stringify', () => {
+    const huge: Record<string, string> = {};
+    for (let i = 0; i < 50_000; i += 1) huge[`field_${i}`] = `value_${i}`;
+    const bigEntry: ActivityLogEntry = {
+      ...entry,
+      id: 'activity-big',
+      payload: { data: huge },
+    };
+
+    render(
+      <ActivityDrawer
+        area='all'
+        entries={[bigEntry]}
+        open
+        search=''
+        status='all'
+        onAreaChange={vi.fn()}
+        onClear={vi.fn()}
+        onClose={vi.fn()}
+        onExport={vi.fn()}
+        onSearchChange={vi.fn()}
+        onStatusChange={vi.fn()}
+      />,
+    );
+
+    const details = screen.getByText('Save document').closest('details');
+    fireEvent.click(screen.getByText('Save document'));
+    const start = performance.now();
+    fireEvent(details!, new Event('toggle', { bubbles: true }));
+    const elapsed = performance.now() - start;
+
+    expect(screen.getByText(/truncated for display/)).toBeTruthy();
+    // Generous bound; full JSON.stringify on 50k keys would be hundreds of ms.
+    expect(elapsed).toBeLessThan(500);
+  });
 });
 
 const entry: ActivityLogEntry = {

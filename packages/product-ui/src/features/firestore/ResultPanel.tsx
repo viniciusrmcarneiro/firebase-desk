@@ -21,6 +21,7 @@ import {
   isCollectionPath,
   type SubcollectionLoadState,
   toggleSet,
+  TREE_VALUE_CHILD_BATCH_SIZE,
 } from './resultModel.tsx';
 import { ResultTable } from './ResultTable.tsx';
 import { ResultTreeView } from './ResultTreeView.tsx';
@@ -95,9 +96,13 @@ export function ResultPanel(
   const [expandedTreeIds, setExpandedTreeIds] = useState<ReadonlySet<string>>(
     () => defaultExpandedTreeIds,
   );
+  const [treeValueChildLimits, setTreeValueChildLimits] = useState<ReadonlyMap<string, number>>(
+    () => new Map(),
+  );
 
   useEffect(() => {
     setExpandedTreeIds(defaultExpandedTreeIds);
+    setTreeValueChildLimits(new Map());
   }, [defaultExpandedTreeIds]);
 
   function toggleTreeNode(id: string) {
@@ -118,6 +123,14 @@ export function ResultPanel(
       || state?.status === 'loading'
     ) return;
     void onLoadSubcollections(document.path);
+  }
+
+  function showMoreTreeValueChildren(id: string) {
+    setTreeValueChildLimits((current) => {
+      const next = new Map(current);
+      next.set(id, (current.get(id) ?? TREE_VALUE_CHILD_BATCH_SIZE) + TREE_VALUE_CHILD_BATCH_SIZE);
+      return next;
+    });
   }
 
   return (
@@ -233,6 +246,7 @@ export function ResultPanel(
                     isFetchingMore={isFetchingMore}
                     rows={rows}
                     subcollectionStates={subcollectionStates}
+                    valueChildLimits={treeValueChildLimits}
                     onDeleteField={onDeleteField}
                     onDeleteDocument={onDeleteDocument}
                     onEditField={onEditField}
@@ -241,6 +255,7 @@ export function ResultPanel(
                     onOpenDocumentInNewTab={onOpenDocumentInNewTab}
                     onSelectDocument={onSelectDocument}
                     onSetFieldNull={onSetFieldNull}
+                    onShowMoreValueChildren={showMoreTreeValueChildren}
                     onToggleNode={toggleTreeNode}
                   />
                 )
@@ -276,7 +291,7 @@ function defaultResultTreeExpansion(
   const firstDocument = rows[0];
   if (!firstDocument) return new Set([rootId]);
   const documentId = `doc:${firstDocument.path}`;
-  return new Set([rootId, documentId, `${documentId}:fields`]);
+  return new Set([rootId, documentId]);
 }
 
 function findDocumentByTreeNodeId(

@@ -719,7 +719,7 @@ export function AppShell(
   const desktopAppApi = getDesktopAppApi();
 
   return (
-    <div className='relative grid h-full grid-rows-[40px_minmax(0,1fr)] bg-bg-app text-text-primary'>
+    <div className='relative grid h-full overflow-hidden grid-rows-[40px_minmax(0,1fr)] bg-bg-app text-text-primary'>
       <AppHeader
         canGoBack={tabsState.interactionHistoryIndex > 0}
         canGoForward={tabsState.interactionHistoryIndex < tabsState.interactionHistory.length - 1}
@@ -732,9 +732,9 @@ export function AppShell(
         onModeChange={settings.changeTheme}
         onOpenSettings={settings.openSettings}
       />
-      <ResizablePanelGroup direction='horizontal' className='h-full min-h-0'>
+      <ResizablePanelGroup direction='horizontal' className='h-full min-h-0 overflow-hidden'>
         <ResizablePanel
-          className='h-full'
+          className='h-full overflow-hidden'
           defaultSize={sidebarCollapsed ? '40px' : `${sidebarDefaultWidth}px`}
           groupResizeBehavior='preserve-pixel-size'
           maxSize={sidebarCollapsed ? '40px' : `${MAX_SIDEBAR_WIDTH}px`}
@@ -776,8 +776,8 @@ export function AppShell(
             )}
         </ResizablePanel>
         <ResizableHandle className='h-full w-px' />
-        <ResizablePanel className='h-full' minSize={`${MIN_WORKSPACE_WIDTH}px`}>
-          <div className='grid h-full min-h-0 grid-rows-[minmax(0,1fr)_auto_auto]'>
+        <ResizablePanel className='h-full overflow-hidden' minSize={`${MIN_WORKSPACE_WIDTH}px`}>
+          <div className='grid h-full min-h-0 overflow-hidden grid-rows-[minmax(0,1fr)_auto_auto]'>
             <WorkspaceShell
               className='h-full min-h-0'
               tabStrip={

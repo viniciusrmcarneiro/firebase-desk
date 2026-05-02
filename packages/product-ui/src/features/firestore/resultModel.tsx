@@ -25,7 +25,15 @@ export interface SubcollectionLoadState {
 
 export const MAX_SUBCOLLECTION_CHIPS = 10;
 
-export type ResultTreeNodeKind = 'branch' | 'leaf' | 'load-more' | 'load-subcollections';
+const TREE_FIELD_SORT_LIMIT = 500;
+export const TREE_VALUE_CHILD_BATCH_SIZE = 100;
+
+export type ResultTreeNodeKind =
+  | 'branch'
+  | 'leaf'
+  | 'load-more'
+  | 'load-subcollections'
+  | 'load-value-children';
 
 export interface ResultTreeRowModel extends ExplorerTreeRowModel {
   readonly documentPath?: string;
@@ -35,6 +43,7 @@ export interface ResultTreeRowModel extends ExplorerTreeRowModel {
   readonly kind: ResultTreeNodeKind;
   readonly openPath?: string;
   readonly subcollectionStatus?: SubcollectionLoadState['status'] | 'idle';
+  readonly valueChildLimitTargetId?: string;
 }
 
 export function fieldCatalogForRows(
@@ -48,11 +57,11 @@ export function fieldCatalogForRows(
       counts.set(field, { count: current.count + 1, types: current.types });
     }
   }
-  return Array.from(counts, ([field, value]) => ({
+  return mergeSortFieldCatalogItems(Array.from(counts, ([field, value]) => ({
     count: value.count,
     field,
     types: sortedStrings(value.types),
-  })).reduce<ReadonlyArray<FieldCatalogItem>>((sorted, item) => insertField(sorted, item), []);
+  })));
 }
 
 export function flattenResultTree(
@@ -62,6 +71,7 @@ export function flattenResultTree(
   expandedIds: ReadonlySet<string>,
   subcollectionStates: Readonly<Record<string, SubcollectionLoadState>>,
   canLoadSubcollections: boolean,
+  valueChildLimits: ReadonlyMap<string, number> = new Map(),
 ): ReadonlyArray<ResultTreeRowModel> {
   const flattened: ResultTreeRowModel[] = [];
   const rootId = `root:${queryPath}`;
@@ -85,6 +95,7 @@ export function flattenResultTree(
       expandedIds,
       subcollectionStates,
       canLoadSubcollections,
+      valueChildLimits,
     );
   }
   if (hasMore) {
@@ -183,6 +194,7 @@ function appendDocumentTreeRows(
   expandedIds: ReadonlySet<string>,
   subcollectionStates: Readonly<Record<string, SubcollectionLoadState>>,
   canLoadSubcollections: boolean,
+  valueChildLimits: ReadonlyMap<string, number>,
 ) {
   const nodeId = `doc:${row.path}`;
   const expanded = expandedIds.has(nodeId);
@@ -199,7 +211,7 @@ function appendDocumentTreeRows(
     openPath: row.path,
   });
   if (!expanded) return;
-  const fields = sortedObjectEntries(row.data);
+  const fieldCount = Object.keys(row.data).length;
   const fieldsId = `${nodeId}:fields`;
   const fieldsExpanded = expandedIds.has(fieldsId);
   flattened.push({
@@ -210,11 +222,12 @@ function appendDocumentTreeRows(
     label: 'Fields',
     level: level + 1,
     meta: 'Group',
-    value: `${fields.length} field${fields.length === 1 ? '' : 's'}`,
-    hasChildren: fields.length > 0,
+    value: `${fieldCount} field${fieldCount === 1 ? '' : 's'}`,
+    hasChildren: fieldCount > 0,
     expanded: fieldsExpanded,
   });
   if (fieldsExpanded) {
+    const fields = fieldEntriesForTree(row.data, fieldCount);
     for (const [key, value] of fields) {
       appendValueTreeRows(
         flattened,
@@ -226,7 +239,20 @@ function appendDocumentTreeRows(
         row.path,
         [],
         true,
+        valueChildLimits,
       );
+    }
+    if (fields.length < fieldCount) {
+      flattened.push({
+        id: `${fieldsId}:field-overflow`,
+        documentPath: row.path,
+        icon: <FileJson size={14} aria-hidden='true' />,
+        kind: 'leaf',
+        label: `${fieldCount - fields.length} more fields`,
+        level: level + 2,
+        meta: 'Hidden',
+        value: 'Open document to inspect all fields',
+      });
     }
   }
   appendSubcollectionTreeRows(
@@ -236,6 +262,7 @@ function appendDocumentTreeRows(
     expandedIds,
     subcollectionStates,
     canLoadSubcollections,
+    valueChildLimits,
   );
 }
 
@@ -246,6 +273,7 @@ function appendSubcollectionTreeRows(
   expandedIds: ReadonlySet<string>,
   subcollectionStates: Readonly<Record<string, SubcollectionLoadState>>,
   canLoadSubcollections: boolean,
+  valueChildLimits: ReadonlyMap<string, number>,
 ) {
   const nodeId = `doc:${row.path}`;
   const groupId = `${nodeId}:subcollections`;
@@ -306,6 +334,7 @@ function appendSubcollectionTreeRows(
           expandedIds,
           subcollectionStates,
           canLoadSubcollections,
+          valueChildLimits,
         );
       }
     }
@@ -322,6 +351,7 @@ function appendValueTreeRows(
   documentPath: string,
   parentFieldPath: ReadonlyArray<string>,
   canEditFieldPath: boolean,
+  valueChildLimits: ReadonlyMap<string, number>,
 ) {
   const nodeId = `${parentId}:${key}`;
   const fieldPath = canEditFieldPath && !key.startsWith('[') ? [...parentFieldPath, key] : null;
@@ -340,10 +370,8 @@ function appendValueTreeRows(
     });
     return;
   }
-  const entries = Array.isArray(value)
-    ? value.map((entry, index) => [`[${index}]`, entry] as const)
-    : sortedObjectEntries(value as Record<string, unknown>);
   const expanded = expandedIds.has(nodeId);
+  const hasChildren = expandableHasChildren(value);
   flattened.push({
     id: nodeId,
     documentPath,
@@ -354,10 +382,12 @@ function appendValueTreeRows(
     level,
     meta: valueType(value),
     value: formatValue(value),
-    hasChildren: entries.length > 0,
+    hasChildren,
     expanded,
   });
   if (!expanded) return;
+  const limit = valueChildLimits.get(nodeId) ?? TREE_VALUE_CHILD_BATCH_SIZE;
+  const { entries, hasMore, remaining } = expandableEntryWindow(value, limit);
   for (const [childKey, childValue] of entries) {
     appendValueTreeRows(
       flattened,
@@ -369,17 +399,139 @@ function appendValueTreeRows(
       documentPath,
       fieldPath ?? parentFieldPath,
       childCanEditFieldPath,
+      valueChildLimits,
     );
+  }
+  if (hasMore) {
+    flattened.push({
+      id: `${nodeId}:value-children-more`,
+      documentPath,
+      icon: <FileJson size={14} aria-hidden='true' />,
+      kind: 'load-value-children',
+      label: remaining === null
+        ? 'More entries'
+        : `${remaining} more item${remaining === 1 ? '' : 's'}`,
+      level: level + 1,
+      meta: 'More',
+      value: `${entries.length} shown`,
+      valueChildLimitTargetId: nodeId,
+    });
   }
 }
 
-function insertField(
-  fields: ReadonlyArray<FieldCatalogItem>,
-  item: FieldCatalogItem,
-): ReadonlyArray<FieldCatalogItem> {
-  const index = fields.findIndex((field) => item.field.localeCompare(field.field) < 0);
-  if (index < 0) return [...fields, item];
-  return [...fields.slice(0, index), item, ...fields.slice(index)];
+function fieldEntriesForTree(
+  data: Record<string, unknown>,
+  fieldCount: number,
+): ReadonlyArray<readonly [string, unknown]> {
+  if (fieldCount > TREE_FIELD_SORT_LIMIT) {
+    return firstObjectEntries(data, TREE_FIELD_SORT_LIMIT);
+  }
+  return sortedObjectEntries(data);
+}
+
+function firstObjectEntries(
+  value: Record<string, unknown>,
+  limit: number,
+): ReadonlyArray<readonly [string, unknown]> {
+  const entries: Array<readonly [string, unknown]> = [];
+  for (const key in value) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+    if (entries.length >= limit) break;
+    entries.push([key, value[key]] as const);
+  }
+  return entries;
+}
+
+function expandableHasChildren(value: unknown): boolean {
+  if (Array.isArray(value)) return value.length > 0;
+  const encoded = encodedExpandableValue(value);
+  if (encoded) return expandableHasChildren(encoded);
+  if (value !== null && typeof value === 'object') {
+    for (const key in value as Record<string, unknown>) {
+      if (Object.prototype.hasOwnProperty.call(value, key)) return true;
+    }
+  }
+  return false;
+}
+
+function expandableEntryWindow(
+  value: unknown,
+  limit: number,
+): {
+  readonly entries: ReadonlyArray<readonly [string, unknown]>;
+  readonly hasMore: boolean;
+  readonly remaining: number | null;
+} {
+  const encoded = encodedExpandableValue(value);
+  if (encoded) return expandableEntryWindow(encoded, limit);
+  if (Array.isArray(value)) {
+    const entries = value.slice(0, limit).map((entry, index) => [`[${index}]`, entry] as const);
+    return {
+      entries,
+      hasMore: value.length > limit,
+      remaining: value.length > limit ? value.length - limit : 0,
+    };
+  }
+  const entries: Array<readonly [string, unknown]> = [];
+  let hasMore = false;
+  for (const key in value as Record<string, unknown>) {
+    if (!Object.prototype.hasOwnProperty.call(value, key)) continue;
+    if (entries.length >= limit) {
+      hasMore = true;
+      break;
+    }
+    entries.push([key, (value as Record<string, unknown>)[key]] as const);
+  }
+  return {
+    entries: hasMore ? entries : mergeSortEntryWindow(entries),
+    hasMore,
+    remaining: null,
+  };
+}
+
+function mergeSortEntryWindow(
+  entries: ReadonlyArray<readonly [string, unknown]>,
+): ReadonlyArray<readonly [string, unknown]> {
+  if (entries.length < 2) return entries;
+  const midpoint = Math.floor(entries.length / 2);
+  return mergeEntryWindow(
+    mergeSortEntryWindow(entries.slice(0, midpoint)),
+    mergeSortEntryWindow(entries.slice(midpoint)),
+  );
+}
+
+function mergeEntryWindow(
+  left: ReadonlyArray<readonly [string, unknown]>,
+  right: ReadonlyArray<readonly [string, unknown]>,
+): ReadonlyArray<readonly [string, unknown]> {
+  const merged: Array<readonly [string, unknown]> = [];
+  let leftIndex = 0;
+  let rightIndex = 0;
+  while (leftIndex < left.length && rightIndex < right.length) {
+    const leftEntry = left[leftIndex]!;
+    const rightEntry = right[rightIndex]!;
+    if (leftEntry[0].localeCompare(rightEntry[0]) <= 0) {
+      merged.push(leftEntry);
+      leftIndex += 1;
+    } else {
+      merged.push(rightEntry);
+      rightIndex += 1;
+    }
+  }
+  return merged.concat(left.slice(leftIndex), right.slice(rightIndex));
+}
+
+function encodedExpandableValue(value: unknown): unknown[] | Record<string, unknown> | null {
+  if (value === null || typeof value !== 'object' || Array.isArray(value)) return null;
+  const type = (value as { readonly __type__?: unknown; }).__type__;
+  const entries = (value as { readonly value?: unknown; }).value;
+  if (
+    type === 'map' && entries !== null && typeof entries === 'object' && !Array.isArray(entries)
+  ) {
+    return entries as Record<string, unknown>;
+  }
+  if (type === 'array' && Array.isArray(entries)) return entries;
+  return null;
 }
 
 function sortedStrings(values: ReadonlySet<string>): ReadonlyArray<string> {
@@ -390,7 +542,40 @@ function sortedStrings(values: ReadonlySet<string>): ReadonlyArray<string> {
   }, []);
 }
 
+function mergeSortFieldCatalogItems(
+  items: ReadonlyArray<FieldCatalogItem>,
+): ReadonlyArray<FieldCatalogItem> {
+  if (items.length < 2) return items;
+  const midpoint = Math.floor(items.length / 2);
+  return mergeFieldCatalogItems(
+    mergeSortFieldCatalogItems(items.slice(0, midpoint)),
+    mergeSortFieldCatalogItems(items.slice(midpoint)),
+  );
+}
+
+function mergeFieldCatalogItems(
+  left: ReadonlyArray<FieldCatalogItem>,
+  right: ReadonlyArray<FieldCatalogItem>,
+): ReadonlyArray<FieldCatalogItem> {
+  const merged: FieldCatalogItem[] = [];
+  let leftIndex = 0;
+  let rightIndex = 0;
+  while (leftIndex < left.length && rightIndex < right.length) {
+    const leftItem = left[leftIndex]!;
+    const rightItem = right[rightIndex]!;
+    if (leftItem.field.localeCompare(rightItem.field) <= 0) {
+      merged.push(leftItem);
+      leftIndex += 1;
+    } else {
+      merged.push(rightItem);
+      rightIndex += 1;
+    }
+  }
+  return merged.concat(left.slice(leftIndex), right.slice(rightIndex));
+}
+
 function isExpandableValue(value: unknown): boolean {
+  if (encodedExpandableValue(value)) return true;
   return value !== null && typeof value === 'object' && !isFirestoreTypedValue(value);
 }
 

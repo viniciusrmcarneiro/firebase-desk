@@ -106,6 +106,7 @@ export function useFirestoreTabState(
   const queryExecutionEnv = {
     getDocument: (connectionId: string, path: string) =>
       repositories.firestore.getDocument(connectionId, path),
+    now: Date.now,
     recordActivity: onQueryActivity,
     runQuery: (query: FirestoreQuery, request: PageRequest) =>
       repositories.firestore.runQuery(query, request),

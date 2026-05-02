@@ -46,6 +46,11 @@ const FirestoreEncodedValueSchema: z.ZodType<unknown> = z.lazy(() =>
       __type__: z.literal('map'),
       value: z.record(z.string(), FirestoreEncodedValueSchema),
     }),
+    z.object({
+      __type__: z.literal('truncated'),
+      sizeBytes: z.number().int().nonnegative(),
+      valueType: z.string(),
+    }),
     z.record(z.string(), FirestoreEncodedValueSchema).superRefine((value, context) => {
       if (typeof value['__type__'] === 'string') {
         context.addIssue({

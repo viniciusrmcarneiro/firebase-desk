@@ -130,4 +130,40 @@ describe('ResultTreeView', () => {
 
     expect(onSelectDocument).toHaveBeenCalledWith('orders/ord_1');
   });
+
+  it('requests more visible children for expanded large object rows', () => {
+    const onShowMoreValueChildren = vi.fn();
+    const metadata = Object.fromEntries(
+      Array.from({ length: 125 }, (_, index) => [`field_${index}`, index]),
+    );
+    const metadataId = 'doc:orders/ord_big:fields:field:metadata';
+
+    render(
+      <ResultTreeView
+        expandedIds={new Set([
+          'root:orders',
+          'doc:orders/ord_big',
+          'doc:orders/ord_big:fields',
+          metadataId,
+        ])}
+        hasMore={false}
+        isFetchingMore={false}
+        queryPath='orders'
+        rows={[{
+          id: 'ord_big',
+          path: 'orders/ord_big',
+          data: { metadata },
+          hasSubcollections: false,
+        }]}
+        subcollectionStates={{}}
+        onLoadMore={() => {}}
+        onShowMoreValueChildren={onShowMoreValueChildren}
+        onToggleNode={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Show more' }));
+
+    expect(onShowMoreValueChildren).toHaveBeenCalledWith(metadataId);
+  });
 });
