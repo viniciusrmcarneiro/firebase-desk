@@ -1,5 +1,5 @@
 /**
- * Central registry of every hotkey id + the wireframe defaults.
+ * Central registry of every hotkey id + default binding.
  * Keys are stable ids; user overrides reference these ids via SettingsRepository.
  */
 export interface HotkeyDefinition {

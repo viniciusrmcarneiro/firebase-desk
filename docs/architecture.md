@@ -10,12 +10,11 @@ The Electron shell gives the JavaScript Query feature access to Node and the Fir
 
 - `apps/desktop` — Electron app (main + preload + renderer).
 - `apps/storybook` — React/Vite component workbench for shared UI packages.
-- `apps/wireframe` — browser-runnable HTML prototype.
 - `packages/design-tokens` — brand primitives, theme tokens, density, CSS variable generation.
 - `packages/ui` — generic Radix/Tailwind React primitives plus virtualized data primitives.
 - `packages/product-ui` — Firebase Desk shell components, appearance provider, command palette, editor wrapper.
 - `packages/repo-contracts` — repository interfaces, zero runtime deps.
-- `packages/repo-mocks` — mock repositories used by the wireframe and unit tests.
+- `packages/repo-mocks` — mock repositories used by unit tests, Storybook, and mock mode.
 - `packages/repo-firebase` — Admin-SDK-backed implementations, main-process only.
 - `packages/data-format` — Firestore <-> typed-JSON encoder/decoder.
 - `packages/script-runner` — isolated worker runtime for user JS.
@@ -74,7 +73,7 @@ Renderer UI -> repo-contracts interface -> preload IPC client (ipc-schemas) -> m
 - UI components never call Firebase code directly.
 - `apps/desktop/renderer` is forbidden from depending on `repo-firebase`, `script-runner`, or any Node/Electron-only package; lint rules enforce this.
 - Feature hooks/components receive repository contracts or use a feature repository provider.
-- `repo-mocks` powers the live wireframe and unit tests; `repo-firebase` powers the shipped app.
+- `repo-mocks` powers mock mode, Storybook, and unit tests; `repo-firebase` powers live emulator and production targets.
 - Real repositories live behind typed IPC (validated by `ipc-schemas`) and run outside the renderer.
 - Cross-cutting behavior such as validation, logging, result normalization, pagination cursors, and emulator switching belongs in repositories/services, not UI components.
 
@@ -172,18 +171,18 @@ Rules:
 
 ## Keyboard Shortcuts
 
-- Use `npm i @tanstack/react-hotkeys` and centralize bindings in a single registry module so shortcuts are discoverable and rebindable later.
-- Default keymap (mirror of the wireframe `?` overlay):
+- Keep shortcut bindings centralized in the hotkeys package so they are discoverable and rebindable.
+- Default keymap:
   - Global: Cmd/Ctrl+B toggle sidebar (rail), Cmd/Ctrl+\\ toggle result overview, Cmd/Ctrl+K focus tree filter, Cmd/Ctrl+T new tab (duplicate active type), Cmd/Ctrl+W close active tab, Cmd/Ctrl+1..9 switch tab, Alt+←/→ history back/forward, Cmd/Ctrl+, settings, ? show shortcut help, Esc close modal/menu/drawer.
   - Query tab: Cmd/Ctrl+L focus query path, Cmd/Ctrl+Enter run query.
   - JS Query tab: Cmd/Ctrl+Enter run script.
   - Auth tab: / focus user search.
 - Bindings must skip when focus is in editable inputs unless explicitly allowed (Cmd/Ctrl+Enter, Esc).
-- `SettingsRepository` must expose a future hotkey-overrides map so users can rebind defaults.
+- `SettingsRepository` owns hotkey override storage.
 
 ## Resizable Layout
 
 - Sidebar and inspector widths.
-- Drag splitters update the variable directly during drag; persist final values via `SettingsRepository` (global) and per-tab state (inspector) once Phase 1 lands.
+- Drag splitters update the variable during drag and persist final values via `SettingsRepository` or tab state.
 - Collapsed sidebar becomes a 48px rail with section icons; clicking any rail icon expands the sidebar and selects the corresponding account/section.
 - Collapsed inspector becomes a ~40px vertical strip with an always-visible expand button.

@@ -2,9 +2,9 @@
 
 A free, open-source desktop Firebase admin client for developers: browse, query, and edit Firestore data, inspect Authentication users, connect to emulators, and run JavaScript admin scripts locally.
 
-Status: mocked app. Current priority is release packaging so GitHub can produce downloadable desktop binaries before real Firebase integration continues.
+Status: active desktop app with mock mode, local emulator support, and production Firebase project support.
 
-Safety note: binaries are published as unsigned development builds with SHA-256 checksums. Expect OS warning prompts, and do not use production Firebase credentials yet; real Firebase integration is not enabled.
+Safety note: binaries are published as unsigned development builds with SHA-256 checksums. Expect OS warning prompts. Production Firebase writes are enabled, so use production credentials carefully.
 
 ## MVP
 
@@ -24,24 +24,20 @@ Safety note: binaries are published as unsigned development builds with SHA-256 
 - Repository layer between UI and Firebase code.
 - Firebase Admin SDK in the Electron main process or an isolated worker process.
 - Native-feeling UI using system fonts, native menus, OS shortcuts, and keychain-backed local storage.
-- **pnpm + Turborepo monorepo** from day one (`apps/desktop`, `apps/wireframe`, `packages/*`, `e2e/`). See [docs/project-structure.md](docs/project-structure.md).
+- **pnpm + Turborepo monorepo** (`apps/desktop`, `apps/storybook`, `packages/*`, `e2e/`). See [docs/project-structure.md](docs/project-structure.md).
 - GitHub Actions from the first scaffold: lint, typecheck, unit tests, build, emulator e2e, and release packaging checks.
 - MIT license.
 
 ## Docs
 
-- [apps/wireframe/src/index.html](apps/wireframe/src/index.html)
-- [apps/wireframe/README.md](apps/wireframe/README.md)
 - [docs/product.md](docs/product.md)
-- [docs/live-wireframe.md](docs/live-wireframe.md)
-- [docs/design-system.md](docs/design-system.md)
 - [docs/architecture.md](docs/architecture.md)
 - [docs/app-core-pattern.md](docs/app-core-pattern.md)
-- [docs/app-core-refactor-tasks.md](docs/app-core-refactor-tasks.md)
 - [docs/data-format.md](docs/data-format.md)
+- [docs/design-system.md](docs/design-system.md)
 - [docs/project-structure.md](docs/project-structure.md)
+- [docs/release-checklist.md](docs/release-checklist.md)
 - [docs/testing-ci.md](docs/testing-ci.md)
-- [docs/tasks.md](docs/tasks.md)
 
 ## Local Scripts ↔ GitHub Actions
 

@@ -17,7 +17,6 @@
     "**/playwright-report",
     "**/test-results",
     "**/*.tsbuildinfo",
-    "pnpm-lock.yaml",
-    "apps/wireframe/**"
+    "pnpm-lock.yaml"
   ]
 }

@@ -50,7 +50,7 @@
 - `pnpm test:packaged` to launch the most recently built packaged app on the current OS and fail if it exits early.
 - `pnpm package:smoke` to build the desktop app for the current OS and immediately run the packaged smoke check.
 - `pnpm package:linux:docker` for local Docker reproduction of the Linux release package smoke. The wrapper uses `linux/amd64` and the Docker capability required by Chromium's sandbox.
-- `pnpm dev` (parallel: desktop + wireframe)
+- `pnpm dev` (desktop app dev server)
 
 ### Desktop Packaging Dependencies
 
@@ -65,7 +65,6 @@
 
 ### Policy
 
-- Workflows are added before live wireframe UI work.
 - Pull requests must pass lint, typecheck, unit tests, and build.
 - Pull requests must package Linux before merge. Pull requests that touch desktop packaging, packaged e2e, release workflows, package scripts, or the lockfile must also package macOS and Windows before merge; use the `package-all` label to force the full matrix.
 - E2E emulator workflow must exist early, even if first specs are smoke tests.
