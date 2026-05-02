@@ -4,7 +4,6 @@ import type {
   ProjectSummary,
   ProjectUpdatePatch,
 } from '@firebase-desk/repo-contracts';
-import type { QueryClient } from '@tanstack/react-query';
 import { useMemo } from 'react';
 import {
   addProjectCommand,
@@ -15,27 +14,27 @@ import type { RepositorySet } from '../RepositoryProvider.tsx';
 
 interface UseProjectCommandControllerInput {
   readonly projects: RepositorySet['projects'];
-  readonly queryClient: QueryClient;
   readonly recordActivity: (input: ActivityLogAppendInput) => Promise<void> | void;
+  readonly reloadProjects: () => Promise<ReadonlyArray<ProjectSummary>>;
   readonly setLastAction: (action: string) => void;
 }
 
 export function useProjectCommandController(
   {
     projects,
-    queryClient,
     recordActivity,
+    reloadProjects,
     setLastAction,
   }: UseProjectCommandControllerInput,
 ) {
   const env = useMemo(() => ({
     invalidateProjects: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['projects'] });
+      await reloadProjects().catch(() => undefined);
     },
     now: Date.now,
     projects,
     recordActivity,
-  }), [queryClient, recordActivity, projects]);
+  }), [recordActivity, reloadProjects, projects]);
 
   return {
     addProject: async (input: ProjectAddInput): Promise<ProjectSummary> => {

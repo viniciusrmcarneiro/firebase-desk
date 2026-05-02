@@ -14,16 +14,8 @@ vi.mock('@firebase-desk/product-ui', () => ({
   AppearanceProvider: ({ children }: { readonly children: ReactNode; }) => <>{children}</>,
 }));
 
-vi.mock('@tanstack/react-query', () => ({
-  QueryClientProvider: ({ children }: { readonly children: ReactNode; }) => <>{children}</>,
-}));
-
 vi.mock('./AppShell.tsx', () => ({
   AppShell: () => <div data-testid='app-shell' />,
-}));
-
-vi.mock('./queryClient.ts', () => ({
-  createAppQueryClient: () => ({}),
 }));
 
 vi.mock('./RepositoryProvider.tsx', () => ({

@@ -2,17 +2,16 @@ import type { AuthUser, ProjectSummary } from '@firebase-desk/repo-contracts';
 import { useEffect, useMemo } from 'react';
 import {
   type AuthCommandEnvironment,
-  type AuthStore,
   clearAuthFilterCommand,
-  createAuthStore,
   loadAuthUsersCommand,
   loadMoreAuthUsersCommand,
   refreshAuthUsersCommand,
   saveAuthCustomClaimsCommand,
-  selectAuthUsersModel,
   setAuthFilterCommand,
-} from '../../app-core/auth/index.ts';
-import { useAppCoreSelector } from '../../app-core/shared/index.ts';
+} from '../../app-core/auth/authCommands.ts';
+import { selectAuthUsersModel } from '../../app-core/auth/authSelectors.ts';
+import { type AuthStore, createAuthStore } from '../../app-core/auth/authStore.ts';
+import { useAppCoreSelector } from '../../app-core/shared/reactStore.ts';
 import { useRepositories } from '../RepositoryProvider.tsx';
 import type { WorkspaceTab } from '../stores/tabsStore.ts';
 

@@ -1,11 +1,10 @@
 import type { FirestoreCollectionNode, ProjectSummary } from '@firebase-desk/repo-contracts';
-import { useQueryClient } from '@tanstack/react-query';
 import { useMemo, useState } from 'react';
 import {
   openWorkspaceTreeItemCommand,
   selectWorkspaceTreeItemCommand,
   type WorkspaceTreeTarget,
-} from '../../app-core/workspace/index.ts';
+} from '../../app-core/workspace/workspaceTreeCommands.ts';
 import { useRepositories } from '../RepositoryProvider.tsx';
 import { selectionActions } from '../stores/selectionStore.ts';
 import {
@@ -52,7 +51,6 @@ export function useWorkspaceTree(
   }: UseWorkspaceTreeInput,
 ) {
   const repositories = useRepositories();
-  const queryClient = useQueryClient();
   const [treeFilter, setTreeFilter] = useState('');
   const [expandedTreeIds, setExpandedTreeIds] = useState<ReadonlySet<string>>(() => new Set());
   const [treeCache, setTreeCache] = useState<TreeCache>(initialTreeCache);
@@ -63,14 +61,10 @@ export function useWorkspaceTree(
 
   async function loadRoots(project: ProjectSummary, refresh = false) {
     const key = project.id;
+    if (!refresh && treeCache.roots[key]?.status === 'success') return;
     setRootState(key, { status: 'loading', items: [] });
-    const queryKey = ['firestore', project.id, 'rootCollections'];
-    if (refresh) await queryClient.invalidateQueries({ queryKey });
     try {
-      const items = await queryClient.fetchQuery({
-        queryKey,
-        queryFn: () => repositories.firestore.listRootCollections(project.id),
-      });
+      const items = await repositories.firestore.listRootCollections(project.id);
       setRootState(key, { status: 'success', items });
       setLastAction(
         `Loaded ${items.length} root collection${
@@ -82,6 +76,14 @@ export function useWorkspaceTree(
       setRootState(key, { status: 'error', items: [], errorMessage });
       setLastAction(`Firestore load failed: ${errorMessage}`);
     }
+  }
+
+  async function refreshLoadedRoots() {
+    await Promise.all(
+      projects
+        .filter((project) => treeCache.roots[project.id]?.status === 'success')
+        .map((project) => loadRoots(project, true)),
+    );
   }
 
   async function loadProjectTools(project: ProjectSummary, refresh = false) {
@@ -190,6 +192,7 @@ export function useWorkspaceTree(
     handleRefreshItem,
     handleSelectItem,
     handleToggleItem,
+    refreshLoadedRoots,
     setTreeFilter,
   };
 }

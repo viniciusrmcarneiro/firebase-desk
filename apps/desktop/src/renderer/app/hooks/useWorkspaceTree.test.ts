@@ -1,5 +1,4 @@
 import type { ProjectSummary } from '@firebase-desk/repo-contracts';
-import { useQueryClient } from '@tanstack/react-query';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRepositories } from '../RepositoryProvider.tsx';
@@ -7,10 +6,6 @@ import { selectionActions, selectionStore } from '../stores/selectionStore.ts';
 import { tabActions, type WorkspaceTab } from '../stores/tabsStore.ts';
 import { projectNodeId } from '../workspaceModel.ts';
 import { useWorkspaceTree } from './useWorkspaceTree.ts';
-
-vi.mock('@tanstack/react-query', () => ({
-  useQueryClient: vi.fn(),
-}));
 
 vi.mock('../RepositoryProvider.tsx', () => ({
   useRepositories: vi.fn(),
@@ -43,12 +38,10 @@ describe('useWorkspaceTree', () => {
   beforeEach(() => {
     vi.restoreAllMocks();
     selectionActions.reset();
-    vi.mocked(useQueryClient).mockReturnValue({
-      fetchQuery: vi.fn().mockResolvedValue([{ id: 'orders', path: 'orders' }]),
-      invalidateQueries: vi.fn(),
-    } as unknown as ReturnType<typeof useQueryClient>);
     vi.mocked(useRepositories).mockReturnValue({
-      firestore: {},
+      firestore: {
+        listRootCollections: vi.fn().mockResolvedValue([{ id: 'orders', path: 'orders' }]),
+      },
     } as unknown as ReturnType<typeof useRepositories>);
   });
 
@@ -84,12 +77,11 @@ describe('useWorkspaceTree', () => {
     expect(setLastAction).toHaveBeenCalledWith('Opened orders');
   });
 
-  it('loads project tools and firestore roots through mocked query client', async () => {
-    const fetchQuery = vi.fn().mockResolvedValue([{ id: 'orders', path: 'orders' }]);
-    vi.mocked(useQueryClient).mockReturnValue({
-      fetchQuery,
-      invalidateQueries: vi.fn(),
-    } as unknown as ReturnType<typeof useQueryClient>);
+  it('loads project tools and firestore roots through the repository', async () => {
+    const listRootCollections = vi.fn().mockResolvedValue([{ id: 'orders', path: 'orders' }]);
+    vi.mocked(useRepositories).mockReturnValue({
+      firestore: { listRootCollections },
+    } as unknown as ReturnType<typeof useRepositories>);
     const { result } = renderHook(() =>
       useWorkspaceTree({
         activeTab,
@@ -115,21 +107,56 @@ describe('useWorkspaceTree', () => {
       )
     );
 
-    expect(fetchQuery).toHaveBeenCalledWith({
-      queryKey: ['firestore', 'emu', 'rootCollections'],
-      queryFn: expect.any(Function),
+    expect(listRootCollections).toHaveBeenCalledWith('emu');
+  });
+
+  it('refreshes loaded firestore roots on demand', async () => {
+    const listRootCollections = vi.fn()
+      .mockResolvedValueOnce([{ id: 'orders', path: 'orders' }])
+      .mockResolvedValueOnce([{ id: 'customers', path: 'customers' }]);
+    vi.mocked(useRepositories).mockReturnValue({
+      firestore: { listRootCollections },
+    } as unknown as ReturnType<typeof useRepositories>);
+    const { result } = renderHook(() =>
+      useWorkspaceTree({
+        activeTab,
+        openFirestoreTab: vi.fn(),
+        openFirestoreTabInNewTab: vi.fn(),
+        openJsTabInNewTab: vi.fn(),
+        openToolTab: vi.fn(),
+        projects,
+        selectedTreeItemId: null,
+        setLastAction: vi.fn(),
+      })
+    );
+
+    act(() => result.current.handleToggleItem(projectNodeId('emu')));
+    act(() => result.current.handleToggleItem('firestore:emu'));
+    await waitFor(() =>
+      expect(result.current.treeItems.some((item) => item.id === 'collection:emu:orders')).toBe(
+        true,
+      )
+    );
+
+    await act(async () => {
+      await result.current.refreshLoadedRoots();
     });
+
+    await waitFor(() =>
+      expect(result.current.treeItems.some((item) => item.id === 'collection:emu:customers')).toBe(
+        true,
+      )
+    );
+    expect(listRootCollections).toHaveBeenCalledTimes(2);
   });
 
   it('surfaces firestore root load errors and retries them', async () => {
-    const fetchQuery = vi.fn()
+    const listRootCollections = vi.fn()
       .mockRejectedValueOnce(new Error('permission denied'))
       .mockResolvedValueOnce([{ id: 'orders', path: 'orders' }]);
-    const invalidateQueries = vi.fn();
-    vi.mocked(useQueryClient).mockReturnValue({
-      fetchQuery,
-      invalidateQueries,
-    } as unknown as ReturnType<typeof useQueryClient>);
+    vi.mocked(useRepositories).mockReturnValue({
+      firestore: { listRootCollections },
+    } as unknown as ReturnType<typeof useRepositories>);
     const setLastAction = vi.fn();
     const { result } = renderHook(() =>
       useWorkspaceTree({
@@ -166,9 +193,7 @@ describe('useWorkspaceTree', () => {
       )
     );
 
-    expect(invalidateQueries).toHaveBeenCalledWith({
-      queryKey: ['firestore', 'emu', 'rootCollections'],
-    });
+    expect(listRootCollections).toHaveBeenCalledTimes(2);
     expect(setLastAction).toHaveBeenCalledWith('Retried Local Emulator');
     expect(setLastAction).toHaveBeenCalledWith(
       expect.stringContaining('Firestore load failed: permission denied'),

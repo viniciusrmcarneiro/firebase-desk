@@ -1,10 +1,8 @@
 import { HotkeysProvider } from '@firebase-desk/hotkeys';
 import { AppearanceProvider } from '@firebase-desk/product-ui';
-import { QueryClientProvider } from '@tanstack/react-query';
 import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { AppShell } from './AppShell.tsx';
-import { createAppQueryClient } from './queryClient.ts';
 import {
   createMockRepositories,
   RepositoryProvider,
@@ -147,19 +145,15 @@ function renderShell(
       disconnect() {}
     },
   );
-  const queryClient = createAppQueryClient();
   render(
     <RepositoryProvider repositories={repositories}>
-      <QueryClientProvider client={queryClient}>
-        <HotkeysProvider settings={repositories.settings}>
-          <AppearanceProvider settings={repositories.settings}>
-            <AppShell dataMode={dataMode} />
-          </AppearanceProvider>
-        </HotkeysProvider>
-      </QueryClientProvider>
+      <HotkeysProvider settings={repositories.settings}>
+        <AppearanceProvider settings={repositories.settings}>
+          <AppShell dataMode={dataMode} />
+        </AppearanceProvider>
+      </HotkeysProvider>
     </RepositoryProvider>,
   );
-  return { queryClient };
 }
 
 describe('desktop AppShell Firestore writes', () => {
@@ -182,12 +176,11 @@ describe('desktop AppShell Firestore writes', () => {
     await waitFor(() => expect(selectionStore.state.firestoreDocumentPath).toBeNull());
   });
 
-  it('saves a Firestore document and invalidates live Firestore queries', async () => {
+  it('saves a Firestore document in live mode', async () => {
     surfaceState.action = 'save';
     const repositories = createMockRepositories();
     const saveDocument = vi.spyOn(repositories.firestore, 'saveDocument');
-    const { queryClient } = renderShell({ dataMode: 'live', repositories });
-    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    renderShell({ dataMode: 'live', repositories });
 
     await waitFor(() => expect(screen.getAllByText('Local Emulator').length).toBeGreaterThan(0));
     fireEvent.click(await screen.findByRole('button', { name: 'Trigger Firestore write' }));
@@ -200,17 +193,13 @@ describe('desktop AppShell Firestore writes', () => {
         undefined,
       )
     );
-    await waitFor(() =>
-      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['firestore'] })
-    );
   });
 
-  it('creates a Firestore document and invalidates live Firestore queries', async () => {
+  it('creates a Firestore document in live mode', async () => {
     surfaceState.action = 'create';
     const repositories = createMockRepositories();
     const createDocument = vi.spyOn(repositories.firestore, 'createDocument');
-    const { queryClient } = renderShell({ dataMode: 'live', repositories });
-    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    renderShell({ dataMode: 'live', repositories });
 
     await waitFor(() => expect(screen.getAllByText('Local Emulator').length).toBeGreaterThan(0));
     fireEvent.click(await screen.findByRole('button', { name: 'Trigger Firestore write' }));
@@ -220,17 +209,13 @@ describe('desktop AppShell Firestore writes', () => {
         status: 'new',
       })
     );
-    await waitFor(() =>
-      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['firestore'] })
-    );
   });
 
-  it('updates Firestore fields through patch writes and invalidates live Firestore queries', async () => {
+  it('updates Firestore fields through patch writes in live mode', async () => {
     surfaceState.action = 'patch';
     const repositories = createMockRepositories();
     const updateDocumentFields = vi.spyOn(repositories.firestore, 'updateDocumentFields');
-    const { queryClient } = renderShell({ dataMode: 'live', repositories });
-    const invalidateQueries = vi.spyOn(queryClient, 'invalidateQueries');
+    renderShell({ dataMode: 'live', repositories });
 
     await waitFor(() => expect(screen.getAllByText('Local Emulator').length).toBeGreaterThan(0));
     fireEvent.click(await screen.findByRole('button', { name: 'Trigger Firestore write' }));
@@ -247,9 +232,6 @@ describe('desktop AppShell Firestore writes', () => {
         }],
         { staleBehavior: 'save-and-notify' },
       )
-    );
-    await waitFor(() =>
-      expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['firestore'] })
     );
   });
 });

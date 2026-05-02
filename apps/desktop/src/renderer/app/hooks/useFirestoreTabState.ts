@@ -8,23 +8,29 @@ import type {
 } from '@firebase-desk/repo-contracts';
 import { useEffect, useRef, useState } from 'react';
 import {
-  createInitialFirestoreQueryRuntimeState,
   executeFirestoreLoadMoreCommand,
   executeFirestoreQueryCommand,
-  firestoreDocumentSelected,
-  firestoreDraftChanged,
-  firestoreTabCleared,
   loadMoreFirestoreQueryCommand,
   openFirestoreDocumentInNewTabCommand,
   refreshFirestoreQueryCommand,
   runFirestoreQueryCommand,
+} from '../../app-core/firestore/query/firestoreQueryCommands.ts';
+import {
   selectFirestoreActiveDraft,
   selectFirestoreActiveQueryRequest,
   selectFirestoreLoadedPageCount,
   selectFirestoreResultRows,
   selectFirestoreSelectedDocument,
-} from '../../app-core/firestore/query/index.ts';
-import type { FirestoreQueryRuntimeState } from '../../app-core/firestore/query/index.ts';
+} from '../../app-core/firestore/query/firestoreQuerySelectors.ts';
+import {
+  createInitialFirestoreQueryRuntimeState,
+  type FirestoreQueryRuntimeState,
+} from '../../app-core/firestore/query/firestoreQueryState.ts';
+import {
+  firestoreDocumentSelected,
+  firestoreDraftChanged,
+  firestoreTabCleared,
+} from '../../app-core/firestore/query/firestoreQueryTransitions.ts';
 import { useRepositories } from '../RepositoryProvider.tsx';
 import { selectionActions } from '../stores/selectionStore.ts';
 import { activePath, tabActions, tabsStore, type WorkspaceTab } from '../stores/tabsStore.ts';

@@ -7,13 +7,13 @@ import type {
   Page,
   PageRequest,
 } from '@firebase-desk/repo-contracts';
-import { messageFromError } from '../../shared/errors.ts';
 import {
   type AppCoreCommandOptions,
-  type AppCoreStore,
   commandActivityMetadata,
   normalizeCommandOptions,
-} from '../../shared/index.ts';
+} from '../../shared/commandOptions.ts';
+import { messageFromError } from '../../shared/errors.ts';
+import type { AppCoreStore } from '../../shared/store.ts';
 import { elapsedMs } from '../../shared/time.ts';
 import {
   firestoreQueryDraftMetadata,

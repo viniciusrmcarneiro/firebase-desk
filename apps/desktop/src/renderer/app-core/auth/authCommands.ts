@@ -5,14 +5,11 @@ import type {
   PageRequest,
 } from '@firebase-desk/repo-contracts';
 import { DEFAULT_PAGE_LIMIT } from '@firebase-desk/repo-contracts';
+import { type AppCoreCommandOptions, commandActivityMetadata } from '../shared/commandOptions.ts';
 import { messageFromError, toError } from '../shared/errors.ts';
-import {
-  type AppCoreCommandOptions,
-  type AppCoreStore,
-  commandActivityMetadata,
-  documentDataMetadata,
-} from '../shared/index.ts';
+import type { AppCoreStore } from '../shared/store.ts';
 import { elapsedMs } from '../shared/time.ts';
+import { documentDataMetadata } from '../shared/valueMetadata.ts';
 import type { AuthRuntimeState } from './authState.ts';
 import {
   authCustomClaimsSaveFailed,

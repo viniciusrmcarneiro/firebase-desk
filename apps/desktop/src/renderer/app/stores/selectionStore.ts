@@ -1,12 +1,12 @@
 import { Store } from '@tanstack/react-store';
+import { initialSelectionState } from '../../app-core/workspace/workspaceState.ts';
 import {
   authUserSelected,
   firestoreDocumentSelected,
-  initialSelectionState,
   selectionReset,
-  type SelectionState,
   treeItemSelected,
-} from '../../app-core/workspace/index.ts';
+} from '../../app-core/workspace/workspaceTransitions.ts';
+import type { SelectionState } from '../../app-core/workspace/workspaceTypes.ts';
 
 export type { SelectionState };
 

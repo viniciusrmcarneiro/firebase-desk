@@ -3,7 +3,7 @@ import type {
   ScriptRunEvent,
   ScriptRunResult,
 } from '@firebase-desk/repo-contracts';
-import type { AppCoreCommandOptions } from '../shared/index.ts';
+import type { AppCoreCommandOptions } from '../shared/commandOptions.ts';
 import type { ActiveScriptRun, JsQueryState } from './jsQueryState.ts';
 
 const MAX_LOGGED_RUN_IDS = 500;

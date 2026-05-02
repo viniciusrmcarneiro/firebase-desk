@@ -2,11 +2,9 @@ import { HotkeysProvider } from '@firebase-desk/hotkeys';
 import { AppearanceProvider } from '@firebase-desk/product-ui';
 import type { DataMode, SettingsSnapshot } from '@firebase-desk/repo-contracts';
 import { Button, InlineAlert } from '@firebase-desk/ui';
-import { QueryClientProvider } from '@tanstack/react-query';
 import { type CSSProperties, useCallback, useEffect, useMemo, useState } from 'react';
 import splashLogoUrl from '../assets/splash-logo.png';
 import { AppShell } from './AppShell.tsx';
-import { createAppQueryClient } from './queryClient.ts';
 import { RenderErrorBoundary } from './RenderErrorBoundary.tsx';
 import { createRepositories, RepositoryProvider } from './RepositoryProvider.tsx';
 
@@ -63,20 +61,17 @@ export function App() {
   const [snapshot, setSnapshot] = useState<SettingsSnapshot | null>(null);
   const [bootAttempt, setBootAttempt] = useState(0);
   const [bootError, setBootError] = useState<string | null>(null);
-  const [queryClient, setQueryClient] = useState(() => createAppQueryClient());
 
   const handleDataModeChange = useCallback((nextDataMode: DataMode) => {
     setBootError(null);
     setSnapshot(null);
     setDataMode(nextDataMode);
-    setQueryClient(createAppQueryClient());
   }, []);
 
   const retryBoot = useCallback(() => {
     setBootError(null);
     setDataMode(null);
     setSnapshot(null);
-    setQueryClient(createAppQueryClient());
     setBootAttempt((attempt) => attempt + 1);
   }, []);
 
@@ -134,26 +129,24 @@ export function App() {
 
   return (
     <RepositoryProvider repositories={repositories}>
-      <QueryClientProvider client={queryClient}>
-        <HotkeysProvider settings={repositories.settings} onError={handleHotkeySettingsError}>
-          <AppearanceProvider settings={repositories.settings}>
-            <div
-              style={{
-                '--sidebar-width': `${snapshot.sidebarWidth}px`,
-                '--inspector-width': `${snapshot.inspectorWidth}px`,
-                height: '100vh',
-              } as CSSProperties}
-            >
-              <RenderErrorBoundary label='Firebase Desk' resetKey={dataMode ?? 'mock'}>
-                <AppShell
-                  dataMode={dataMode ?? 'mock'}
-                  initialSidebarWidth={snapshot.sidebarWidth}
-                />
-              </RenderErrorBoundary>
-            </div>
-          </AppearanceProvider>
-        </HotkeysProvider>
-      </QueryClientProvider>
+      <HotkeysProvider settings={repositories.settings} onError={handleHotkeySettingsError}>
+        <AppearanceProvider settings={repositories.settings}>
+          <div
+            style={{
+              '--sidebar-width': `${snapshot.sidebarWidth}px`,
+              '--inspector-width': `${snapshot.inspectorWidth}px`,
+              height: '100vh',
+            } as CSSProperties}
+          >
+            <RenderErrorBoundary label='Firebase Desk' resetKey={dataMode ?? 'mock'}>
+              <AppShell
+                dataMode={dataMode ?? 'mock'}
+                initialSidebarWidth={snapshot.sidebarWidth}
+              />
+            </RenderErrorBoundary>
+          </div>
+        </AppearanceProvider>
+      </HotkeysProvider>
     </RepositoryProvider>
   );
 }

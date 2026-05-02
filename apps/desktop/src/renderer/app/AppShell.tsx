@@ -10,8 +10,6 @@ import {
   JsQuerySurface,
   SettingsDialog,
   SidebarShell,
-  StatusBar,
-  TargetModeBadge,
   useAppearance,
   WorkspaceShell,
   type WorkspaceTabModel,
@@ -49,13 +47,11 @@ import {
   ResizablePanelGroup,
   Toolbar,
 } from '@firebase-desk/ui';
-import { useQueryClient } from '@tanstack/react-query';
 import { useSelector } from '@tanstack/react-store';
 import {
   ArrowLeft,
   ArrowRight,
   Database,
-  ListChecks,
   Moon,
   PanelLeftClose,
   PanelLeftOpen,
@@ -66,11 +62,13 @@ import {
   X,
 } from 'lucide-react';
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { type ActivityStore, useActivityController } from '../app-core/activity/index.ts';
-import { useFirestoreWriteController } from '../app-core/firestore/write/index.ts';
-import { useSettingsController } from '../app-core/settings/index.ts';
+import type { ActivityStore } from '../app-core/activity/activityStore.ts';
+import { useActivityController } from '../app-core/activity/useActivityController.ts';
+import { useFirestoreWriteController } from '../app-core/firestore/write/useFirestoreWriteController.ts';
+import { useSettingsController } from '../app-core/settings/useSettingsController.ts';
 import { closeWorkspaceTabsCommand } from '../app-core/workspace/workspaceCommands.ts';
 import appIconUrl from '../assets/app-icon.png';
+import { AppStatusBar } from './AppStatusBar.tsx';
 import { createCommandPaletteModel } from './commandPaletteModel.ts';
 import { AddProjectDialog } from './dialogs/AddProjectDialog.tsx';
 import { EditProjectDialog } from './dialogs/EditProjectDialog.tsx';
@@ -88,7 +86,7 @@ import {
   usePersistWorkspaceSnapshot,
 } from './hooks/usePersistedWorkspaceState.ts';
 import { useProjectCommandController } from './hooks/useProjectCommandController.ts';
-import { useProjects } from './hooks/useRepositoriesData.ts';
+import { useProjects } from './hooks/useProjects.ts';
 import { useWorkspaceTree } from './hooks/useWorkspaceTree.ts';
 import { RenderErrorBoundary } from './RenderErrorBoundary.tsx';
 import { type RepositorySet, useRepositories } from './RepositoryProvider.tsx';
@@ -128,7 +126,6 @@ export function AppShell(
 ) {
   const appearance = useAppearance();
   const repositories = useRepositories();
-  const queryClient = useQueryClient();
   const tabsState = useSelector(tabsStore, (state) => state);
   const selection = useSelector(selectionStore, (state) => state);
   const projectsQuery = useProjects();
@@ -172,17 +169,25 @@ export function AppShell(
     onQueryActivity: recordActivity,
     selectedTreeItemId: selection.treeItemId,
   });
+  const workspaceTree = useWorkspaceTree({
+    activeTab,
+    openFirestoreTab,
+    openFirestoreTabInNewTab,
+    openJsTabInNewTab,
+    openToolTab,
+    projects,
+    selectedTreeItemId: selection.treeItemId,
+    setLastAction,
+  });
   const firestoreWrite = useFirestoreWriteController({
     activeProject,
     activeTab,
     clearSelectedDocument: (tabId) => firestoreTab.selectDocument(tabId, null),
     dataMode,
     firestore: repositories.firestore,
-    invalidateFirestoreQueries: async () => {
-      await queryClient.invalidateQueries({ queryKey: ['firestore'] });
-    },
     onStatus: setLastAction,
     recordActivity,
+    refreshAfterLiveWrite: workspaceTree.refreshLoadedRoots,
   });
   const authTab = useAuthTabState({
     activeProject,
@@ -197,24 +202,14 @@ export function AppShell(
     recordActivity,
     selectedTreeItemId: selection.treeItemId,
   });
-  const workspaceTree = useWorkspaceTree({
-    activeTab,
-    openFirestoreTab,
-    openFirestoreTabInNewTab,
-    openJsTabInNewTab,
-    openToolTab,
-    projects,
-    selectedTreeItemId: selection.treeItemId,
-    setLastAction,
-  });
   const editingProject = editingProjectId
     ? projects.find((project) => project.id === editingProjectId) ?? null
     : null;
   const sidebarDefaultWidth = clampSidebarWidth(initialSidebarWidth);
   const projectCommands = useProjectCommandController({
     projects: repositories.projects,
-    queryClient,
     recordActivity,
+    reloadProjects: projectsQuery.reload,
     setLastAction,
   });
   const workspaceSnapshot = useMemo(() => ({
@@ -857,37 +852,15 @@ export function AppShell(
               onSearchChange={activity.setSearch}
               onStatusChange={activity.setStatus}
             />
-            <StatusBar
-              left={
-                <>
-                  {activeProject ? <TargetModeBadge mode={activeProject.target} /> : null}
-                  <span>{activeProject?.name ?? 'No project'}</span>
-                  <span>{activeProject?.projectId ?? 'No project id'}</span>
-                  <span>{activeTab?.title ?? 'No tab'}</span>
-                  <span>{selection.treeItemId ?? 'No tree selection'}</span>
-                </>
-              }
-              right={
-                <>
-                  <Button
-                    aria-pressed={activity.drawer.open}
-                    size='xs'
-                    variant={activity.button.variant}
-                    onClick={activity.toggle}
-                  >
-                    <ListChecks size={13} aria-hidden='true' />
-                    Activity
-                    {activity.button.badge
-                      ? (
-                        <Badge variant={activity.button.badge.variant}>
-                          {activity.button.badge.label}
-                        </Badge>
-                      )
-                      : null}
-                  </Button>
-                  <span>{lastAction}</span>
-                </>
-              }
+            <AppStatusBar
+              activeProject={activeProject}
+              activeTabTitle={activeTab?.title ?? 'No tab'}
+              activityBadge={activity.button.badge}
+              activityButtonVariant={activity.button.variant}
+              activityOpen={activity.drawer.open}
+              lastAction={lastAction}
+              selectedTreeItemId={selection.treeItemId}
+              onActivityToggle={activity.toggle}
             />
           </div>
         </ResizablePanel>

@@ -1,7 +1,7 @@
 import type { FirestoreQueryDraft } from '@firebase-desk/repo-contracts';
 import type { SettingsRepository } from '@firebase-desk/repo-contracts';
 import { useEffect, useRef, useState } from 'react';
-import { restoreWorkspaceTabsCommand } from '../../app-core/workspace/index.ts';
+import { restoreWorkspaceTabsCommand } from '../../app-core/workspace/workspaceCommands.ts';
 import { selectionActions } from '../stores/selectionStore.ts';
 import { type TabsState, tabsStore } from '../stores/tabsStore.ts';
 import { treeItemIdForTab } from '../workspaceModel.ts';

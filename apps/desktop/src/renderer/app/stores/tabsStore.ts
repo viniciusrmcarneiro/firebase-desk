@@ -1,14 +1,11 @@
 import { Store } from '@tanstack/react-store';
+import { activePath, createEmptyTabsState } from '../../app-core/workspace/workspaceState.ts';
 import {
-  activePath,
   allTabsClosed,
-  createEmptyTabsState,
   findOpenWorkspaceTab,
-  type InteractionHistoryEntry,
   interactionMovedBack,
   interactionMovedForward,
   interactionRecorded,
-  type OpenTabInput,
   otherTabsClosed,
   tabClosed,
   tabConnectionUpdated,
@@ -24,13 +21,17 @@ import {
   tabsReset,
   tabsRestored,
   tabsSortedByProject,
-  type TabsState,
   tabsToLeftClosed,
   tabsToRightClosed,
+} from '../../app-core/workspace/workspaceTransitions.ts';
+import {
+  type InteractionHistoryEntry,
+  type OpenTabInput,
+  type TabsState,
   WORKSPACE_TAB_KINDS,
   type WorkspaceTab,
   type WorkspaceTabKind,
-} from '../../app-core/workspace/index.ts';
+} from '../../app-core/workspace/workspaceTypes.ts';
 
 export {
   activePath,

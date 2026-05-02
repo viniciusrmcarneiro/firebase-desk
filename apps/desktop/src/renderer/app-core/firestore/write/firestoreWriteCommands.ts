@@ -9,16 +9,15 @@ import type {
   FirestoreUpdateDocumentFieldsOptions,
   FirestoreUpdateDocumentFieldsResult,
 } from '@firebase-desk/repo-contracts';
-import { messageFromError, toError } from '../../shared/errors.ts';
 import {
   type AppCoreCommandOptions,
-  type AppCoreStore,
   commandActivityMetadata,
-  documentDataMetadata,
-  fieldPatchMetadata,
   shouldNotifyForCommandStatus,
-} from '../../shared/index.ts';
+} from '../../shared/commandOptions.ts';
+import { messageFromError, toError } from '../../shared/errors.ts';
+import type { AppCoreStore } from '../../shared/store.ts';
 import { elapsedMs } from '../../shared/time.ts';
+import { documentDataMetadata, fieldPatchMetadata } from '../../shared/valueMetadata.ts';
 import { fieldPatchStatusLabel } from './firestoreWriteSelectors.ts';
 import type { FirestoreWriteState } from './firestoreWriteState.ts';
 import {
@@ -44,9 +43,9 @@ export interface FirestoreWriteProjectContext {
 export interface FirestoreWriteCommandEnvironment {
   readonly dataMode: DataMode;
   readonly firestore: FirestoreWriteRepository;
-  readonly invalidateFirestoreQueries: () => Promise<void>;
   readonly now: () => number;
   readonly recordActivity: (input: ActivityLogAppendInput) => Promise<void> | void;
+  readonly refreshAfterLiveWrite: () => Promise<void>;
 }
 
 export type FirestoreWriteRepository = Pick<
@@ -131,7 +130,7 @@ export async function createFirestoreDocumentCommand(
         input.documentId,
         input.data,
       );
-      if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
+      if (env.dataMode !== 'mock') await env.refreshAfterLiveWrite();
       store.update((state) => firestoreCreateSucceeded(state, document));
       void env.recordActivity({
         action: 'Create document',
@@ -218,7 +217,7 @@ export async function saveFirestoreDocumentCommand(
           input.commandOptions,
         );
       }
-      if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
+      if (env.dataMode !== 'mock') await env.refreshAfterLiveWrite();
       void env.recordActivity({
         action: 'Save document',
         area: 'firestore',
@@ -314,7 +313,7 @@ export async function updateFirestoreDocumentFieldsCommand(
           input.commandOptions,
         );
       }
-      if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
+      if (env.dataMode !== 'mock') await env.refreshAfterLiveWrite();
       const lastAction = result.documentChanged
         ? `Saved ${result.document.path}; document changed elsewhere`
         : `Saved ${result.document.path}`;
@@ -375,7 +374,7 @@ export async function deleteFirestoreDocumentCommand(
       await env.firestore.deleteDocument(project.connectionId, input.documentPath, {
         deleteSubcollectionPaths: input.deleteSubcollectionPaths,
       });
-      if (env.dataMode !== 'mock') await env.invalidateFirestoreQueries();
+      if (env.dataMode !== 'mock') await env.refreshAfterLiveWrite();
       store.update((state) => firestoreDeleteSucceeded(state, input.documentPath));
       void env.recordActivity({
         action: 'Delete document',

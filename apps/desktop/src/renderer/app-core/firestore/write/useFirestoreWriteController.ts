@@ -11,7 +11,7 @@ import type {
 } from '@firebase-desk/repo-contracts';
 import { useMemo } from 'react';
 import { messageFromError } from '../../shared/errors.ts';
-import { useAppCoreSelector } from '../../shared/index.ts';
+import { useAppCoreSelector } from '../../shared/reactStore.ts';
 import {
   createFirestoreDocumentCommand,
   deleteFirestoreDocumentCommand,
@@ -46,9 +46,9 @@ export interface UseFirestoreWriteControllerInput {
     | 'saveDocument'
     | 'updateDocumentFields'
   >;
-  readonly invalidateFirestoreQueries: () => Promise<void>;
   readonly onStatus: (message: string) => void;
   readonly recordActivity: FirestoreWriteCommandEnvironment['recordActivity'];
+  readonly refreshAfterLiveWrite: () => Promise<void>;
   readonly store?: FirestoreWriteStore | undefined;
 }
 
@@ -90,9 +90,9 @@ export function useFirestoreWriteController(
   const env: FirestoreWriteCommandEnvironment = {
     dataMode: input.dataMode,
     firestore: input.firestore,
-    invalidateFirestoreQueries: input.invalidateFirestoreQueries,
     now: Date.now,
     recordActivity: input.recordActivity,
+    refreshAfterLiveWrite: input.refreshAfterLiveWrite,
   };
 
   function requestCreateDocument(request: PendingCreateDocumentRequest) {

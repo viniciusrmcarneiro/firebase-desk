@@ -5,11 +5,8 @@ import type {
   ScriptRunRequest,
   ScriptRunResult,
 } from '@firebase-desk/repo-contracts';
-import {
-  type AppCoreCommandOptions,
-  type AppCoreStore,
-  commandActivityMetadata,
-} from '../shared/index.ts';
+import { type AppCoreCommandOptions, commandActivityMetadata } from '../shared/commandOptions.ts';
+import type { AppCoreStore } from '../shared/store.ts';
 import { scriptResultCounts } from './jsQuerySelectors.ts';
 import type { JsQueryState } from './jsQueryState.ts';
 import {

@@ -19,9 +19,9 @@ describe('useFirestoreWriteController', () => {
         clearSelectedDocument: vi.fn(),
         dataMode: 'mock',
         firestore,
-        invalidateFirestoreQueries: vi.fn(),
         onStatus,
         recordActivity: vi.fn(),
+        refreshAfterLiveWrite: vi.fn(),
       })
     );
 

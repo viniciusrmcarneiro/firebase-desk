@@ -4,9 +4,9 @@ import { describe, expect, it, vi } from 'vitest';
 import { useProjectCommandController } from './useProjectCommandController.ts';
 
 describe('useProjectCommandController', () => {
-  it('runs project commands with status and invalidation wiring', async () => {
+  it('runs project commands with status and project reload wiring', async () => {
     const setLastAction = vi.fn();
-    const invalidateQueries = vi.fn().mockResolvedValue(undefined);
+    const reloadProjects = vi.fn().mockResolvedValue([project]);
     const recordActivity = vi.fn();
     const projects = {
       add: vi.fn().mockResolvedValue(project),
@@ -16,8 +16,8 @@ describe('useProjectCommandController', () => {
     const { result } = renderHook(() =>
       useProjectCommandController({
         projects: projects as never,
-        queryClient: { invalidateQueries } as never,
         recordActivity,
+        reloadProjects,
         setLastAction,
       })
     );
@@ -27,7 +27,7 @@ describe('useProjectCommandController', () => {
     });
 
     expect(projects.update).toHaveBeenCalledWith('emu', { name: 'Local Emulator' });
-    expect(invalidateQueries).toHaveBeenCalledWith({ queryKey: ['projects'] });
+    expect(reloadProjects).toHaveBeenCalledTimes(1);
     expect(setLastAction).toHaveBeenCalledWith('Updated Local Emulator');
     expect(recordActivity).toHaveBeenCalledWith(expect.objectContaining({
       action: 'Update account',

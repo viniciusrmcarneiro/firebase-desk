@@ -4,7 +4,7 @@ import type {
   FirestoreQueryDraft,
 } from '@firebase-desk/repo-contracts';
 import { describe, expect, it, vi } from 'vitest';
-import { createAppCoreStore } from '../../shared/index.ts';
+import { createAppCoreStore } from '../../shared/store.ts';
 import {
   completeFirestoreQueryCommand,
   continueFirestorePageReloadCommand,

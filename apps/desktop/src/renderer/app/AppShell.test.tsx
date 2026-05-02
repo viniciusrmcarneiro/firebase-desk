@@ -1,16 +1,12 @@
 import { HotkeysProvider } from '@firebase-desk/hotkeys';
 import { AppearanceProvider } from '@firebase-desk/product-ui';
-import { QueryClientProvider } from '@tanstack/react-query';
 import { act, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { StrictMode } from 'react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import {
-  type ActivityState,
-  createActivityStore,
-  createInitialActivityState,
-} from '../app-core/activity/index.ts';
+import type { ActivityState } from '../app-core/activity/activityState.ts';
+import { createInitialActivityState } from '../app-core/activity/activityState.ts';
+import { createActivityStore } from '../app-core/activity/activityStore.ts';
 import { AppShell } from './AppShell.tsx';
-import { createAppQueryClient } from './queryClient.ts';
 import {
   createMockRepositories,
   RepositoryProvider,
@@ -106,17 +102,14 @@ function renderShell(
       disconnect() {}
     },
   );
-  const queryClient = createAppQueryClient();
   const activityStore = activityState ? createActivityStore(activityState) : undefined;
   const shell = (
     <RepositoryProvider repositories={repositories}>
-      <QueryClientProvider client={queryClient}>
-        <HotkeysProvider settings={repositories.settings}>
-          <AppearanceProvider settings={repositories.settings}>
-            <AppShell activityStore={activityStore} dataMode={dataMode} />
-          </AppearanceProvider>
-        </HotkeysProvider>
-      </QueryClientProvider>
+      <HotkeysProvider settings={repositories.settings}>
+        <AppearanceProvider settings={repositories.settings}>
+          <AppShell activityStore={activityStore} dataMode={dataMode} />
+        </AppearanceProvider>
+      </HotkeysProvider>
     </RepositoryProvider>
   );
   render(strictMode ? <StrictMode>{shell}</StrictMode> : shell);
