@@ -84,7 +84,9 @@ async function sourceFiles(dir: string): Promise<ReadonlyArray<string>> {
     .filter((entry) => entry.isFile() && isProductionTypeScript(entry.name))
     .map((entry) => join(dir, entry.name));
   const nestedFiles = await Promise.all(
-    entries.filter((entry) => entry.isDirectory()).map((entry) => sourceFiles(join(dir, entry.name))),
+    entries.filter((entry) => entry.isDirectory()).map((entry) =>
+      sourceFiles(join(dir, entry.name))
+    ),
   );
   return files.concat(...nestedFiles);
 }

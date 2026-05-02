@@ -23,19 +23,25 @@ async function main(): Promise<void> {
 
   if (!setsEqual(new Set(workspaceRuntimePackages), workspaceDependencySet)) {
     problems.push(
-      `workspaceRuntimePackages does not match desktop workspace dependencies: ${JSON.stringify(workspaceDependencies)}`,
+      `workspaceRuntimePackages does not match desktop workspace dependencies: ${
+        JSON.stringify(workspaceDependencies)
+      }`,
     );
   }
 
   if (!setsEqual(new Set(bundledMainPackages), bundledDependencySet)) {
     problems.push(
-      `bundledMainPackages does not match expected bundled desktop dependencies: ${JSON.stringify([...bundledDependencySet])}`,
+      `bundledMainPackages does not match expected bundled desktop dependencies: ${
+        JSON.stringify([...bundledDependencySet])
+      }`,
     );
   }
 
   if (!setsEqual(new Set(mainExternalizeDeps.exclude ?? []), bundledDependencySet)) {
     problems.push(
-      `mainExternalizeDeps.exclude does not match expected bundled desktop dependencies: ${JSON.stringify([...bundledDependencySet])}`,
+      `mainExternalizeDeps.exclude does not match expected bundled desktop dependencies: ${
+        JSON.stringify([...bundledDependencySet])
+      }`,
     );
   }
 

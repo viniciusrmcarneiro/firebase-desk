@@ -37,6 +37,13 @@
       "cache": false,
       "outputs": []
     },
+    "//#package:smoke:root": {
+      "cache": false,
+      "dependsOn": [
+        "@firebase-desk/desktop#package"
+      ],
+      "outputs": []
+    },
     "test": {
       "dependsOn": [
         "^build"

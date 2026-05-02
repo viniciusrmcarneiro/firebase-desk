@@ -5,8 +5,10 @@
     "composite": false,
     "noEmit": true,
     "emitDeclarationOnly": false,
+    "allowJs": true,
+    "checkJs": true,
     "allowImportingTsExtensions": true,
     "types": ["node"]
   },
-  "include": ["specs/**/*", "fixtures/**/*", "playwright.config.ts"]
+  "include": ["specs/**/*", "fixtures/**/*", "playwright.config.ts", "scripts/*"]
 }
