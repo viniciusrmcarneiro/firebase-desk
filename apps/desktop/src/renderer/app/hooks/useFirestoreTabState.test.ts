@@ -143,6 +143,36 @@ describe('useFirestoreTabState', () => {
     );
   });
 
+  it('keeps current query rows while editing draft controls', async () => {
+    const { result } = renderHook(() =>
+      useFirestoreTabState({
+        activeProject: project,
+        activeTab: tab,
+        selectedTreeItemId: 'collection:emu:orders',
+      })
+    );
+
+    act(() => {
+      result.current.runQuery();
+    });
+    await waitFor(() => expect(result.current.queryRows).toEqual(rows));
+
+    act(() => result.current.setDraft({ ...result.current.activeDraft, limit: 1 }));
+
+    expect(result.current.queryRows).toEqual(rows);
+    expect(firestore.runQuery).toHaveBeenCalledTimes(1);
+
+    act(() => {
+      result.current.runQuery();
+    });
+
+    await waitFor(() => expect(firestore.runQuery).toHaveBeenCalledTimes(2));
+    expect(firestore.runQuery).toHaveBeenLastCalledWith(
+      expect.objectContaining({ connectionId: 'emu', path: 'orders' }),
+      expect.objectContaining({ limit: 1 }),
+    );
+  });
+
   it('keeps selected document scoped to current query rows', async () => {
     tabActions.restore({
       activeTabId: tab.id,

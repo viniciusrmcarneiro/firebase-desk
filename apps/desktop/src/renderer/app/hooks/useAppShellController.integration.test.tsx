@@ -11,9 +11,8 @@ import {
   RepositoryProvider,
   type RepositorySet,
 } from '../RepositoryProvider.tsx';
-import { selectionActions, selectionStore } from '../stores/selectionStore.ts';
+import { selectionActions } from '../stores/selectionStore.ts';
 import { tabActions, tabsStore, type WorkspaceTabKind } from '../stores/tabsStore.ts';
-import { collectionNodeId } from '../workspaceModel.ts';
 import { type PersistedWorkspaceState } from '../workspacePersistence.ts';
 import { useAppShellController } from './useAppShellController.ts';
 
@@ -25,7 +24,7 @@ afterEach(() => {
   selectionActions.reset();
 });
 
-describe('useAppShellController', () => {
+describe('useAppShellController integration', () => {
   it('changes theme through settings and records activity', async () => {
     const repositories = createMockRepositories();
     const appendActivity = vi.spyOn(repositories.activity, 'append');
@@ -76,28 +75,6 @@ describe('useAppShellController', () => {
     await waitFor(() => expect(result.current.workspace.activity.buttonBadge).toBeNull());
   });
 
-  it('records Firestore query activity', async () => {
-    const repositories = createMockRepositories();
-    const appendActivity = vi.spyOn(repositories.activity, 'append');
-    const { result } = renderController({
-      initialTabs: [{ kind: 'firestore-query', connectionId: 'emu' }],
-      repositories,
-    });
-    await waitForProjects(result);
-
-    act(() => currentFirestore(result).onRunQuery());
-
-    await waitFor(() =>
-      expect(appendActivity).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'Run query',
-          area: 'firestore',
-          status: 'success',
-        }),
-      )
-    );
-  });
-
   it('surfaces invalid saved workspace state as workspace activity', async () => {
     const repositories = createMockRepositories();
     const appendActivity = vi.spyOn(repositories.activity, 'append');
@@ -115,27 +92,6 @@ describe('useAppShellController', () => {
     await waitFor(() =>
       expect(result.current.workspace.lastAction).toMatch(/Workspace persistence failed/)
     );
-  });
-
-  it('builds destructive close-tab state and confirms through tab cleanup', async () => {
-    const { result } = renderController({
-      initialTabs: [
-        { kind: 'firestore-query', connectionId: 'emu' },
-        { kind: 'js-query', connectionId: 'emu' },
-      ],
-    });
-    await waitForProjects(result);
-    const activeTabId = tabsStore.state.activeTabId;
-    expect(activeTabId).toBeTruthy();
-
-    act(() => result.current.workspace.onCloseTab(activeTabId));
-
-    await waitFor(() => expect(result.current.dialogs.destructiveAction?.title).toBe('Close tab'));
-    expect(result.current.dialogs.destructiveAction?.confirmLabel).toBe('Close');
-
-    act(() => result.current.dialogs.destructiveAction?.onConfirm());
-
-    expect(tabsStore.state.tabs.some((tab) => tab.id === activeTabId)).toBe(false);
   });
 
   it('cancels a running JS Query when closing its tab', async () => {
@@ -180,153 +136,6 @@ describe('useAppShellController', () => {
 
     expect(tabsStore.state.tabs.some((tab) => tab.id === activeTabId)).toBe(true);
     expect(result.current.workspace.lastAction).toMatch(/Still loading/);
-  });
-
-  it('switches the active tab project and clears connection-scoped selection', async () => {
-    const { result } = renderController({
-      initialTabs: [{ kind: 'auth-users', connectionId: 'emu' }],
-    });
-    await waitForProjects(result);
-    act(() => selectionActions.selectAuthUser('u_ada'));
-
-    act(() => result.current.workspace.onConnectionChange('prod'));
-
-    const activeTab = tabsStore.state.tabs.find((tab) => tab.id === tabsStore.state.activeTabId);
-    expect(activeTab?.connectionId).toBe('prod');
-    expect(selectionStore.state.authUserId).toBeNull();
-    expect(result.current.workspace.lastAction).toBe('Changed tab account');
-  });
-
-  it('runs document path queries through getDocument', async () => {
-    const repositories = createMockRepositories();
-    const getDocument = vi.spyOn(repositories.firestore, 'getDocument');
-    const runQuery = vi.spyOn(repositories.firestore, 'runQuery');
-    const { result } = renderController({
-      initialTabs: [{ kind: 'firestore-query', connectionId: 'emu', path: 'orders' }],
-      repositories,
-    });
-    await waitForProjects(result);
-
-    act(() =>
-      currentFirestore(result).onDraftChange({
-        ...currentFirestore(result).draft,
-        path: 'orders/ord_1024',
-      })
-    );
-    act(() => currentFirestore(result).onRunQuery());
-
-    await waitFor(() => expect(getDocument).toHaveBeenCalledWith('emu', 'orders/ord_1024'));
-    expect(runQuery).not.toHaveBeenCalled();
-  });
-
-  it('uses repository search for auth filtering', async () => {
-    const repositories = createMockRepositories();
-    const searchUsers = vi.spyOn(repositories.auth, 'searchUsers');
-    const { result } = renderController({
-      initialTabs: [{ kind: 'auth-users', connectionId: 'emu' }],
-      repositories,
-    });
-    await waitForProjects(result);
-
-    act(() => currentAuth(result).onFilterChange('grace'));
-
-    await waitFor(() => expect(searchUsers).toHaveBeenCalledWith('emu', 'grace'));
-  });
-
-  it('loads auth users when an auth tab opens and records activity', async () => {
-    const repositories = createMockRepositories();
-    const appendActivity = vi.spyOn(repositories.activity, 'append');
-    const { result } = renderController({
-      initialTabs: [{ kind: 'auth-users', connectionId: 'emu' }],
-      repositories,
-    });
-    await waitForProjects(result);
-
-    await waitFor(() => expect(currentAuth(result).users.length).toBeGreaterThan(0));
-    await waitFor(() =>
-      expect(appendActivity).toHaveBeenCalledWith(
-        expect.objectContaining({
-          action: 'Load users',
-          area: 'auth',
-          status: 'success',
-        }),
-      )
-    );
-  });
-
-  it('runs JS Query through the script runner repository', async () => {
-    const repositories = createMockRepositories();
-    const run = vi.spyOn(repositories.scriptRunner, 'run');
-    const { result } = renderController({
-      initialTabs: [{ kind: 'js-query', connectionId: 'emu' }],
-      repositories,
-    });
-    await waitForProjects(result);
-
-    act(() => currentScript(result).onRun());
-
-    await waitFor(() =>
-      expect(run).toHaveBeenCalledWith(
-        expect.objectContaining({
-          connectionId: 'emu',
-          runId: expect.any(String),
-          source: expect.any(String),
-        }),
-      )
-    );
-    await waitFor(() =>
-      expect(
-        (currentScript(result).result?.stream ?? []).some((item) =>
-          item.label === 'yield DocumentSnapshot'
-        ),
-      ).toBe(true)
-    );
-  });
-
-  it('starts the create-document flow from a collection tree node', async () => {
-    const { result } = renderController();
-    await waitForProjects(result);
-
-    act(() => result.current.sidebar.onCreateDocument(collectionNodeId('emu', 'orders')));
-
-    await waitFor(() =>
-      expect(result.current.tabView?.firestore.createDocumentRequest).toMatchObject({
-        collectionPath: 'orders',
-      })
-    );
-    expect(result.current.workspace.lastAction).toBe('Creating document in orders');
-  });
-
-  it('keeps current Firestore results when editing the draft limit', async () => {
-    const repositories = createMockRepositories();
-    const runQuery = vi.spyOn(repositories.firestore, 'runQuery');
-    const { result } = renderController({
-      initialTabs: [{ kind: 'firestore-query', connectionId: 'emu', path: 'orders' }],
-      repositories,
-    });
-    await waitForProjects(result);
-
-    act(() => currentFirestore(result).onRunQuery());
-    await waitFor(() => expect(runQuery).toHaveBeenCalledTimes(1));
-    await waitFor(() => expect(currentFirestore(result).rows.length).toBeGreaterThan(0));
-    const originalRows = currentFirestore(result).rows;
-
-    act(() =>
-      currentFirestore(result).onDraftChange({
-        ...currentFirestore(result).draft,
-        limit: 1,
-      })
-    );
-
-    expect(currentFirestore(result).rows).toStrictEqual(originalRows);
-    expect(runQuery).toHaveBeenCalledTimes(1);
-
-    act(() => currentFirestore(result).onRunQuery());
-    await waitFor(() => expect(runQuery).toHaveBeenCalledTimes(2));
-    expect(runQuery).toHaveBeenLastCalledWith(
-      expect.objectContaining({ connectionId: 'emu', path: 'orders' }),
-      expect.objectContaining({ limit: 1 }),
-    );
   });
 
   it('restores user tab state without restoring query results', async () => {
@@ -432,104 +241,6 @@ describe('useAppShellController', () => {
     expect(listUsers).not.toHaveBeenCalled();
     expect(runQuery).not.toHaveBeenCalled();
   });
-
-  it('routes document saves through the Firestore repository', async () => {
-    const repositories = createMockRepositories();
-    const saveDocument = vi.spyOn(repositories.firestore, 'saveDocument');
-    const { result } = renderController({
-      dataMode: 'live',
-      initialTabs: [{ kind: 'firestore-query', connectionId: 'emu' }],
-      repositories,
-    });
-    await waitForProjects(result);
-
-    await act(async () => {
-      await currentFirestore(result).onSaveDocument('orders/ord_1024', { status: 'paid' });
-    });
-
-    expect(saveDocument).toHaveBeenCalledWith(
-      'emu',
-      'orders/ord_1024',
-      { status: 'paid' },
-      undefined,
-    );
-  });
-
-  it('routes document creates through the Firestore repository', async () => {
-    const repositories = createMockRepositories();
-    const createDocument = vi.spyOn(repositories.firestore, 'createDocument');
-    const { result } = renderController({
-      dataMode: 'live',
-      initialTabs: [{ kind: 'firestore-query', connectionId: 'emu' }],
-      repositories,
-    });
-    await waitForProjects(result);
-
-    await act(async () => {
-      await currentFirestore(result).onCreateDocument('orders', 'ord_created', { status: 'new' });
-    });
-
-    expect(createDocument).toHaveBeenCalledWith('emu', 'orders', 'ord_created', {
-      status: 'new',
-    });
-  });
-
-  it('routes field patches through the Firestore repository', async () => {
-    const repositories = createMockRepositories();
-    const updateDocumentFields = vi.spyOn(repositories.firestore, 'updateDocumentFields');
-    const { result } = renderController({
-      dataMode: 'live',
-      initialTabs: [{ kind: 'firestore-query', connectionId: 'emu' }],
-      repositories,
-    });
-    await waitForProjects(result);
-    const operations = [{
-      baseValue: 'draft',
-      fieldPath: ['status'],
-      type: 'set' as const,
-      value: 'paid',
-    }];
-
-    await act(async () => {
-      await currentFirestore(result).onUpdateDocumentFields(
-        'orders/ord_1024',
-        operations,
-        { staleBehavior: 'save-and-notify' },
-      );
-    });
-
-    expect(updateDocumentFields).toHaveBeenCalledWith(
-      'emu',
-      'orders/ord_1024',
-      operations,
-      { staleBehavior: 'save-and-notify' },
-    );
-  });
-
-  it('routes deletes with selected subcollections and clears selected document', async () => {
-    const repositories = createMockRepositories();
-    const deleteDocument = vi.spyOn(repositories.firestore, 'deleteDocument');
-    const { result } = renderController({
-      dataMode: 'live',
-      initialTabs: [{ kind: 'firestore-query', connectionId: 'emu' }],
-      repositories,
-    });
-    await waitForProjects(result);
-    act(() => selectionActions.selectDocument('orders/ord_1024'));
-
-    await act(async () => {
-      await currentFirestore(result).onDeleteDocument('orders/ord_1024', {
-        deleteDescendantDocumentPaths: ['orders/ord_1024/events/event_1'],
-        deleteSubcollectionPaths: ['orders/ord_1024/events'],
-      });
-    });
-
-    expect(deleteDocument).toHaveBeenCalledWith('emu', 'orders/ord_1024', {
-      deleteSubcollectionPaths: ['orders/ord_1024/events'],
-    });
-    expect(deleteDocument).toHaveBeenCalledTimes(1);
-    expect(selectionStore.state.firestoreDocumentPath).toBeNull();
-  });
 });
 
 function renderController(
@@ -606,14 +317,6 @@ function currentFirestore(
   const tabView = result.current.tabView;
   if (!tabView) throw new Error('Expected an active tab view.');
   return tabView.firestore;
-}
-
-function currentAuth(
-  result: ReturnType<typeof renderController>['result'],
-) {
-  const tabView = result.current.tabView;
-  if (!tabView) throw new Error('Expected an active tab view.');
-  return tabView.auth;
 }
 
 function currentScript(

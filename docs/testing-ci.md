@@ -17,6 +17,13 @@
 - `packages/script-runner` tests cover logs, returned values, empty returns, thrown errors, and timeout behavior.
 - `packages/data-format` tests cover encode/decode round-trips for every `__type__`.
 
+## Integration Tests
+
+- Unit tests are the default. Do not add a `.unit.test.*` suffix.
+- Use `.integration.test.*` only for rare adapter or package-boundary tests where the behavior depends on real composition between several units.
+- Prefer extracting pure app-core logic and testing it with normal `.test.*` files before adding an integration test.
+- Integration tests should stay small, have a clear reason to exist, and avoid becoming broad AppShell regressions for unrelated workflows.
+
 ## E2E Tests
 
 - Start Firestore and Authentication emulators.

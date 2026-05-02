@@ -65,3 +65,5 @@
 - Cover behavior, not only types.
 - Avoid tests that only assert `satisfies`.
 - Prefer role-based UI queries that match real user interaction.
+- Unit tests are the default; do not suffix them with `.unit.test.*`.
+- Use `.integration.test.*` rarely, only when real composition across units is the behavior under test.
