@@ -163,6 +163,7 @@ export function SettingsDialog(
     <Dialog open={open} onOpenChange={onOpenChange}>
       <DialogContent
         description='Configure Firebase Desk preferences and app info.'
+        stickyHeader
         title='Settings'
       >
         <div className='grid gap-2'>

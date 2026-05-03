@@ -12,4 +12,16 @@ describe('Dialog', () => {
     expect(screen.getByRole('dialog')).toBeDefined();
     expect(screen.getByText('Settings')).toBeDefined();
   });
+
+  it('can keep the dialog header sticky while content scrolls', () => {
+    render(
+      <Dialog open>
+        <DialogContent description='Configure the app' stickyHeader title='Settings'>
+          Body
+        </DialogContent>
+      </Dialog>,
+    );
+
+    expect(screen.getByText('Settings').closest('.sticky')).toBeTruthy();
+  });
 });

@@ -50,6 +50,24 @@ describe('SettingsDialog', () => {
     expect(onOpenChange).toHaveBeenCalledWith(false);
   });
 
+  it('keeps the settings header sticky while settings content scrolls', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    render(
+      <AppearanceProvider settings={new MockSettingsRepository()}>
+        <SettingsDialog open onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    expect(screen.getByText('Settings').closest('.sticky')).toBeTruthy();
+  });
+
   it('updates density when density controls are provided', () => {
     vi.stubGlobal(
       'matchMedia',
