@@ -7,6 +7,7 @@ import {
   ContextMenu,
   ContextMenuContent,
   ContextMenuItem,
+  ContextMenuSeparator,
   ContextMenuTrigger,
   IconButton,
 } from '@firebase-desk/ui';
@@ -249,26 +250,61 @@ function SortableTab(
           />
         </div>
       </ContextMenuTrigger>
-      <ContextMenuContent>
-        <ContextMenuItem onSelect={() => onSelectTab(tab.id)}>Switch to tab</ContextMenuItem>
-        <ContextMenuItem onSelect={() => onCloseTab(tab.id)}>Close tab</ContextMenuItem>
-        <ContextMenuItem onSelect={() => onCloseOtherTabs(tab.id)}>
-          <X size={13} aria-hidden='true' /> Close Others
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => onCloseTabsToLeft(tab.id)}>
-          <ArrowLeft size={13} aria-hidden='true' /> Close Tabs to Left
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={() => onCloseTabsToRight(tab.id)}>
-          <ArrowRight size={13} aria-hidden='true' /> Close Tabs to Right
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={onSortByProject}>
-          <Database size={13} aria-hidden='true' /> Sort by Connection
-        </ContextMenuItem>
-        <ContextMenuItem onSelect={onCloseAllTabs}>
-          <Trash2 size={13} aria-hidden='true' /> Close All
-        </ContextMenuItem>
+      <ContextMenuContent className='min-w-52 p-1.5'>
+        <TabContextMenuItem
+          icon={<X size={13} aria-hidden='true' />}
+          onSelect={() => onCloseTab(tab.id)}
+        >
+          Close tab
+        </TabContextMenuItem>
+        <TabContextMenuItem
+          icon={<X size={13} aria-hidden='true' />}
+          onSelect={() => onCloseOtherTabs(tab.id)}
+        >
+          Close others
+        </TabContextMenuItem>
+        <TabContextMenuItem
+          icon={<ArrowLeft size={13} aria-hidden='true' />}
+          onSelect={() => onCloseTabsToLeft(tab.id)}
+        >
+          Close tabs to left
+        </TabContextMenuItem>
+        <TabContextMenuItem
+          icon={<ArrowRight size={13} aria-hidden='true' />}
+          onSelect={() => onCloseTabsToRight(tab.id)}
+        >
+          Close tabs to right
+        </TabContextMenuItem>
+        <ContextMenuSeparator />
+        <TabContextMenuItem
+          icon={<Database size={13} aria-hidden='true' />}
+          onSelect={onSortByProject}
+        >
+          Sort by connection
+        </TabContextMenuItem>
+        <TabContextMenuItem
+          icon={<Trash2 size={13} aria-hidden='true' />}
+          onSelect={onCloseAllTabs}
+        >
+          Close all
+        </TabContextMenuItem>
       </ContextMenuContent>
     </ContextMenu>
+  );
+}
+
+interface TabContextMenuItemProps {
+  readonly children: ReactNode;
+  readonly icon: ReactNode;
+  readonly onSelect: () => void;
+}
+
+function TabContextMenuItem({ children, icon, onSelect }: TabContextMenuItemProps) {
+  return (
+    <ContextMenuItem className='gap-2 px-2.5' onSelect={onSelect}>
+      <span className='grid size-4 shrink-0 place-items-center text-text-muted'>{icon}</span>
+      <span className='min-w-0 flex-1 truncate'>{children}</span>
+    </ContextMenuItem>
   );
 }
 
