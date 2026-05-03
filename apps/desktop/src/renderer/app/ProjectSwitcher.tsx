@@ -27,6 +27,7 @@ export function ProjectSwitcher(
         >
           <span className='text-text-muted'>Connection</span>
           <span className='truncate'>{activeProject.name}</span>
+          {activeProject.target === 'emulator' ? <Badge variant='emulator'>emulator</Badge> : null}
         </Button>
       </DropdownMenuTrigger>
       <DropdownMenuContent align='start'>
@@ -36,7 +37,7 @@ export function ProjectSwitcher(
             onSelect={() => onConnectionChange(project.id)}
           >
             <span className='min-w-0 flex-1 truncate'>{project.name}</span>
-            <Badge variant={project.target}>{project.target}</Badge>
+            {project.target === 'emulator' ? <Badge variant='emulator'>emulator</Badge> : null}
           </DropdownMenuItem>
         ))}
       </DropdownMenuContent>

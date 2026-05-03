@@ -1,4 +1,4 @@
-import { StatusBar, TargetModeBadge } from '@firebase-desk/product-ui';
+import { StatusBar } from '@firebase-desk/product-ui';
 import type { ProjectSummary } from '@firebase-desk/repo-contracts';
 import { Badge, Button } from '@firebase-desk/ui';
 import { BriefcaseBusiness, ListChecks } from 'lucide-react';
@@ -45,7 +45,6 @@ export function AppStatusBar(
     <StatusBar
       left={
         <>
-          {activeProject ? <TargetModeBadge mode={activeProject.target} /> : null}
           <span className='min-w-0 shrink truncate' title={activeProject?.name ?? 'No project'}>
             {activeProject?.name ?? 'No project'}
           </span>

@@ -44,5 +44,7 @@ describe('AppStatusBar', () => {
     expect(screen.getByRole('button', { name: /activity/i }).className).toContain(
       'whitespace-nowrap',
     );
+    expect(screen.queryByText(/target/i)).toBeNull();
+    expect(screen.queryByText(/emulator/i)).toBeNull();
   });
 });
