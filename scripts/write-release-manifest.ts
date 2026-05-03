@@ -1,7 +1,7 @@
 import { createHash } from 'node:crypto';
 import { createReadStream } from 'node:fs';
 import { mkdir, readdir, readFile, stat, writeFile } from 'node:fs/promises';
-import { basename, dirname, extname, relative, resolve } from 'node:path';
+import { basename, dirname, extname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 interface PackageJson {
@@ -101,7 +101,7 @@ async function assetFromFile(root: string, filePath: string): Promise<ReleaseMan
     arch: archFromName(basename(filePath)),
     kind: isChecksumFile(filePath) ? 'checksums' : 'package',
     name: basename(filePath),
-    path: relative(root, filePath),
+    path: basename(filePath),
     platform: platformFromName(basename(filePath)),
     sha256: await digest(filePath),
     size: fileStat.size,
