@@ -1,6 +1,10 @@
 // @vitest-environment jsdom
 
-import type { FirestoreDocumentResult, ProjectSummary } from '@firebase-desk/repo-contracts';
+import type {
+  FirestoreDocumentResult,
+  FirestoreQuery,
+  ProjectSummary,
+} from '@firebase-desk/repo-contracts';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRepositories } from '../RepositoryProvider.tsx';
@@ -36,6 +40,10 @@ const tab: WorkspaceTab = {
 
 const rows: ReadonlyArray<FirestoreDocumentResult> = [
   { id: 'ord_1024', path: 'orders/ord_1024', data: { status: 'paid' }, hasSubcollections: false },
+];
+
+const openRows: ReadonlyArray<FirestoreDocumentResult> = [
+  { id: 'ord_1025', path: 'orders/ord_1025', data: { status: 'open' }, hasSubcollections: false },
 ];
 
 describe('useFirestoreTabState', () => {
@@ -171,6 +179,52 @@ describe('useFirestoreTabState', () => {
       expect.objectContaining({ connectionId: 'emu', path: 'orders' }),
       expect.objectContaining({ limit: 1 }),
     );
+  });
+
+  it('keeps query results isolated for multiple tabs on the same collection', async () => {
+    const secondTab: WorkspaceTab = { ...tab, id: 'tab-firestore-query-2' };
+    firestore.runQuery.mockImplementation(async (query: FirestoreQuery) => ({
+      items: query.filters?.some((filter) => filter.value === 'open') ? openRows : rows,
+      nextCursor: null,
+    }));
+    let activeTab = tab;
+    const { rerender, result } = renderHook(() =>
+      useFirestoreTabState({
+        activeProject: project,
+        activeTab,
+        selectedTreeItemId: 'collection:emu:orders',
+      })
+    );
+
+    act(() =>
+      result.current.setDraft({
+        ...result.current.activeDraft,
+        filters: [{ id: 'status-paid', field: 'status', op: '==', value: '"paid"' }],
+      })
+    );
+    act(() => {
+      result.current.runQuery();
+    });
+    await waitFor(() => expect(result.current.queryRows).toEqual(rows));
+
+    activeTab = secondTab;
+    rerender();
+    act(() =>
+      result.current.setDraft({
+        ...result.current.activeDraft,
+        filters: [{ id: 'status-open', field: 'status', op: '==', value: '"open"' }],
+      })
+    );
+    act(() => {
+      result.current.runQuery();
+    });
+    await waitFor(() => expect(result.current.queryRows).toEqual(openRows));
+
+    activeTab = tab;
+    rerender();
+
+    expect(result.current.queryRows).toEqual(rows);
+    expect(result.current.activeDraft.filters?.[0]?.value).toBe('"paid"');
   });
 
   it('keeps selected document scoped to current query rows', async () => {

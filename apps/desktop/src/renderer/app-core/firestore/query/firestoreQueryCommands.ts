@@ -20,6 +20,7 @@ import {
   firestoreQueryMetadata,
   selectFirestoreLoadedPageCount,
   selectFirestoreResultRows,
+  selectFirestoreTabResultState,
 } from './firestoreQuerySelectors.ts';
 import type { FirestoreQueryPage, FirestoreQueryRuntimeState } from './firestoreQueryState.ts';
 import {
@@ -147,10 +148,10 @@ export function runFirestoreQueryCommand(
 
 export function loadMoreFirestoreQueryCommand(
   state: FirestoreQueryRuntimeState,
-  input: { readonly isDocumentQuery: boolean; },
+  input: { readonly isDocumentQuery: boolean; readonly tabId: string | null; },
 ): FirestoreLoadMoreCommandResult {
-  if (input.isDocumentQuery) return { shouldFetchNextPage: false, state };
-  return { shouldFetchNextPage: true, state: firestoreLoadMoreStarted(state) };
+  if (input.isDocumentQuery || !input.tabId) return { shouldFetchNextPage: false, state };
+  return { shouldFetchNextPage: true, state: firestoreLoadMoreStarted(state, input.tabId) };
 }
 
 export async function executeFirestoreQueryCommand(
@@ -176,7 +177,7 @@ export async function executeFirestoreQueryCommand(
     const transition = (current: FirestoreQueryRuntimeState) =>
       input.isRefresh
         ? firestoreRefreshSucceeded(current, input.tab.id, pages, hasMore)
-        : firestoreQuerySucceeded(current, pages, hasMore);
+        : firestoreQuerySucceeded(current, input.tab.id, pages, hasMore);
     completeExecutedFirestoreQuery(store, env, {
       commandOptions: input.commandOptions,
       draft: input.draft,
@@ -201,7 +202,7 @@ export async function executeFirestoreQueryCommand(
       resultCount: 0,
       runId,
       tab: input.tab,
-      transition: (current) => firestoreQueryFailed(current, loadErrorMessage),
+      transition: (current) => firestoreQueryFailed(current, input.tab.id, loadErrorMessage),
     });
   }
 }
@@ -216,9 +217,10 @@ export async function executeFirestoreLoadMoreCommand(
   },
 ): Promise<void> {
   const stateSnapshot = store.get();
-  const cursor = stateSnapshot.pages[stateSnapshot.pages.length - 1]?.nextCursor;
+  const tabResult = selectFirestoreTabResultState(stateSnapshot, input.tab);
+  const cursor = tabResult.pages[tabResult.pages.length - 1]?.nextCursor;
   if (!cursor) {
-    store.update((state) => firestoreLoadMoreSucceeded(state, { items: [] }, false));
+    store.update((state) => firestoreLoadMoreSucceeded(state, input.tab.id, { items: [] }, false));
     return;
   }
   const startedAt = env.now();
@@ -230,6 +232,7 @@ export async function executeFirestoreLoadMoreCommand(
       currentRun = true;
       return firestoreLoadMoreSucceeded(
         state,
+        input.tab.id,
         firestoreQueryPage(page.items, page.nextCursor),
         Boolean(page.nextCursor),
       );
@@ -251,7 +254,7 @@ export async function executeFirestoreLoadMoreCommand(
     store.update((state) => {
       if (!isCurrentFirestoreQueryRun(state, input.tab.id, input.request.runId)) return state;
       currentRun = true;
-      return firestoreLoadMoreFailed(state, moreErrorMessage);
+      return firestoreLoadMoreFailed(state, input.tab.id, moreErrorMessage);
     });
     if (currentRun) {
       void env.recordActivity?.(firestoreLoadMoreActivity({

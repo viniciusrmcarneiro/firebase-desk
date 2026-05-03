@@ -100,13 +100,17 @@ describe('firestore query commands', () => {
       createInitialFirestoreQueryRuntimeState(),
       {
         isDocumentQuery: false,
+        tabId: tab.id,
       },
     );
     expect(collectionResult.shouldFetchNextPage).toBe(true);
     expect(collectionResult.state.isFetchingMore).toBe(true);
 
     const documentState = createInitialFirestoreQueryRuntimeState();
-    expect(loadMoreFirestoreQueryCommand(documentState, { isDocumentQuery: true })).toEqual({
+    expect(loadMoreFirestoreQueryCommand(documentState, {
+      isDocumentQuery: true,
+      tabId: tab.id,
+    })).toEqual({
       shouldFetchNextPage: false,
       state: documentState,
     });
@@ -236,7 +240,7 @@ describe('firestore query commands', () => {
       cursor: { token: 'page-2' },
       limit: 25,
     });
-    expect(store.get().pages).toHaveLength(2);
+    expect(store.get().resultsByTab[tab.id]?.pages).toHaveLength(2);
     expect(recordActivity).toHaveBeenCalledTimes(1);
     expect(recordActivity).toHaveBeenCalledWith(expect.objectContaining({
       durationMs: 45,
@@ -276,7 +280,7 @@ describe('firestore query commands', () => {
       tab,
     });
 
-    expect(store.get().pages).toEqual([]);
+    expect(store.get().resultsByTab[tab.id]?.pages).toEqual([]);
     expect(store.get().queryRequests[tab.id]?.query.path).toBe('customers');
     expect(recordActivity).not.toHaveBeenCalled();
   });
@@ -311,7 +315,10 @@ describe('firestore query commands', () => {
       request: submitted.queryRequests[tab.id]!,
       tab,
     });
-    const loadMore = loadMoreFirestoreQueryCommand(store.get(), { isDocumentQuery: false });
+    const loadMore = loadMoreFirestoreQueryCommand(store.get(), {
+      isDocumentQuery: false,
+      tabId: tab.id,
+    });
     store.set(loadMore.state);
 
     await executeFirestoreLoadMoreCommand(store, {
@@ -328,7 +335,9 @@ describe('firestore query commands', () => {
       cursor: { token: 'page-2' },
       limit: 25,
     });
-    expect(store.get().pages.flatMap((page) => page.items.map((item) => item.id))).toEqual([
+    expect(
+      store.get().resultsByTab[tab.id]?.pages.flatMap((page) => page.items.map((item) => item.id)),
+    ).toEqual([
       'ord_1',
       'ord_2',
     ]);

@@ -147,6 +147,44 @@ describe('useAuthTabState', () => {
     expect(auth.listUsers).toHaveBeenLastCalledWith('emu', { limit: 25 });
   });
 
+  it('keeps user lists isolated by project and does not reload loaded tabs on revisit', async () => {
+    auth.listUsers.mockImplementation(async (projectId) => ({
+      items: projectId === 'prod' ? [ada] : [grace],
+      nextCursor: null,
+    }));
+    let activeProject = project;
+    let activeTab: WorkspaceTab | undefined = tab;
+    const { rerender, result } = renderHook(() =>
+      useAuthTabState({
+        activeProject,
+        activeTab,
+        recordActivity: vi.fn(),
+        selectedUserId: null,
+      })
+    );
+
+    await waitFor(() => expect(result.current.users).toEqual([grace]));
+    expect(auth.listUsers).toHaveBeenCalledTimes(1);
+
+    activeProject = prodProject;
+    activeTab = { ...tab, connectionId: 'prod', id: 'tab-auth-prod' };
+    rerender();
+
+    expect(result.current.users).toEqual([]);
+    await waitFor(() => expect(result.current.users).toEqual([ada]));
+    expect(auth.listUsers).toHaveBeenCalledTimes(2);
+
+    activeTab = { ...tab, kind: 'firestore-query' };
+    rerender();
+    activeProject = project;
+    activeTab = tab;
+    rerender();
+
+    expect(result.current.users).toEqual([grace]);
+    await Promise.resolve();
+    expect(auth.listUsers).toHaveBeenCalledTimes(2);
+  });
+
   it('records successful initial user loads once', async () => {
     const recordActivity = vi.fn();
     const { rerender } = renderHook(() =>
@@ -249,4 +287,12 @@ const project: ProjectSummary = {
   hasCredential: false,
   credentialEncrypted: null,
   createdAt: '2026-04-27T00:00:00.000Z',
+};
+
+const prodProject: ProjectSummary = {
+  ...project,
+  id: 'prod',
+  name: 'Production',
+  projectId: 'prod',
+  target: 'production',
 };

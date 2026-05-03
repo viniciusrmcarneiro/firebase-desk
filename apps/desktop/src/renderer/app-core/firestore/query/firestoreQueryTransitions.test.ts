@@ -58,32 +58,37 @@ describe('firestore query transitions and selectors', () => {
 
   it('stores successful and failed query results', () => {
     const row = document('orders/ord_1');
-    const succeeded = firestoreQuerySucceeded(createInitialFirestoreQueryRuntimeState(), [{
-      items: [row],
-    }], true);
+    const succeeded = firestoreQuerySucceeded(
+      createInitialFirestoreQueryRuntimeState(),
+      'tab-1',
+      [{ items: [row] }],
+      true,
+    );
 
     expect(succeeded.pages).toEqual([{ items: [row] }]);
+    expect(succeeded.resultsByTab['tab-1']?.pages).toEqual([{ items: [row] }]);
     expect(succeeded.hasMore).toBe(true);
     expect(succeeded.isLoading).toBe(false);
 
-    const failed = firestoreQueryFailed(succeeded, 'failed');
+    const failed = firestoreQueryFailed(succeeded, 'tab-1', 'failed');
     expect(failed.errorMessage).toBe('failed');
     expect(failed.isLoading).toBe(false);
   });
 
   it('loads more pages and captures load-more errors', () => {
-    const started = firestoreLoadMoreStarted(createInitialFirestoreQueryRuntimeState());
+    const started = firestoreLoadMoreStarted(createInitialFirestoreQueryRuntimeState(), 'tab-1');
     expect(started.isFetchingMore).toBe(true);
 
     const loaded = firestoreLoadMoreSucceeded(
       started,
+      'tab-1',
       { items: [document('orders/ord_1')] },
       false,
     );
     expect(loaded.pages).toHaveLength(1);
     expect(loaded.isFetchingMore).toBe(false);
 
-    const failed = firestoreLoadMoreFailed(started, 'fetch failed');
+    const failed = firestoreLoadMoreFailed(started, 'tab-1', 'fetch failed');
     expect(failed.errorMessage).toBe('fetch failed');
     expect(failed.isFetchingMore).toBe(false);
   });
@@ -133,9 +138,11 @@ describe('firestore query transitions and selectors', () => {
   });
 
   it('merges loaded subcollections into matching result rows', () => {
-    const state = firestoreQuerySucceeded(createInitialFirestoreQueryRuntimeState(), [{
-      items: [document('orders/ord_1'), document('orders/ord_2')],
-    }]);
+    const state = firestoreQuerySucceeded(
+      createInitialFirestoreQueryRuntimeState(),
+      'tab-1',
+      [{ items: [document('orders/ord_1'), document('orders/ord_2')] }],
+    );
 
     const merged = firestoreSubcollectionsLoaded(state, 'orders/ord_1', [{
       id: 'events',

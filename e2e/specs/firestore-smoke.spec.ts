@@ -28,6 +28,10 @@ test('Firestore query, create, edit, conflict, and delete flows use emulator UI'
       await querySeededOrders(page);
     });
 
+    await test.step('same collection tabs keep independent query results', async () => {
+      await querySameCollectionInTwoTabs(page);
+    });
+
     await test.step('create first document for a new collection from sidebar', async () => {
       await createCollectionFromSidebar(page, suffix);
     });
@@ -113,6 +117,37 @@ async function querySeededOrders(page: Page): Promise<void> {
   await page.getByLabel('Sort direction').selectOption('desc');
   await page.getByRole('button', { name: 'Run' }).click();
   await expect(page.getByText('ord_1123')).toBeVisible();
+}
+
+async function querySameCollectionInTwoTabs(page: Page): Promise<void> {
+  const tree = page.getByRole('tree', { name: 'Account tree' });
+  const workspaceTabs = page.locator('[role="tablist"]').first();
+
+  await page.getByLabel('Query path').fill('orders');
+  await page.getByLabel('Result limit').fill('1');
+  await clearFiltersAndSort(page);
+  await queryField(page, 'Sort field').fill('total');
+  await page.getByLabel('Sort direction').selectOption('desc');
+  await page.getByRole('button', { name: 'Run' }).click();
+  await expectResultDocumentId(page, 'ord_1123');
+
+  await tree.getByRole('treeitem', { name: /orders/ }).dblclick();
+  await expect(workspaceTabs.getByRole('tab', { name: /orders/ })).toHaveCount(2);
+  await page.getByLabel('Query path').fill('orders');
+  await page.getByLabel('Result limit').fill('2');
+  await clearFiltersAndSort(page);
+  await ensureFilterRow(page);
+  await queryField(page, 'Filter 1 field').fill('status');
+  await page.getByLabel('Filter 1 value').fill('paid');
+  await page.getByRole('button', { name: 'Run' }).click();
+  await expectResultDocumentId(page, 'ord_1024');
+
+  await workspaceTabs.getByRole('tab', { name: /orders/ }).first().click();
+  await expectResultDocumentId(page, 'ord_1123');
+  await expect(resultDocumentIdCell(page, 'ord_1024')).toHaveCount(0);
+
+  await workspaceTabs.getByRole('tab', { name: /orders/ }).nth(1).click();
+  await expectResultDocumentId(page, 'ord_1024');
 }
 
 async function createCollectionFromSidebar(page: Page, suffix: string): Promise<void> {

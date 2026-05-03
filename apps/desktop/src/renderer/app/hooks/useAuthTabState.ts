@@ -1,5 +1,5 @@
 import type { AuthUser, ProjectSummary } from '@firebase-desk/repo-contracts';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   type AuthCommandEnvironment,
   clearAuthFilterCommand,
@@ -50,12 +50,18 @@ export function useAuthTabState(
     store: inputStore,
   }: UseAuthTabStateInput,
 ): AuthTabState {
-  const store = useMemo(
-    () => inputStore ?? createAuthStore({ filter: initialAuthFilter }),
-    [initialAuthFilter, inputStore],
-  );
-  const state = useAppCoreSelector(store, (snapshot) => snapshot);
   const activeProjectId = activeTab?.kind === 'auth-users' ? activeProject?.id ?? null : null;
+  const storeCache = useRef<{
+    readonly stores: Map<string, AuthStore>;
+    initialAuthFilter: string;
+  }>({ initialAuthFilter, stores: new Map() });
+  if (storeCache.current.initialAuthFilter !== initialAuthFilter) {
+    storeCache.current.initialAuthFilter = initialAuthFilter;
+    storeCache.current.stores.clear();
+  }
+  const store = inputStore
+    ?? authStoreFor(activeProjectId ?? 'inactive', storeCache.current.stores, initialAuthFilter);
+  const state = useAppCoreSelector(store, (snapshot) => snapshot);
   const repositories = useRepositories();
   const model = selectAuthUsersModel(state, {
     listError: state.errorMessage,
@@ -138,4 +144,16 @@ export function useAuthTabState(
     saveCustomClaims,
     setAuthFilter: (value) => store.update((current) => setAuthFilterCommand(current, value)),
   };
+}
+
+function authStoreFor(
+  key: string,
+  stores: Map<string, AuthStore>,
+  initialAuthFilter: string,
+): AuthStore {
+  const existing = stores.get(key);
+  if (existing) return existing;
+  const store = createAuthStore({ filter: initialAuthFilter });
+  stores.set(key, store);
+  return store;
 }

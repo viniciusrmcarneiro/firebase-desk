@@ -21,6 +21,7 @@ import {
   selectFirestoreLoadedPageCount,
   selectFirestoreResultRows,
   selectFirestoreSelectedDocument,
+  selectFirestoreTabResultState,
 } from '../../app-core/firestore/query/firestoreQuerySelectors.ts';
 import {
   createInitialFirestoreQueryRuntimeState,
@@ -131,15 +132,16 @@ export function useFirestoreTabState(
   );
   const submittedQuery = activeQueryRequest?.query ?? null;
   const queryRequestIsDocument = submittedQuery ? isDocumentPath(submittedQuery.path) : false;
-  const queryRows = activeQueryRequest ? selectFirestoreResultRows(queryState.pages) : [];
+  const activeResult = selectFirestoreTabResultState(queryState, activeTab);
+  const queryRows = activeQueryRequest ? selectFirestoreResultRows(activeResult.pages) : [];
   const activeSelectedDocumentPath = activeTab?.kind === 'firestore-query'
     ? queryState.selectedDocumentPaths[activeTab.id] ?? null
     : null;
   const selectedDocument = selectFirestoreSelectedDocument(queryRows, activeSelectedDocumentPath);
   const selectedDocumentPath = selectedDocument?.path ?? null;
-  const activeErrorMessage = queryState.errorMessage;
+  const activeErrorMessage = activeResult.errorMessage;
   const activeLoadedPageCount = selectFirestoreLoadedPageCount(
-    queryState.pages,
+    activeResult.pages,
     queryRequestIsDocument,
     queryRows.length > 0,
   );
@@ -240,16 +242,7 @@ export function useFirestoreTabState(
   function clearTab(tabId: string) {
     updateQueryState((current) => {
       const cleared = firestoreTabCleared(current, tabId);
-      return activeTab?.id === tabId
-        ? {
-          ...cleared,
-          errorMessage: null,
-          hasMore: false,
-          isFetchingMore: false,
-          isLoading: false,
-          pages: [],
-        }
-        : cleared;
+      return activeTab?.id === tabId ? { ...cleared, errorMessage: null } : cleared;
     });
     selectDocument(tabId, null);
   }
@@ -262,6 +255,7 @@ export function useFirestoreTabState(
   function loadMore() {
     const result = loadMoreFirestoreQueryCommand(queryState, {
       isDocumentQuery: queryRequestIsDocument,
+      tabId: activeTab?.kind === 'firestore-query' ? activeTab.id : null,
     });
     updateQueryState(result.state);
     if (result.shouldFetchNextPage && activeTab?.kind === 'firestore-query' && activeQueryRequest) {
@@ -280,9 +274,9 @@ export function useFirestoreTabState(
     activeQueryPath: submittedQuery?.path ?? null,
     activeQueryRunId: activeQueryRequest?.runId ?? null,
     errorMessage: activeErrorMessage,
-    hasMore: !queryRequestIsDocument && queryState.hasMore,
-    isFetchingMore: !queryRequestIsDocument && queryState.isFetchingMore,
-    isLoading: queryState.isLoading,
+    hasMore: !queryRequestIsDocument && activeResult.hasMore,
+    isFetchingMore: !queryRequestIsDocument && activeResult.isFetchingMore,
+    isLoading: activeResult.isLoading,
     isTabLoading,
     queryRows,
     selectedDocument,
@@ -299,6 +293,7 @@ export function useFirestoreTabState(
   };
 
   function isTabLoading(tabId: string): boolean {
-    return activeTab?.id === tabId && (queryState.isLoading || queryState.isFetchingMore);
+    const tabResult = queryState.resultsByTab[tabId];
+    return Boolean(tabResult?.isLoading || tabResult?.isFetchingMore);
   }
 }
