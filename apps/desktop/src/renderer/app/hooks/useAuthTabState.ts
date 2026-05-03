@@ -1,20 +1,19 @@
 import type { AuthUser, ProjectSummary } from '@firebase-desk/repo-contracts';
-import { useEffect, useMemo } from 'react';
+import { useEffect, useRef } from 'react';
 import {
   type AuthCommandEnvironment,
-  type AuthStore,
-  authUsersFailureActivityCommand,
   clearAuthFilterCommand,
-  createAuthStore,
+  loadAuthUsersCommand,
   loadMoreAuthUsersCommand,
   refreshAuthUsersCommand,
   saveAuthCustomClaimsCommand,
-  selectAuthUsersModel,
   setAuthFilterCommand,
-} from '../../app-core/auth/index.ts';
-import { useAppCoreSelector } from '../../app-core/shared/index.ts';
+} from '../../app-core/auth/authCommands.ts';
+import { selectAuthUsersModel } from '../../app-core/auth/authSelectors.ts';
+import { type AuthStore, createAuthStore } from '../../app-core/auth/authStore.ts';
+import { useAppCoreSelector } from '../../app-core/shared/reactStore.ts';
+import { useRepositories } from '../RepositoryProvider.tsx';
 import type { WorkspaceTab } from '../stores/tabsStore.ts';
-import { useSearchUsers, useSetCustomClaims, useUsers } from './useRepositoriesData.ts';
 
 interface UseAuthTabStateInput {
   readonly activeProject: ProjectSummary | null;
@@ -34,6 +33,7 @@ export interface AuthTabState {
   readonly usersIsFetchingMore: boolean;
   readonly usersIsLoading: boolean;
   readonly clear: () => void;
+  readonly isTabLoading: (tabId: string) => boolean;
   readonly loadMore: () => void;
   readonly refetch: () => void;
   readonly saveCustomClaims: (uid: string, claims: Record<string, unknown>) => Promise<void>;
@@ -50,67 +50,71 @@ export function useAuthTabState(
     store: inputStore,
   }: UseAuthTabStateInput,
 ): AuthTabState {
-  const store = useMemo(
-    () => inputStore ?? createAuthStore({ filter: initialAuthFilter }),
-    [initialAuthFilter, inputStore],
-  );
-  const state = useAppCoreSelector(store, (snapshot) => snapshot);
   const activeProjectId = activeTab?.kind === 'auth-users' ? activeProject?.id ?? null : null;
-  const scopeId = activeTab?.kind === 'auth-users' ? activeTab.id : 'inactive';
-  const usersQuery = useUsers(activeProjectId, 25, scopeId, state.refreshRunId);
-  const authSearchText = state.filter.trim();
-  const usersSearchQuery = useSearchUsers(
-    activeProjectId,
-    authSearchText,
-    Boolean(authSearchText),
-    scopeId,
-    state.refreshRunId,
-  );
-  const listUsers = usersQuery.data?.pages.flatMap((page) => page.items) ?? [];
-  const searchUsers = usersSearchQuery.data ?? [];
+  const storeCache = useRef<{
+    readonly stores: Map<string, AuthStore>;
+    initialAuthFilter: string;
+  }>({ initialAuthFilter, stores: new Map() });
+  if (storeCache.current.initialAuthFilter !== initialAuthFilter) {
+    storeCache.current.initialAuthFilter = initialAuthFilter;
+    storeCache.current.stores.clear();
+  }
+  const store = inputStore
+    ?? authStoreFor(activeProjectId ?? 'inactive', storeCache.current.stores, initialAuthFilter);
+  const state = useAppCoreSelector(store, (snapshot) => snapshot);
+  const repositories = useRepositories();
   const model = selectAuthUsersModel(state, {
-    listError: usersQuery.error,
-    listHasMore: Boolean(usersQuery.hasNextPage),
-    listIsFetchingMore: usersQuery.isFetchingNextPage,
-    listIsLoading: usersQuery.isLoading,
-    listUsers,
+    listError: state.errorMessage,
+    listHasMore: state.usersHasMore,
+    listIsFetchingMore: state.usersIsFetchingMore,
+    listIsLoading: state.usersIsLoading,
+    listUsers: activeProjectId ? state.users : [],
     projectId: activeProjectId,
-    searchError: usersSearchQuery.error,
-    searchIsLoading: usersSearchQuery.isLoading,
-    searchUsers,
+    searchError: state.errorMessage,
+    searchIsLoading: state.usersIsLoading,
+    searchUsers: activeProjectId ? state.searchUsers : [],
     selectedUserId,
   });
-  const setCustomClaims = useSetCustomClaims();
   const env: AuthCommandEnvironment = {
+    listUsers: (projectId, request) => repositories.auth.listUsers(projectId, request),
     now: Date.now,
     recordActivity,
+    searchUsers: (projectId, query) => repositories.auth.searchUsers(projectId, query),
     setCustomClaims: (projectId, uid, claims) =>
-      setCustomClaims.mutateAsync({ claims, projectId, uid }),
+      repositories.auth.setCustomClaims(projectId, uid, claims),
   };
 
   useEffect(() => {
-    const result = authUsersFailureActivityCommand(store.get(), {
-      errorMessage: model.errorMessage,
-      filter: state.filter,
+    void loadAuthUsersCommand(store, env, {
+      project: activeProject
+        ? { connectionId: activeProject.id, projectId: activeProject.projectId }
+        : null,
       tab: activeTab,
     });
-    if (result.state !== store.get()) store.set(result.state);
-    if (result.activity) void recordActivity(result.activity);
-  }, [activeTab, model.errorMessage, recordActivity, state.filter, store]);
+  }, [
+    activeProject?.id,
+    activeProject?.projectId,
+    activeTab,
+    repositories.auth,
+    recordActivity,
+    state.filter,
+    store,
+  ]);
 
   function loadMore() {
-    loadMoreAuthUsersCommand(env, {
-      connectionId: activeProject?.id,
-      fetchNextPage: () => void usersQuery.fetchNextPage(),
-      filter: state.filter,
+    void loadMoreAuthUsersCommand(store, env, {
+      project: activeProject
+        ? { connectionId: activeProject.id, projectId: activeProject.projectId }
+        : null,
     });
   }
 
   function refetch() {
-    refreshAuthUsersCommand(store, env, {
-      connectionId: activeProject?.id,
-      filter: state.filter,
-      projectId: activeProjectId,
+    void refreshAuthUsersCommand(store, env, {
+      project: activeProject
+        ? { connectionId: activeProject.id, projectId: activeProject.projectId }
+        : null,
+      tab: activeTab,
     });
   }
 
@@ -133,9 +137,23 @@ export function useAuthTabState(
     usersIsFetchingMore: model.usersIsFetchingMore,
     usersIsLoading: model.usersIsLoading,
     clear: () => store.update(clearAuthFilterCommand),
+    isTabLoading: (tabId) =>
+      activeTab?.id === tabId && (state.usersIsLoading || state.usersIsFetchingMore),
     loadMore,
     refetch,
     saveCustomClaims,
     setAuthFilter: (value) => store.update((current) => setAuthFilterCommand(current, value)),
   };
+}
+
+function authStoreFor(
+  key: string,
+  stores: Map<string, AuthStore>,
+  initialAuthFilter: string,
+): AuthStore {
+  const existing = stores.get(key);
+  if (existing) return existing;
+  const store = createAuthStore({ filter: initialAuthFilter });
+  stores.set(key, store);
+  return store;
 }

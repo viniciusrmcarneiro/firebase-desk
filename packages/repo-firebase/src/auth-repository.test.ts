@@ -65,6 +65,15 @@ describe('FirebaseAuthRepository', () => {
     expect(process.env['FIREBASE_AUTH_EMULATOR_HOST']).toBe('localhost:9999');
   });
 
+  it('uses the shared default page size when no limit is provided', async () => {
+    firebaseMocks.auth.listUsers.mockResolvedValue({ users: [], pageToken: undefined });
+    const { repository } = createRepository();
+
+    await repository.listUsers('emu');
+
+    expect(firebaseMocks.auth.listUsers).toHaveBeenCalledWith(25, undefined);
+  });
+
   it('searches by exact uid and email and dedupes results', async () => {
     const user = userRecord({ email: 'ada@example.com', uid: 'u_ada' });
     firebaseMocks.auth.getUser.mockResolvedValue(user);
@@ -113,6 +122,16 @@ describe('FirebaseAuthRepository', () => {
     expect(firebaseMocks.auth.setCustomUserClaims).toHaveBeenCalledWith('u_ada', {
       role: 'owner',
     });
+  });
+
+  it('rejects non-object custom claims', async () => {
+    const { repository } = createRepository();
+
+    await expect(
+      repository.setCustomClaims('emu', 'u_ada', [] as unknown as Record<string, unknown>),
+    )
+      .rejects.toThrow('Custom claims JSON must be an object.');
+    expect(firebaseMocks.auth.setCustomUserClaims).not.toHaveBeenCalled();
   });
 });
 

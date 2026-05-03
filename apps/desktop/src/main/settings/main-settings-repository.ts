@@ -45,6 +45,9 @@ export class MainSettingsRepository implements SettingsRepository {
       firestoreWrites: normalizeFirestoreWriteSettings(
         patch.firestoreWrites ?? current.firestoreWrites,
       ),
+      workspaceState: patch.workspaceState === undefined
+        ? cloneWorkspaceState(current.workspaceState)
+        : cloneWorkspaceState(patch.workspaceState),
     });
   }
 
@@ -55,6 +58,11 @@ export class MainSettingsRepository implements SettingsRepository {
   async setHotkeyOverrides(overrides: HotkeyOverrides): Promise<void> {
     await this.save({ hotkeyOverrides: { ...overrides } });
   }
+}
+
+function cloneWorkspaceState(value: unknown | null): unknown | null {
+  if (value === null || value === undefined) return null;
+  return JSON.parse(JSON.stringify(value)) as unknown;
 }
 
 function cloneActivityLogSettings(settings: ActivityLogSettings): ActivityLogSettings {

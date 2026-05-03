@@ -2,18 +2,36 @@ import type { editor as MonacoEditorTypes } from 'monaco-editor';
 import { lazy, Suspense, useEffect, useRef } from 'react';
 import { useAppearance } from '../appearance/AppearanceProvider.tsx';
 
+type MonacoEditorApiModule = typeof import('monaco-editor');
+type MonacoExtraLibDefaults = {
+  readonly addExtraLib: (
+    content: string,
+    filePath?: string,
+  ) => { dispose(): void; };
+};
+interface MonacoTypeScriptContribution {
+  readonly javascriptDefaults: MonacoExtraLibDefaults;
+  readonly typescriptDefaults: MonacoExtraLibDefaults;
+}
+
+export interface CodeEditorExtraLib {
+  readonly content: string;
+  readonly filePath: string;
+}
+
 const MonacoEditor = lazy(async () => {
-  const module = await import('@monaco-editor/react');
+  const module = await loadMonacoReact();
   return { default: module.default };
 });
 
 const MonacoDiffEditor = lazy(async () => {
-  const module = await import('@monaco-editor/react');
+  const module = await loadMonacoReact();
   return { default: module.DiffEditor };
 });
 
 export interface CodeEditorProps {
   readonly ariaLabel?: string;
+  readonly extraLibs?: ReadonlyArray<CodeEditorExtraLib> | undefined;
   readonly height?: string;
   readonly language: string;
   readonly onChange?: (value: string) => void;
@@ -22,7 +40,15 @@ export interface CodeEditorProps {
 }
 
 export function CodeEditor(
-  { ariaLabel, height = '100%', language, onChange, readOnly = false, value }: CodeEditorProps,
+  {
+    ariaLabel,
+    extraLibs,
+    height = '100%',
+    language,
+    onChange,
+    readOnly = false,
+    value,
+  }: CodeEditorProps,
 ) {
   const { resolvedTheme } = useAppearance();
   const options: MonacoEditorTypes.IStandaloneEditorConstructionOptions = {
@@ -34,6 +60,10 @@ export function CodeEditor(
   return (
     <Suspense fallback={<div role='status'>Loading editor</div>}>
       <MonacoEditor
+        beforeMount={(monaco) => {
+          registerExtraLibs(extraLibs ?? []);
+          exposeMonacoForDiagnostics(monaco);
+        }}
         height={height}
         language={language}
         options={options}
@@ -74,6 +104,7 @@ export function DiffCodeEditor(
   return (
     <Suspense fallback={<div role='status'>Loading editor</div>}>
       <MonacoDiffEditor
+        beforeMount={exposeMonacoForDiagnostics}
         height={height}
         language={language}
         modified={modified}
@@ -95,4 +126,52 @@ export function DiffCodeEditor(
       />
     </Suspense>
   );
+}
+
+async function loadMonacoReact(): Promise<typeof import('@monaco-editor/react')> {
+  const [module, monaco, , , , typeScriptContribution] = await Promise.all([
+    import('@monaco-editor/react'),
+    // @ts-expect-error Monaco does not publish declarations for this ESM entry.
+    import('monaco-editor/esm/vs/editor/editor.api'),
+    // @ts-expect-error Monaco does not publish declarations for this ESM entry.
+    import('monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution'),
+    // @ts-expect-error Monaco does not publish declarations for this ESM entry.
+    import('monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution'),
+    // @ts-expect-error Monaco does not publish declarations for this ESM entry.
+    import('monaco-editor/esm/vs/language/json/monaco.contribution'),
+    // @ts-expect-error Monaco does not publish declarations for this ESM entry.
+    import('monaco-editor/esm/vs/language/typescript/monaco.contribution'),
+  ]);
+  monacoTypeScriptContribution = typeScriptContribution as MonacoTypeScriptContribution;
+  module.loader.config({ monaco });
+  return module;
+}
+
+let monacoTypeScriptContribution: MonacoTypeScriptContribution | null = null;
+const registeredExtraLibs = new Map<string, {
+  readonly content: string;
+  readonly disposables: ReadonlyArray<{ dispose(): void; }>;
+}>();
+
+function registerExtraLibs(
+  extraLibs: ReadonlyArray<CodeEditorExtraLib>,
+): void {
+  const defaults = monacoTypeScriptContribution;
+  if (!defaults) return;
+  for (const extraLib of extraLibs) {
+    const registered = registeredExtraLibs.get(extraLib.filePath);
+    if (registered?.content === extraLib.content) continue;
+    for (const disposable of registered?.disposables ?? []) disposable.dispose();
+    registeredExtraLibs.set(extraLib.filePath, {
+      content: extraLib.content,
+      disposables: [
+        defaults.javascriptDefaults.addExtraLib(extraLib.content, extraLib.filePath),
+        defaults.typescriptDefaults.addExtraLib(extraLib.content, extraLib.filePath),
+      ],
+    });
+  }
+}
+
+function exposeMonacoForDiagnostics(monaco: MonacoEditorApiModule): void {
+  (globalThis as typeof globalThis & { monaco?: MonacoEditorApiModule; }).monaco = monaco;
 }

@@ -6,11 +6,11 @@ import type {
 import { cn, ResizableHandle, ResizablePanel, ResizablePanelGroup } from '@firebase-desk/ui';
 import { type ReactNode, useMemo, useState } from 'react';
 import { useMediaQuery } from '../../hooks/useMediaQuery.ts';
+import { messageFromError } from '../../shared/errors.ts';
 import { type FieldEditTarget } from './fieldEditModel.ts';
 import {
   findDocumentByPath,
   mergeLoadedSubcollections,
-  messageFromError,
   type SubcollectionLoadState,
 } from './resultModel.tsx';
 import { OverviewCollapseStrip, ResultContextPanel } from './ResultOverviewPanel.tsx';
@@ -41,6 +41,7 @@ export interface FirestoreDocumentBrowserProps {
   readonly onResultViewChange: (view: FirestoreResultView) => void;
   readonly onRefreshResults?: (() => void) | undefined;
   readonly onSelectDocument?: ((documentPath: string) => void) | undefined;
+  readonly onSettingsError?: ((message: string) => void) | undefined;
   readonly onSetFieldValue?: ((target: FieldEditTarget, value: unknown) => void) | undefined;
   readonly onSetFieldNull?: ((target: FieldEditTarget) => void) | undefined;
   readonly queryPath: string;
@@ -73,6 +74,7 @@ export function FirestoreDocumentBrowser(
     onResultViewChange,
     onRefreshResults,
     onSelectDocument,
+    onSettingsError,
     onSetFieldValue,
     onSetFieldNull,
     queryPath,
@@ -158,6 +160,7 @@ export function FirestoreDocumentBrowser(
         onResultViewChange={onResultViewChange}
         onRefreshResults={onRefreshResults}
         onSelectDocument={onSelectDocument}
+        onSettingsError={onSettingsError}
         onSetFieldNull={onSetFieldNull}
       />
     </div>

@@ -2,6 +2,7 @@ import type { FirestoreDocumentResult } from '@firebase-desk/repo-contracts';
 import { Button, Dialog, DialogContent, InlineAlert } from '@firebase-desk/ui';
 import { useEffect, useState } from 'react';
 import { CodeEditor } from '../../code-editor/CodeEditor.tsx';
+import { messageFromError } from '../../shared/errors.ts';
 import { parseDocumentJson, validateFirestoreDocumentData } from './fieldEditModel.ts';
 
 export interface DocumentEditorModalProps {
@@ -78,9 +79,4 @@ export function DocumentEditorModal(
       </DialogContent>
     </Dialog>
   );
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  if (error instanceof Error) return error.message;
-  return fallback;
 }

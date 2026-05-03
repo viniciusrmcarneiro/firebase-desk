@@ -12,6 +12,8 @@ import {
   type SubcollectionLoadState,
 } from './resultModel.tsx';
 
+const EMPTY_VALUE_CHILD_LIMITS = new Map<string, number>();
+
 export function ResultTreeView(
   {
     expandedIds,
@@ -25,10 +27,12 @@ export function ResultTreeView(
     onEditField,
     onSelectDocument,
     onSetFieldNull,
+    onShowMoreValueChildren,
     onToggleNode,
     queryPath,
     rows,
     subcollectionStates,
+    valueChildLimits,
   }: {
     readonly expandedIds: ReadonlySet<string>;
     readonly hasMore: boolean;
@@ -41,10 +45,12 @@ export function ResultTreeView(
     readonly onOpenDocumentInNewTab?: ((documentPath: string) => void) | undefined;
     readonly onSelectDocument?: ((documentPath: string) => void) | undefined;
     readonly onSetFieldNull?: ((target: FieldEditTarget) => void) | undefined;
+    readonly onShowMoreValueChildren?: ((id: string) => void) | undefined;
     readonly onToggleNode: (id: string) => void;
     readonly queryPath: string;
     readonly rows: ReadonlyArray<FirestoreDocumentResult>;
     readonly subcollectionStates: Readonly<Record<string, SubcollectionLoadState>>;
+    readonly valueChildLimits?: ReadonlyMap<string, number> | undefined;
   },
 ) {
   const canLoadSubcollections = Boolean(onLoadSubcollections);
@@ -58,8 +64,17 @@ export function ResultTreeView(
         expandedIds,
         subcollectionStates,
         canLoadSubcollections,
+        valueChildLimits ?? EMPTY_VALUE_CHILD_LIMITS,
       ),
-    [canLoadSubcollections, expandedIds, hasMore, queryPath, rows, subcollectionStates],
+    [
+      canLoadSubcollections,
+      expandedIds,
+      hasMore,
+      queryPath,
+      rows,
+      subcollectionStates,
+      valueChildLimits,
+    ],
   );
   const openNode = useCallback(
     (id: string) => {
@@ -117,6 +132,7 @@ export function ResultTreeView(
           node={node}
           onLoadMore={onLoadMore}
           onLoadSubcollections={onLoadSubcollections}
+          onShowMoreValueChildren={onShowMoreValueChildren}
           onOpenDocumentInNewTab={onOpenDocumentInNewTab}
           onDeleteDocument={onDeleteDocument}
           documentsByPath={documentsByPath}
@@ -132,6 +148,7 @@ function TreeRowAction(
     node,
     onLoadMore,
     onLoadSubcollections,
+    onShowMoreValueChildren,
     onOpenDocumentInNewTab,
     onDeleteDocument,
     documentsByPath,
@@ -140,6 +157,7 @@ function TreeRowAction(
     readonly node: ResultTreeRowModel;
     readonly onLoadMore: () => void;
     readonly onLoadSubcollections?: ((documentPath: string) => Promise<void> | void) | undefined;
+    readonly onShowMoreValueChildren?: ((id: string) => void) | undefined;
     readonly onOpenDocumentInNewTab?: ((documentPath: string) => void) | undefined;
     readonly onDeleteDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
     readonly documentsByPath: ReadonlyMap<string, FirestoreDocumentResult>;
@@ -157,6 +175,20 @@ function TreeRowAction(
         }}
       >
         Load more
+      </Button>
+    );
+  }
+  if (node.kind === 'load-value-children' && node.valueChildLimitTargetId) {
+    return (
+      <Button
+        size='xs'
+        variant='secondary'
+        onClick={(event) => {
+          event.stopPropagation();
+          onShowMoreValueChildren?.(node.valueChildLimitTargetId ?? '');
+        }}
+      >
+        Show more
       </Button>
     );
   }

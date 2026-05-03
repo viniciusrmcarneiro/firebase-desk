@@ -7,7 +7,35 @@ import { CodeEditor, DiffCodeEditor } from './CodeEditor.tsx';
 
 const monacoMock = vi.hoisted(() => ({
   diffContentListener: null as (() => void) | null,
+  javascriptContribution: vi.fn(),
+  javascriptAddExtraLib: vi.fn(() => ({ dispose: vi.fn() })),
+  loaderConfig: vi.fn(),
   modifiedValue: '',
+  typescriptAddExtraLib: vi.fn(() => ({ dispose: vi.fn() })),
+  typescriptContribution: vi.fn(),
+}));
+const monacoApiMock = vi.hoisted(() => ({
+  editor: {},
+  languages: {
+    typescript: {
+      javascriptDefaults: { addExtraLib: monacoMock.javascriptAddExtraLib },
+      typescriptDefaults: { addExtraLib: monacoMock.typescriptAddExtraLib },
+    },
+  },
+}));
+
+vi.mock('monaco-editor/esm/vs/editor/editor.api', () => monacoApiMock);
+vi.mock('monaco-editor/esm/vs/basic-languages/javascript/javascript.contribution', () => {
+  monacoMock.javascriptContribution();
+  return {};
+});
+vi.mock('monaco-editor/esm/vs/basic-languages/typescript/typescript.contribution', () => {
+  monacoMock.typescriptContribution();
+  return {};
+});
+vi.mock('monaco-editor/esm/vs/language/typescript/monaco.contribution', () => ({
+  javascriptDefaults: { addExtraLib: monacoMock.javascriptAddExtraLib },
+  typescriptDefaults: { addExtraLib: monacoMock.typescriptAddExtraLib },
 }));
 
 vi.mock('@monaco-editor/react', async () => {
@@ -15,29 +43,38 @@ vi.mock('@monaco-editor/react', async () => {
   return {
     default: (
       {
+        beforeMount,
         options,
         theme,
         value,
       }: {
+        readonly beforeMount?: (monaco: typeof monacoApiMock) => void;
         readonly options?: { readonly ariaLabel?: string; };
         readonly theme: string;
         readonly value: string;
       },
-    ) => (
-      <textarea
-        aria-label={options?.ariaLabel}
-        data-testid='monaco'
-        data-theme={theme}
-        readOnly
-        value={value}
-      />
-    ),
+    ) => {
+      React.useEffect(() => {
+        beforeMount?.(monacoApiMock);
+      }, [beforeMount]);
+      return (
+        <textarea
+          aria-label={options?.ariaLabel}
+          data-testid='monaco'
+          data-theme={theme}
+          readOnly
+          value={value}
+        />
+      );
+    },
     DiffEditor: (
       {
         modified,
+        beforeMount,
         onMount,
         theme,
       }: {
+        readonly beforeMount?: (monaco: typeof monacoApiMock) => void;
         readonly modified: string;
         readonly onMount?: (editor: MonacoEditorTypes.IStandaloneDiffEditor) => void;
         readonly theme: string;
@@ -48,6 +85,7 @@ vi.mock('@monaco-editor/react', async () => {
       React.useEffect(() => {
         if (mounted.current) return;
         mounted.current = true;
+        beforeMount?.(monacoApiMock);
         onMount?.({
           getModifiedEditor: () => ({
             getValue: () => monacoMock.modifiedValue,
@@ -66,10 +104,73 @@ vi.mock('@monaco-editor/react', async () => {
       }, []);
       return <textarea data-testid='monaco-diff' data-theme={theme} readOnly value={modified} />;
     },
+    loader: { config: monacoMock.loaderConfig },
   };
 });
 
 describe('CodeEditor', () => {
+  it('configures Monaco to use the bundled editor package', async () => {
+    render(
+      <AppearanceProvider settings={new MockSettingsRepository()}>
+        <CodeEditor language='json' value='{}' />
+      </AppearanceProvider>,
+    );
+    await screen.findByTestId('monaco');
+
+    expect(monacoMock.loaderConfig).toHaveBeenCalledWith({
+      monaco: monacoApiMock,
+    });
+  });
+
+  it('registers JavaScript and TypeScript tokenization contributions', async () => {
+    render(
+      <AppearanceProvider settings={new MockSettingsRepository()}>
+        <CodeEditor language='javascript' value='yield 1;' />
+      </AppearanceProvider>,
+    );
+    await screen.findByTestId('monaco');
+
+    expect(monacoMock.javascriptContribution).toHaveBeenCalledTimes(1);
+    expect(monacoMock.typescriptContribution).toHaveBeenCalledTimes(1);
+  });
+
+  it('registers editor extra libs with Monaco language defaults', async () => {
+    const extraLib = {
+      content: 'declare const admin: { firestore(): unknown };',
+      filePath: 'file:///test/firebase-desk-js-query.d.ts',
+    };
+    render(
+      <AppearanceProvider settings={new MockSettingsRepository()}>
+        <CodeEditor extraLibs={[extraLib]} language='javascript' value='admin.' />
+      </AppearanceProvider>,
+    );
+    await screen.findByTestId('monaco');
+
+    expect(monacoMock.javascriptAddExtraLib).toHaveBeenCalledWith(
+      extraLib.content,
+      extraLib.filePath,
+    );
+    expect(monacoMock.typescriptAddExtraLib).toHaveBeenCalledWith(
+      extraLib.content,
+      extraLib.filePath,
+    );
+  });
+
+  it('exposes Monaco when mounted for integration diagnostics', async () => {
+    delete (globalThis as typeof globalThis & { monaco?: unknown; }).monaco;
+    render(
+      <AppearanceProvider settings={new MockSettingsRepository()}>
+        <CodeEditor language='json' value='{}' />
+      </AppearanceProvider>,
+    );
+    await screen.findByTestId('monaco');
+
+    expect((globalThis as typeof globalThis & { monaco?: unknown; }).monaco).toBe(
+      monacoApiMock,
+    );
+    delete (globalThis as typeof globalThis & { monaco?: unknown; }).monaco;
+  });
+
   it('passes resolved appearance to Monaco', async () => {
     vi.stubGlobal(
       'matchMedia',

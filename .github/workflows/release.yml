@@ -31,7 +31,7 @@ jobs:
                       const allPlatforms = [
                           { os: 'ubuntu-latest', platform: 'linux', smoke: 'packaged' },
                           { os: 'macos-latest', platform: 'macos', smoke: 'packaged' },
-                          { os: 'windows-latest', platform: 'windows', smoke: 'files' },
+                          { os: 'windows-latest', platform: 'windows', smoke: 'packaged' },
                       ];
 
                       const packagePathPrefixes = [
@@ -154,16 +154,11 @@ jobs:
               if: matrix.platform == 'macos'
               run: |
                   pnpm dlx firebase-tools@15.15.0 --project demo-local emulators:exec --only auth,firestore --config firebase/emulator/firebase.json "pnpm --filter @firebase-desk/emulator-tools seed && pnpm --filter @firebase-desk/e2e test:packaged"
-            - name: Check Windows unpacked app exists
+            - name: Smoke packaged app with emulators (Windows)
               if: matrix.platform == 'windows'
-              shell: pwsh
+              shell: bash
               run: |
-                  $match = Get-ChildItem -Path "apps/desktop/release" -Recurse -Filter "Firebase Desk.exe" | Select-Object -First 1
-                  if (-not $match) {
-                    Get-ChildItem -Path "apps/desktop/release" -Recurse
-                    exit 1
-                  }
-                  Write-Host "Found packaged app: $($match.FullName)"
+                  pnpm dlx firebase-tools@15.15.0 --project demo-local emulators:exec --only auth,firestore --config firebase/emulator/firebase.json "pnpm --filter @firebase-desk/emulator-tools seed && pnpm --filter @firebase-desk/e2e test:packaged"
             - uses: actions/upload-artifact@v7
               with:
                   name: ${{ steps.package_names.outputs.artifact }}

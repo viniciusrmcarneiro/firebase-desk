@@ -12,7 +12,7 @@
     "build": "electron-vite build",
     "preview": "electron-vite preview",
     "lint": "oxlint --config ../../packages/config-oxlint/oxlintrc.base.json src/main src/preload && oxlint --config ../../packages/config-oxlint/oxlintrc.renderer.json src/renderer",
-    "typecheck": "tsc -b",
+    "typecheck": "tsc -p tsconfig.main.typecheck.json && tsc -p tsconfig.preload.typecheck.json && tsc -p tsconfig.renderer.typecheck.json",
     "test": "vitest run --passWithNoTests",
     "test:coverage": "vitest run --coverage --passWithNoTests",
     "package": "node ../../scripts/package-desktop.mjs"
@@ -28,7 +28,6 @@
     "@firebase-desk/repo-mocks": "workspace:*",
     "@firebase-desk/script-runner": "workspace:*",
     "@firebase-desk/ui": "workspace:*",
-    "@tanstack/react-query": "5.90.12",
     "@tanstack/react-store": "0.11.0",
     "firebase-admin": "13.8.0",
     "lucide-react": "1.11.0",

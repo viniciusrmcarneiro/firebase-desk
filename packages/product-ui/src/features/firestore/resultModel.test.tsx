@@ -8,6 +8,7 @@ import {
   findDocumentByPath,
   flattenResultTree,
   mergeLoadedSubcollections,
+  TREE_VALUE_CHILD_BATCH_SIZE,
 } from './resultModel.tsx';
 
 const rows: ReadonlyArray<FirestoreDocumentResult> = [
@@ -92,6 +93,149 @@ describe('firestore result model', () => {
       'zebra',
     ]);
     expect(treeRows.find((row) => row.label === 'alpha')?.value).toBe('{"nested":true}');
+  });
+
+  it('caps tree field values at 255 characters', () => {
+    const expanded = new Set(['root:orders', 'doc:orders/ord_long', 'doc:orders/ord_long:fields']);
+    const treeRows = flattenResultTree(
+      'orders',
+      [{
+        id: 'ord_long',
+        path: 'orders/ord_long',
+        data: { notes: 'x'.repeat(300) },
+        hasSubcollections: false,
+      }],
+      false,
+      expanded,
+      {},
+      false,
+    );
+    const value = treeRows.find((row) => row.label === 'notes')?.value;
+
+    expect(value).toHaveLength(255);
+    expect(String(value).endsWith('...')).toBe(true);
+  });
+
+  it('expands encoded map values in the tree', () => {
+    const expanded = new Set([
+      'root:orders',
+      'doc:orders/ord_map',
+      'doc:orders/ord_map:fields',
+      'doc:orders/ord_map:fields:field:metadata',
+    ]);
+
+    const treeRows = flattenResultTree(
+      'orders',
+      [{
+        id: 'ord_map',
+        path: 'orders/ord_map',
+        data: { metadata: { __type__: 'map', value: { status: 'paid' } } },
+        hasSubcollections: false,
+      }],
+      false,
+      expanded,
+      {},
+      false,
+    );
+
+    expect(treeRows.map((row) => row.label)).toContain('metadata');
+    expect(treeRows.map((row) => row.label)).toContain('status');
+  });
+
+  it('caps expanded tree fields for very wide documents', () => {
+    const data = Object.fromEntries(
+      Array.from({ length: 650 }, (_, index) => [`field_${index}`, index]),
+    );
+    const expanded = new Set(['root:orders', 'doc:orders/ord_big', 'doc:orders/ord_big:fields']);
+
+    const treeRows = flattenResultTree(
+      'orders',
+      [{ id: 'ord_big', path: 'orders/ord_big', data, hasSubcollections: false }],
+      false,
+      expanded,
+      {},
+      false,
+    );
+
+    expect(treeRows.find((row) => row.label === '150 more fields')?.value).toBe(
+      'Open document to inspect all fields',
+    );
+    expect(treeRows.filter((row) => String(row.label).startsWith('field_'))).toHaveLength(500);
+  });
+
+  it('caps expanded object children and adds a progressive show-more row', () => {
+    const metadata = Object.fromEntries(
+      Array.from({ length: TREE_VALUE_CHILD_BATCH_SIZE + 25 }, (_, index) => [
+        `field_${index}`,
+        index,
+      ]),
+    );
+    const metadataId = 'doc:orders/ord_big_map:fields:field:metadata';
+    const expanded = new Set([
+      'root:orders',
+      'doc:orders/ord_big_map',
+      'doc:orders/ord_big_map:fields',
+      metadataId,
+    ]);
+
+    const treeRows = flattenResultTree(
+      'orders',
+      [{
+        id: 'ord_big_map',
+        path: 'orders/ord_big_map',
+        data: { metadata },
+        hasSubcollections: false,
+      }],
+      false,
+      expanded,
+      {},
+      false,
+    );
+
+    expect(treeRows.filter((row) => String(row.label).startsWith('field_'))).toHaveLength(
+      TREE_VALUE_CHILD_BATCH_SIZE,
+    );
+    expect(treeRows.find((row) => row.kind === 'load-value-children')).toMatchObject({
+      label: 'More entries',
+      value: `${TREE_VALUE_CHILD_BATCH_SIZE} shown`,
+      valueChildLimitTargetId: metadataId,
+    });
+  });
+
+  it('uses increased tree child limits for expanded object nodes', () => {
+    const metadata = Object.fromEntries(
+      Array.from({ length: TREE_VALUE_CHILD_BATCH_SIZE + 25 }, (_, index) => [
+        `field_${index}`,
+        index,
+      ]),
+    );
+    const metadataId = 'doc:orders/ord_big_map:fields:field:metadata';
+    const expanded = new Set([
+      'root:orders',
+      'doc:orders/ord_big_map',
+      'doc:orders/ord_big_map:fields',
+      metadataId,
+    ]);
+
+    const treeRows = flattenResultTree(
+      'orders',
+      [{
+        id: 'ord_big_map',
+        path: 'orders/ord_big_map',
+        data: { metadata },
+        hasSubcollections: false,
+      }],
+      false,
+      expanded,
+      {},
+      false,
+      new Map([[metadataId, TREE_VALUE_CHILD_BATCH_SIZE * 2]]),
+    );
+
+    expect(treeRows.filter((row) => String(row.label).startsWith('field_'))).toHaveLength(
+      TREE_VALUE_CHILD_BATCH_SIZE + 25,
+    );
+    expect(treeRows.find((row) => row.kind === 'load-value-children')).toBeUndefined();
   });
 
   it('marks document-owned tree rows for selection', () => {

@@ -3,7 +3,11 @@ import type {
   FirestoreQuery,
   FirestoreQueryDraft,
 } from '@firebase-desk/repo-contracts';
-import type { FirestoreQueryRuntimeState } from './firestoreQueryState.ts';
+import {
+  emptyFirestoreQueryResultState,
+  type FirestoreQueryResultState,
+  type FirestoreQueryRuntimeState,
+} from './firestoreQueryState.ts';
 
 interface FirestoreQueryTabLike {
   readonly id: string;
@@ -33,6 +37,15 @@ export function selectFirestoreResultRows(
   pages: ReadonlyArray<{ readonly items: ReadonlyArray<FirestoreDocumentResult>; }>,
 ): ReadonlyArray<FirestoreDocumentResult> {
   return pages.flatMap((page) => page.items);
+}
+
+export function selectFirestoreTabResultState(
+  state: FirestoreQueryRuntimeState,
+  tab: FirestoreQueryTabLike | undefined,
+): FirestoreQueryResultState {
+  return tab?.kind === 'firestore-query'
+    ? state.resultsByTab[tab.id] ?? emptyFirestoreQueryResultState()
+    : emptyFirestoreQueryResultState();
 }
 
 export function selectFirestoreSelectedDocument(

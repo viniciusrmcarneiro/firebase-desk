@@ -1,28 +1,39 @@
 import { decode, encode } from '@firebase-desk/data-format';
-import type {
-  FirestoreCollectionNode,
-  FirestoreDeleteDocumentOptions,
-  FirestoreDocumentNode,
-  FirestoreDocumentResult,
-  FirestoreFieldPatchOperation,
-  FirestoreFilter,
-  FirestoreQuery,
-  FirestoreRepository,
-  FirestoreSaveDocumentOptions,
-  FirestoreSaveDocumentResult,
-  FirestoreSort,
-  FirestoreUpdateDocumentFieldsOptions,
-  FirestoreUpdateDocumentFieldsResult,
-  Page,
-  PageRequest,
+import {
+  DEFAULT_PAGE_LIMIT,
+  type FirestoreCollectionNode,
+  type FirestoreDeleteDocumentOptions,
+  type FirestoreDocumentNode,
+  type FirestoreDocumentResult,
+  type FirestoreFieldPatchOperation,
+  type FirestoreFilter,
+  firestorePathParts,
+  type FirestoreQuery,
+  type FirestoreRepository,
+  type FirestoreSaveDocumentOptions,
+  type FirestoreSaveDocumentResult,
+  type FirestoreSort,
+  type FirestoreUpdateDocumentFieldsOptions,
+  type FirestoreUpdateDocumentFieldsResult,
+  isFirestoreCollectionPath,
+  isFirestoreDocumentPath,
+  type Page,
+  type PageRequest,
 } from '@firebase-desk/repo-contracts';
+import {
+  applyFirestoreFieldPatchOperation as applyFieldPatchOperation,
+  fieldPatchHasChangedRemoteValue,
+  FIRESTORE_FIELD_PATH_SEGMENT_MAX_BYTES,
+  isPlainRecord as isPlainObject,
+  utf8ByteLength,
+} from '@firebase-desk/repo-contracts/firestore-field-patch';
 import { COLLECTIONS, MOCK_CONNECTION_LOAD_ERROR_PROJECT_ID } from './fixtures/index.ts';
 
 type FixtureDoc = (typeof COLLECTIONS)[number]['docs'][number];
 type FixtureCollection = (typeof COLLECTIONS)[number];
 type UpdateTimeLookup = (documentPath: string) => string;
 
-const DEFAULT_LIMIT = 25;
+const MAX_LIMIT = 250;
 const MOCK_UPDATE_TIME_EPOCH = Date.UTC(2026, 0, 1);
 
 export class MockFirebaseError extends Error {
@@ -59,6 +70,7 @@ export class MockFirestoreRepository implements FirestoreRepository {
     request?: PageRequest,
   ): Promise<Page<FirestoreDocumentNode>> {
     assertConnectionAvailable(connectionId);
+    assertCollectionPath(collectionPath);
     const collection = this.collections.find((c) => c.path === collectionPath);
     const docs = collection?.docs ?? [];
     return pageDocuments(this.collections, collectionPath, docs, request);
@@ -69,6 +81,7 @@ export class MockFirestoreRepository implements FirestoreRepository {
     documentPath: string,
   ): Promise<ReadonlyArray<FirestoreCollectionNode>> {
     assertConnectionAvailable(connectionId);
+    assertDocumentPath(documentPath);
     return subcollectionsFor(this.collections, documentPath, (path) => this.updateTimeFor(path));
   }
 
@@ -77,6 +90,7 @@ export class MockFirestoreRepository implements FirestoreRepository {
     request?: PageRequest,
   ): Promise<Page<FirestoreDocumentResult>> {
     assertConnectionAvailable(query.connectionId);
+    assertCollectionPath(query.path);
     const collection = this.collections.find((c) => c.path === query.path);
     const docs = sortDocs(filterDocs(collection?.docs ?? [], query.filters), query.sorts);
     return pageResults(
@@ -93,7 +107,8 @@ export class MockFirestoreRepository implements FirestoreRepository {
     documentPath: string,
   ): Promise<FirestoreDocumentResult | null> {
     assertConnectionAvailable(connectionId);
-    const parts = documentPath.split('/');
+    assertDocumentPath(documentPath);
+    const parts = firestorePathParts(documentPath);
     const docId = parts.at(-1);
     const collectionPath = parts.slice(0, -1).join('/');
     const collection = this.collections.find((c) => c.path === collectionPath);
@@ -328,13 +343,37 @@ function pageResults(
 }
 
 function pageSlice<T>(items: ReadonlyArray<T>, request?: PageRequest): Page<T> {
-  const offset = Number.parseInt(request?.cursor?.token ?? '0', 10) || 0;
-  const limit = request?.limit ?? DEFAULT_LIMIT;
+  const offset = offsetFor(items.length, request);
+  const limit = limitFor(request);
   const nextOffset = offset + limit;
   return {
     items: items.slice(offset, nextOffset),
     nextCursor: nextOffset < items.length ? { token: String(nextOffset) } : null,
   };
+}
+
+function offsetFor(itemCount: number, request?: PageRequest): number {
+  if (!request?.cursor) return 0;
+  const token = request.cursor.token;
+  if (!/^\d+$/.test(token)) {
+    throw new MockFirebaseError(
+      'invalid-argument',
+      'Firestore pagination cursor expired. Run the query again.',
+    );
+  }
+  const offset = Number.parseInt(token, 10);
+  if (offset < 0 || offset > itemCount) {
+    throw new MockFirebaseError(
+      'invalid-argument',
+      'Firestore pagination cursor expired. Run the query again.',
+    );
+  }
+  return offset;
+}
+
+function limitFor(request?: PageRequest): number {
+  const value = request?.limit ?? DEFAULT_PAGE_LIMIT;
+  return Math.max(1, Math.min(MAX_LIMIT, value));
 }
 
 function hasSubcollections(
@@ -449,8 +488,8 @@ function assertConnectionAvailable(connectionId: string) {
 }
 
 function splitDocumentPath(documentPath: string) {
-  const parts = pathParts(documentPath);
-  if (parts.length === 0 || parts.length % 2 !== 0) {
+  const parts = firestorePathParts(documentPath);
+  if (!isFirestoreDocumentPath(documentPath)) {
     throw new MockFirebaseError('invalid-argument', `Invalid document path: ${documentPath}`);
   }
   return {
@@ -460,9 +499,14 @@ function splitDocumentPath(documentPath: string) {
 }
 
 function assertCollectionPath(collectionPath: string) {
-  const parts = pathParts(collectionPath);
-  if (parts.length === 0 || parts.length % 2 === 0) {
+  if (!isFirestoreCollectionPath(collectionPath)) {
     throw new MockFirebaseError('invalid-argument', `Invalid collection path: ${collectionPath}`);
+  }
+}
+
+function assertDocumentPath(documentPath: string) {
+  if (!isFirestoreDocumentPath(documentPath)) {
+    throw new MockFirebaseError('invalid-argument', `Invalid document path: ${documentPath}`);
   }
 }
 
@@ -481,7 +525,10 @@ function assertFieldPatchOperations(operations: ReadonlyArray<FirestoreFieldPatc
       throw new MockFirebaseError('invalid-argument', 'Field path is required.');
     }
     for (const segment of operation.fieldPath) {
-      if (!segment || /^__.*__$/.test(segment) || utf8ByteLength(segment) > 1500) {
+      if (
+        !segment || /^__.*__$/.test(segment)
+        || utf8ByteLength(segment) > FIRESTORE_FIELD_PATH_SEGMENT_MAX_BYTES
+      ) {
         throw new MockFirebaseError('invalid-argument', `Invalid field path segment: ${segment}`);
       }
     }
@@ -489,9 +536,9 @@ function assertFieldPatchOperations(operations: ReadonlyArray<FirestoreFieldPatc
 }
 
 function assertDirectSubcollectionPath(documentPath: string, collectionPath: string) {
-  const documentParts = pathParts(documentPath);
-  const collectionParts = pathParts(collectionPath);
-  if (collectionParts.length === 0 || collectionParts.length % 2 === 0) {
+  const documentParts = firestorePathParts(documentPath);
+  const collectionParts = firestorePathParts(collectionPath);
+  if (!isFirestoreCollectionPath(collectionPath)) {
     throw new MockFirebaseError('invalid-argument', `Invalid collection path: ${collectionPath}`);
   }
   if (
@@ -505,118 +552,12 @@ function assertDirectSubcollectionPath(documentPath: string, collectionPath: str
   }
 }
 
-function pathParts(path: string): ReadonlyArray<string> {
-  const parts = path.split('/');
-  return parts.some((part) => part.length === 0) ? [] : parts;
-}
-
 function decodeDocumentData(data: Record<string, unknown>): Record<string, unknown> {
   const decoded = decode(data as never);
   if (!isPlainObject(decoded)) {
     throw new MockFirebaseError('invalid-argument', 'Firestore document data must be an object.');
   }
   return decoded;
-}
-
-function applyFieldPatchOperation(
-  data: Record<string, unknown>,
-  operation: FirestoreFieldPatchOperation,
-): Record<string, unknown> {
-  return operation.type === 'delete'
-    ? deleteNestedValue(data, operation.fieldPath)
-    : setNestedValue(data, operation.fieldPath, operation.value);
-}
-
-function setNestedValue(
-  data: Record<string, unknown>,
-  fieldPath: ReadonlyArray<string>,
-  value: unknown,
-): Record<string, unknown> {
-  const [head, ...rest] = fieldPath;
-  if (!head) return data;
-  const next = { ...data };
-  if (!rest.length) {
-    next[head] = value;
-    return next;
-  }
-  next[head] = setNestedValue(isPlainObject(next[head]) ? next[head] : {}, rest, value);
-  return next;
-}
-
-function deleteNestedValue(
-  data: Record<string, unknown>,
-  fieldPath: ReadonlyArray<string>,
-): Record<string, unknown> {
-  const [head, ...rest] = fieldPath;
-  if (!head) return data;
-  const next = { ...data };
-  if (!rest.length) {
-    delete next[head];
-    return next;
-  }
-  if (isPlainObject(next[head])) next[head] = deleteNestedValue(next[head], rest);
-  return next;
-}
-
-function fieldPatchHasChangedRemoteValue(
-  remoteData: Record<string, unknown>,
-  operations: ReadonlyArray<FirestoreFieldPatchOperation>,
-): boolean {
-  return operations.some((operation) =>
-    !deepEqual(getNestedValue(remoteData, operation.fieldPath), operation.baseValue)
-  );
-}
-
-function getNestedValue(
-  data: Record<string, unknown>,
-  fieldPath: ReadonlyArray<string>,
-): unknown {
-  let current: unknown = data;
-  for (const segment of fieldPath) {
-    if (!isPlainObject(current)) return undefined;
-    current = current[segment];
-  }
-  return current;
-}
-
-function deepEqual(left: unknown, right: unknown): boolean {
-  return JSON.stringify(sortJson(left)) === JSON.stringify(sortJson(right));
-}
-
-function sortJson(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortJson);
-  if (!isPlainObject(value)) return value;
-  return Object.fromEntries(
-    sortedEntriesByKey(value)
-      .map(([key, entry]) => [key, sortJson(entry)]),
-  );
-}
-
-function sortedEntriesByKey(value: Record<string, unknown>): ReadonlyArray<[string, unknown]> {
-  const sorted: Array<[string, unknown]> = [];
-  for (const entry of Object.entries(value)) {
-    const index = sorted.findIndex(([key]) => entry[0].localeCompare(key) < 0);
-    if (index < 0) sorted.push(entry);
-    else sorted.splice(index, 0, entry);
-  }
-  return sorted;
-}
-
-function isPlainObject(value: unknown): value is Record<string, unknown> {
-  return typeof value === 'object' && value !== null && !Array.isArray(value);
-}
-
-function utf8ByteLength(value: string): number {
-  let bytes = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    const codePoint = value.codePointAt(index) ?? 0;
-    if (codePoint > 0xffff) index += 1;
-    if (codePoint <= 0x7f) bytes += 1;
-    else if (codePoint <= 0x7ff) bytes += 2;
-    else if (codePoint <= 0xffff) bytes += 3;
-    else bytes += 4;
-  }
-  return bytes;
 }
 
 function cloneCollections(

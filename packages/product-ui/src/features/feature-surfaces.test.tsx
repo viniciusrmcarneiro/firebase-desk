@@ -10,12 +10,11 @@ import type {
   ProjectSummary,
   ScriptRunResult,
 } from '@firebase-desk/repo-contracts';
-import { AUTH_USERS, MockSettingsRepository } from '@firebase-desk/repo-mocks';
+import { MockSettingsRepository } from '@firebase-desk/repo-mocks';
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import type { Key, ReactNode } from 'react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { AppearanceProvider } from '../appearance/AppearanceProvider.tsx';
-import { AuthUsersSurface } from './auth/AuthUsersSurface.tsx';
 import { FirestoreDocumentBrowser } from './firestore/FirestoreDocumentBrowser.tsx';
 import { FirestoreQuerySurface } from './firestore/FirestoreQuerySurface.tsx';
 import { JS_QUERY_SAMPLE_SOURCE, JsQuerySurface } from './js-query/JsQuerySurface.tsx';
@@ -57,6 +56,7 @@ vi.mock('@monaco-editor/react', () => ({
       onChange={(event) => onChange?.(event.currentTarget.value)}
     />
   ),
+  loader: { config: vi.fn() },
 }));
 
 vi.mock('@firebase-desk/ui', async (importOriginal) => {
@@ -590,121 +590,6 @@ describe('feature surfaces', () => {
         delete (HTMLElement.prototype as { scrollBy?: unknown; }).scrollBy;
       }
     }
-  });
-
-  it('AuthUsersSurface renders provided users, selects users, and exposes Load more', () => {
-    const onSelectUser = vi.fn();
-    const onLoadMore = vi.fn();
-    render(
-      <AuthUsersSurface
-        filterValue='grace@example.com'
-        hasMore
-        users={[AUTH_USERS[1]!]}
-        onFilterChange={() => {}}
-        onLoadMore={onLoadMore}
-        onSelectUser={onSelectUser}
-      />,
-    );
-
-    expect(screen.getAllByText('Grace Hopper').length).toBeGreaterThan(0);
-    expect(screen.queryByText('Ada Lovelace')).toBeNull();
-    fireEvent.click(screen.getAllByText('Grace Hopper')[0]!);
-    fireEvent.click(screen.getByRole('button', { name: 'Load more' }));
-
-    expect(onSelectUser).toHaveBeenCalledWith('u_grace');
-    expect(onLoadMore).toHaveBeenCalledTimes(1);
-  });
-
-  it('AuthUsersSurface shows loading state before users arrive', () => {
-    render(
-      <AuthUsersSurface
-        filterValue=''
-        hasMore={false}
-        isLoading
-        users={[]}
-        onFilterChange={() => {}}
-        onLoadMore={() => {}}
-        onSelectUser={() => {}}
-      />,
-    );
-
-    expect(screen.getByRole('status').textContent).toContain('Loading users');
-    expect(screen.queryByText('No users')).toBeNull();
-  });
-
-  it('AuthUsersSurface edits custom claims JSON', async () => {
-    const onSaveCustomClaims = vi.fn();
-    renderWithAppearance(
-      <AuthUsersSurface
-        filterValue=''
-        hasMore={false}
-        selectedUserId='u_ada'
-        users={[AUTH_USERS[0]!]}
-        onFilterChange={() => {}}
-        onLoadMore={() => {}}
-        onSaveCustomClaims={onSaveCustomClaims}
-        onSelectUser={() => {}}
-      />,
-    );
-
-    expect(screen.getByText((content) => content.includes('"role": "admin"'))).toBeTruthy();
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    expect(await screen.findByRole('dialog', { name: 'Custom claims' })).toBeTruthy();
-    fireEvent.change(await screen.findByTestId('monaco'), {
-      target: { value: '{ "role": "owner" }' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    await waitFor(() =>
-      expect(onSaveCustomClaims).toHaveBeenCalledWith('u_ada', { role: 'owner' })
-    );
-  });
-
-  it('AuthUsersSurface rejects non-object custom claims JSON', async () => {
-    const onSaveCustomClaims = vi.fn();
-    renderWithAppearance(
-      <AuthUsersSurface
-        filterValue=''
-        hasMore={false}
-        selectedUserId='u_ada'
-        users={[AUTH_USERS[0]!]}
-        onFilterChange={() => {}}
-        onLoadMore={() => {}}
-        onSaveCustomClaims={onSaveCustomClaims}
-        onSelectUser={() => {}}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    fireEvent.change(await screen.findByTestId('monaco'), { target: { value: '[]' } });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    expect(await screen.findByText('Custom claims JSON must be an object.')).toBeTruthy();
-    expect(onSaveCustomClaims).not.toHaveBeenCalled();
-  });
-
-  it('AuthUsersSurface surfaces custom claims save errors', async () => {
-    const onSaveCustomClaims = vi.fn().mockRejectedValue(new Error('Claims rejected'));
-    renderWithAppearance(
-      <AuthUsersSurface
-        filterValue=''
-        hasMore={false}
-        selectedUserId='u_ada'
-        users={[AUTH_USERS[0]!]}
-        onFilterChange={() => {}}
-        onLoadMore={() => {}}
-        onSaveCustomClaims={onSaveCustomClaims}
-        onSelectUser={() => {}}
-      />,
-    );
-
-    fireEvent.click(screen.getByRole('button', { name: 'Edit' }));
-    fireEvent.change(await screen.findByTestId('monaco'), {
-      target: { value: '{ "role": "owner" }' },
-    });
-    fireEvent.click(screen.getByRole('button', { name: 'Save' }));
-
-    expect(await screen.findByText('Claims rejected')).toBeTruthy();
   });
 
   it('FirestoreQuerySurface selects rows, opens editor, and renders nested subcollection docs', async () => {

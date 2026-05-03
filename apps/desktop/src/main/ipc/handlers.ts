@@ -1,0 +1,53 @@
+import type {
+  ActivityLogRepository,
+  AuthRepository,
+  FirestoreRepository,
+  PickServiceAccountFileResult,
+  ProjectsRepository,
+  ScriptRunnerRepository,
+} from '@firebase-desk/repo-contracts';
+import { createActivityHandlers } from './activity-handlers.ts';
+import { type AppHandlerDeps, createAppHandlers } from './app-handlers.ts';
+import { createAuthHandlers } from './auth-handlers.ts';
+import { createFirestoreHandlers } from './firestore-handlers.ts';
+import type { IpcHandlerMap } from './handler-types.ts';
+import { createProjectsHandlers } from './projects-handlers.ts';
+import { createScriptRunnerHandlers } from './script-runner-handlers.ts';
+import { createSettingsHandlers } from './settings-handlers.ts';
+
+export interface CreateIpcHandlersDeps extends AppHandlerDeps {
+  readonly activityLogRepository: ActivityLogRepository & { readonly prune: () => Promise<void>; };
+  readonly authProvider: {
+    readonly invalidateConnection: (connectionId: string) => Promise<void>;
+  };
+  readonly authRepository: AuthRepository;
+  readonly firestoreProvider: {
+    readonly invalidateConnection: (connectionId: string) => Promise<void>;
+  };
+  readonly firestoreRepository: FirestoreRepository & {
+    readonly invalidateConnection: (connectionId: string) => void;
+  };
+  readonly pickServiceAccountFile: () => Promise<PickServiceAccountFileResult>;
+  readonly projectsRepository: ProjectsRepository & {
+    readonly validateServiceAccount: NonNullable<ProjectsRepository['validateServiceAccount']>;
+  };
+  readonly scriptRunnerRepository: Pick<ScriptRunnerRepository, 'cancel' | 'run'>;
+}
+
+export function createIpcHandlers(deps: CreateIpcHandlersDeps): IpcHandlerMap {
+  return {
+    ...createAppHandlers(deps),
+    ...createActivityHandlers(deps.activityLogRepository),
+    ...createProjectsHandlers({
+      authProvider: deps.authProvider,
+      firestoreProvider: deps.firestoreProvider,
+      firestoreRepository: deps.firestoreRepository,
+      pickServiceAccountFile: deps.pickServiceAccountFile,
+      projectsRepository: deps.projectsRepository,
+    }),
+    ...createFirestoreHandlers(deps.firestoreRepository),
+    ...createScriptRunnerHandlers(deps.scriptRunnerRepository),
+    ...createAuthHandlers(deps.authRepository),
+    ...createSettingsHandlers(deps.settingsRepository, deps.activityLogRepository),
+  };
+}

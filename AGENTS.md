@@ -61,7 +61,5 @@
 
 ## Tests
 
-- Add tests close to changed code.
-- Cover behavior, not only types.
-- Avoid tests that only assert `satisfies`.
-- Prefer role-based UI queries that match real user interaction.
+- Before writing or modifying any test, regardless of type, load `.github/skills/writing-tests/SKILL.md` and follow it.
+- `docs/testing-ci.md` is CI/release context, not test-authoring policy.

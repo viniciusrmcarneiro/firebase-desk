@@ -96,6 +96,7 @@ export interface SettingsSnapshot {
   readonly resultTableLayouts: ResultTableLayouts;
   readonly firestoreFieldCatalogs: FirestoreFieldCatalogs;
   readonly firestoreWrites: FirestoreWriteSettings;
+  readonly workspaceState: unknown | null;
 }
 
 export interface SettingsPatch {
@@ -108,6 +109,7 @@ export interface SettingsPatch {
   readonly resultTableLayouts?: ResultTableLayouts | undefined;
   readonly firestoreFieldCatalogs?: FirestoreFieldCatalogs | undefined;
   readonly firestoreWrites?: FirestoreWriteSettings | undefined;
+  readonly workspaceState?: unknown | null | undefined;
 }
 
 export interface SettingsRepository {

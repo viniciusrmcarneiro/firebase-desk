@@ -4,16 +4,17 @@ import { useEffect, useMemo, useRef } from 'react';
 import {
   cancelJsQueryCommand,
   clearJsQueryTabCommand,
-  createJsQueryStore,
   type JsQueryCommandEnvironment,
-  type JsQueryStore,
   receiveJsQueryEventCommand,
   runJsQueryCommand,
+  setJsQuerySourceCommand,
+} from '../../app-core/js-query/jsQueryCommands.ts';
+import {
   selectIsJsQueryTabRunning,
   selectJsQueryTabModel,
-  setJsQuerySourceCommand,
-} from '../../app-core/js-query/index.ts';
-import { useAppCoreSelector } from '../../app-core/shared/index.ts';
+} from '../../app-core/js-query/jsQuerySelectors.ts';
+import { createJsQueryStore, type JsQueryStore } from '../../app-core/js-query/jsQueryStore.ts';
+import { useAppCoreSelector } from '../../app-core/shared/reactStore.ts';
 import { useRepositories } from '../RepositoryProvider.tsx';
 import { activePath, tabActions, tabsStore, type WorkspaceTab } from '../stores/tabsStore.ts';
 
@@ -50,7 +51,7 @@ export function useJsTabState(
 ): JsTabState {
   const store = useMemo(
     () => inputStore ?? createJsQueryStore({ scripts: initialScripts }),
-    [inputStore],
+    [initialScripts, inputStore],
   );
   const state = useAppCoreSelector(store, (snapshot) => snapshot);
   const scriptEventHandlerRef = useRef<(event: ScriptRunEvent) => void>(() => {});

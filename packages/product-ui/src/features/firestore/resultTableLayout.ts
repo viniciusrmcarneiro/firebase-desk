@@ -5,6 +5,7 @@ import type {
 } from '@firebase-desk/repo-contracts';
 import { type DataTableColumn, sanitizeDataTableColumnLayout } from '@firebase-desk/ui';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { messageFromError } from '../../shared/errors.ts';
 
 const SAVE_DELAY_MS = 250;
 
@@ -17,10 +18,12 @@ export function collectionLayoutKeyForPath(path: string): string {
 export function useResultTableLayout<TData>(
   {
     columns,
+    onSettingsError,
     queryPath,
     settings,
   }: {
     readonly columns: ReadonlyArray<DataTableColumn<TData>>;
+    readonly onSettingsError?: ((message: string) => void) | undefined;
     readonly queryPath: string;
     readonly settings?: SettingsRepository | undefined;
   },
@@ -43,13 +46,16 @@ export function useResultTableLayout<TData>(
     let cancelled = false;
     settings.load().then((snapshot) => {
       if (!cancelled) setLayouts(snapshot.resultTableLayouts);
-    }).catch(() => {
-      if (!cancelled) setLayouts({});
+    }).catch((error) => {
+      if (!cancelled) {
+        setLayouts({});
+        onSettingsError?.(messageFromError(error, 'Could not load table layout settings.'));
+      }
     });
     return () => {
       cancelled = true;
     };
-  }, [settings]);
+  }, [onSettingsError, settings]);
 
   useEffect(() => {
     return () => {
@@ -73,10 +79,14 @@ export function useResultTableLayout<TData>(
           .then((snapshot) => {
             if (mountedRef.current) setLayouts(snapshot.resultTableLayouts);
           })
-          .catch(() => undefined);
+          .catch((error) => {
+            if (mountedRef.current) {
+              onSettingsError?.(messageFromError(error, 'Could not save table layout settings.'));
+            }
+          });
       }, SAVE_DELAY_MS);
     },
-    [key, settings],
+    [key, onSettingsError, settings],
   );
 
   useEffect(() => {

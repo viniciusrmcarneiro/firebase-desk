@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { visibleVirtualRows } from './virtualRows.ts';
 
 export interface VirtualTreeNode {
   readonly id: string;
@@ -48,8 +49,17 @@ export function VirtualTree(
     count: flattenedNodes.length,
     getScrollElement: () => parentRef.current,
     estimateSize: () => resolvedRowHeight,
+    initialRect: {
+      height: resolvedRowHeight * Math.min(Math.max(flattenedNodes.length, 1), 12),
+      width: 0,
+    },
     overscan: 8,
   });
+  const virtualRows = visibleVirtualRows(
+    virtualizer.getVirtualItems(),
+    flattenedNodes.length,
+    resolvedRowHeight,
+  );
 
   useEffect(() => {
     setFocusedIndex((current) => clampIndex(current, flattenedNodes.length));
@@ -92,7 +102,7 @@ export function VirtualTree(
   return (
     <div ref={parentRef} className='h-full overflow-auto' role='tree' aria-label={ariaLabel}>
       <div style={{ height: virtualizer.getTotalSize(), position: 'relative' }}>
-        {virtualizer.getVirtualItems().map((row) => {
+        {virtualRows.map((row) => {
           const node = flattenedNodes[row.index];
           if (!node) return null;
           return (

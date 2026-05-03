@@ -6,6 +6,7 @@ import {
   selectFirestoreLoadedPageCount,
   selectFirestoreResultRows,
   selectFirestoreSelectedDocument,
+  selectFirestoreTabResultState,
 } from './firestoreQuerySelectors.ts';
 import { createInitialFirestoreQueryRuntimeState } from './firestoreQueryState.ts';
 import {
@@ -15,6 +16,7 @@ import {
   firestoreLoadMoreStarted,
   firestoreLoadMoreSucceeded,
   firestorePendingPageReloadCleared,
+  firestoreQueryCompletionRecorded,
   firestoreQueryFailed,
   firestoreQueryStarted,
   firestoreQuerySucceeded,
@@ -52,39 +54,43 @@ describe('firestore query transitions and selectors', () => {
     expect(state.queryRequests['tab-1']).toMatchObject({ limit: 25, runId: 1 });
     expect(state.nextRunId).toBe(2);
     expect(state.selectedDocumentPaths['tab-1']).toBeUndefined();
-    expect(state.isLoading).toBe(true);
+    expect(resultFor(state, 'tab-1').isLoading).toBe(true);
   });
 
   it('stores successful and failed query results', () => {
     const row = document('orders/ord_1');
-    const succeeded = firestoreQuerySucceeded(createInitialFirestoreQueryRuntimeState(), [{
-      items: [row],
-    }], true);
+    const succeeded = firestoreQuerySucceeded(
+      createInitialFirestoreQueryRuntimeState(),
+      'tab-1',
+      [{ items: [row] }],
+      true,
+    );
 
-    expect(succeeded.pages).toEqual([{ items: [row] }]);
-    expect(succeeded.hasMore).toBe(true);
-    expect(succeeded.isLoading).toBe(false);
+    expect(resultFor(succeeded, 'tab-1').pages).toEqual([{ items: [row] }]);
+    expect(resultFor(succeeded, 'tab-1').hasMore).toBe(true);
+    expect(resultFor(succeeded, 'tab-1').isLoading).toBe(false);
 
-    const failed = firestoreQueryFailed(succeeded, 'failed');
-    expect(failed.errorMessage).toBe('failed');
-    expect(failed.isLoading).toBe(false);
+    const failed = firestoreQueryFailed(succeeded, 'tab-1', 'failed');
+    expect(resultFor(failed, 'tab-1').errorMessage).toBe('failed');
+    expect(resultFor(failed, 'tab-1').isLoading).toBe(false);
   });
 
   it('loads more pages and captures load-more errors', () => {
-    const started = firestoreLoadMoreStarted(createInitialFirestoreQueryRuntimeState());
-    expect(started.isFetchingMore).toBe(true);
+    const started = firestoreLoadMoreStarted(createInitialFirestoreQueryRuntimeState(), 'tab-1');
+    expect(resultFor(started, 'tab-1').isFetchingMore).toBe(true);
 
     const loaded = firestoreLoadMoreSucceeded(
       started,
+      'tab-1',
       { items: [document('orders/ord_1')] },
       false,
     );
-    expect(loaded.pages).toHaveLength(1);
-    expect(loaded.isFetchingMore).toBe(false);
+    expect(resultFor(loaded, 'tab-1').pages).toHaveLength(1);
+    expect(resultFor(loaded, 'tab-1').isFetchingMore).toBe(false);
 
-    const failed = firestoreLoadMoreFailed(started, 'fetch failed');
-    expect(failed.errorMessage).toBe('fetch failed');
-    expect(failed.isFetchingMore).toBe(false);
+    const failed = firestoreLoadMoreFailed(started, 'tab-1', 'fetch failed');
+    expect(resultFor(failed, 'tab-1').errorMessage).toBe('fetch failed');
+    expect(resultFor(failed, 'tab-1').isFetchingMore).toBe(false);
   });
 
   it('refreshes from page one and tracks loaded page reload count', () => {
@@ -99,7 +105,7 @@ describe('firestore query transitions and selectors', () => {
 
     const refreshed = firestoreRefreshSucceeded(state, 'tab-1', [{ items: [] }]);
     expect(refreshed.pendingPageReloads['tab-1']).toBeUndefined();
-    expect(refreshed.resultsStale).toBe(false);
+    expect(resultFor(refreshed, 'tab-1').resultsStale).toBe(false);
   });
 
   it('changes result view, selection, stale state, and tab scoped state', () => {
@@ -110,12 +116,25 @@ describe('firestore query transitions and selectors', () => {
     );
     expect(selected.selectedDocumentPaths['tab-1']).toBe('a/b');
 
-    const viewChanged = firestoreResultViewChanged(selected, 'json');
-    expect(viewChanged.resultView).toBe('json');
+    const viewChanged = firestoreResultViewChanged(selected, 'tab-1', 'json');
+    expect(resultFor(viewChanged, 'tab-1').resultView).toBe('json');
 
-    const stale = firestoreResultsMarkedStale(viewChanged);
-    expect(stale.resultsStale).toBe(true);
-    expect(firestoreResultsRefreshed(stale).resultsStale).toBe(false);
+    const otherTabChanged = firestoreResultViewChanged(viewChanged, 'tab-2', 'tree');
+    expect(resultFor(otherTabChanged, 'tab-1').resultView).toBe('json');
+    expect(resultFor(otherTabChanged, 'tab-2').resultView).toBe('tree');
+
+    const rerun = firestoreQueryStarted(viewChanged, {
+      clearSelection: true,
+      limit: 25,
+      query: query('orders'),
+      tabId: 'tab-1',
+    });
+    expect(resultFor(rerun, 'tab-1').resultView).toBe('json');
+
+    const stale = firestoreResultsMarkedStale(viewChanged, 'tab-1');
+    expect(resultFor(stale, 'tab-1').resultsStale).toBe(true);
+    const refreshed = firestoreResultsRefreshed(stale, 'tab-1');
+    expect(resultFor(refreshed, 'tab-1').resultsStale).toBe(false);
 
     const clearedReload = firestorePendingPageReloadCleared(
       { ...stale, pendingPageReloads: { 'tab-1': 2 } },
@@ -123,25 +142,31 @@ describe('firestore query transitions and selectors', () => {
     );
     expect(clearedReload.pendingPageReloads['tab-1']).toBeUndefined();
 
-    const clearedTab = firestoreTabCleared(stale, 'tab-1');
+    const recorded = firestoreQueryCompletionRecorded(stale, 'tab-1:1');
+    expect(recorded.recordedQueryCompletions['tab-1:1']).toBe(true);
+
+    const clearedTab = firestoreTabCleared(recorded, 'tab-1');
     expect(clearedTab.selectedDocumentPaths['tab-1']).toBeUndefined();
+    expect(clearedTab.recordedQueryCompletions['tab-1:1']).toBeUndefined();
   });
 
   it('merges loaded subcollections into matching result rows', () => {
-    const state = firestoreQuerySucceeded(createInitialFirestoreQueryRuntimeState(), [{
-      items: [document('orders/ord_1'), document('orders/ord_2')],
-    }]);
+    const state = firestoreQuerySucceeded(
+      createInitialFirestoreQueryRuntimeState(),
+      'tab-1',
+      [{ items: [document('orders/ord_1'), document('orders/ord_2')] }],
+    );
 
     const merged = firestoreSubcollectionsLoaded(state, 'orders/ord_1', [{
       id: 'events',
       path: 'orders/ord_1/events',
     }]);
 
-    expect(merged.pages[0]?.items[0]?.subcollections).toEqual([{
+    expect(resultFor(merged, 'tab-1').pages[0]?.items[0]?.subcollections).toEqual([{
       id: 'events',
       path: 'orders/ord_1/events',
     }]);
-    expect(merged.pages[0]?.items[1]?.subcollections).toBeUndefined();
+    expect(resultFor(merged, 'tab-1').pages[0]?.items[1]?.subcollections).toBeUndefined();
   });
 
   it('selects rows, selected documents, page count, and query metadata', () => {
@@ -156,6 +181,13 @@ describe('firestore query transitions and selectors', () => {
     });
   });
 });
+
+function resultFor(
+  state: ReturnType<typeof createInitialFirestoreQueryRuntimeState>,
+  tabId: string,
+) {
+  return selectFirestoreTabResultState(state, { id: tabId, kind: 'firestore-query' });
+}
 
 function query(path: string): FirestoreQuery {
   return { connectionId: 'emu', filters: [], path };

@@ -374,6 +374,17 @@ describe('FirebaseFirestoreRepository', () => {
   it('rejects invalid write and delete paths', async () => {
     const repository = new FirebaseFirestoreRepository(providerFor({} as Firestore));
 
+    await expect(repository.listDocuments('test', 'orders/ord_1')).rejects.toThrow(
+      'Invalid Firestore collection path',
+    );
+    await expect(repository.listSubcollections('test', 'orders')).rejects.toThrow(
+      'Invalid Firestore document path',
+    );
+    await expect(repository.runQuery({ connectionId: 'test', path: 'orders/ord_1' })).rejects
+      .toThrow('Invalid Firestore collection path');
+    await expect(repository.getDocument('test', 'orders')).rejects.toThrow(
+      'Invalid Firestore document path',
+    );
     await expect(repository.saveDocument('test', 'orders', {})).rejects.toThrow(
       'Invalid Firestore document path',
     );
@@ -392,6 +403,9 @@ describe('FirebaseFirestoreRepository', () => {
     await expect(repository.deleteDocument('test', 'orders/ord_1', {
       deleteSubcollectionPaths: ['orders/ord_1/events/'],
     })).rejects.toThrow('Invalid Firestore collection path');
+    await expect(repository.deleteDocument('test', 'orders/ord_1', {
+      deleteSubcollectionPaths: ['orders/ord_1/events/evt_1/logs'],
+    })).rejects.toThrow('Invalid Firestore subcollection path');
   });
 
   it('surfaces emulator connection failures as actionable errors', async () => {

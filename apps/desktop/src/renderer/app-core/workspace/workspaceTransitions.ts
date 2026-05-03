@@ -236,13 +236,6 @@ export function treeItemSelected(state: SelectionState, treeItemId: string | nul
   return { ...state, treeItemId };
 }
 
-export function firestoreDocumentSelected(
-  state: SelectionState,
-  path: string | null,
-): SelectionState {
-  return { ...state, firestoreDocumentPath: path };
-}
-
 export function authUserSelected(state: SelectionState, uid: string | null): SelectionState {
   return { ...state, authUserId: uid };
 }

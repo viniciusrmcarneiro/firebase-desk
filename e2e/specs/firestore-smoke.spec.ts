@@ -9,6 +9,7 @@ import {
 } from '../fixtures/firestore-rest.ts';
 import {
   addLocalEmulatorAccount,
+  openAuthentication,
   openFirestore,
   openLiveApp,
   uniqueSmokeId,
@@ -26,6 +27,10 @@ test('Firestore query, create, edit, conflict, and delete flows use emulator UI'
     await test.step('query seeded orders', async () => {
       await expectFirestoreRoots(page);
       await querySeededOrders(page);
+    });
+
+    await test.step('same collection tabs keep independent query results', async () => {
+      await querySameCollectionInTwoTabs(page);
     });
 
     await test.step('create first document for a new collection from sidebar', async () => {
@@ -113,6 +118,70 @@ async function querySeededOrders(page: Page): Promise<void> {
   await page.getByLabel('Sort direction').selectOption('desc');
   await page.getByRole('button', { name: 'Run' }).click();
   await expect(page.getByText('ord_1123')).toBeVisible();
+}
+
+async function querySameCollectionInTwoTabs(page: Page): Promise<void> {
+  const tree = page.getByRole('tree', { name: 'Account tree' });
+  const workspaceTabs = page.locator('[role="tablist"]').first();
+
+  await page.getByLabel('Query path').fill('orders');
+  await page.getByLabel('Result limit').fill('1');
+  await clearFiltersAndSort(page);
+  await queryField(page, 'Sort field').fill('total');
+  await page.getByLabel('Sort direction').selectOption('desc');
+  await page.getByRole('button', { name: 'Run' }).click();
+  await expectResultDocumentId(page, 'ord_1123');
+
+  await tree.getByRole('treeitem', { name: /orders/ }).dblclick();
+  await expect(workspaceTabs.getByRole('tab', { name: /orders/ })).toHaveCount(2);
+  await page.getByLabel('Query path').fill('orders');
+  await page.getByLabel('Result limit').fill('2');
+  await clearFiltersAndSort(page);
+  await ensureFilterRow(page);
+  await queryField(page, 'Filter 1 field').fill('status');
+  await page.getByLabel('Filter 1 value').fill('paid');
+  await page.getByRole('button', { name: 'Run' }).click();
+  await expectResultDocumentId(page, 'ord_1024');
+
+  await workspaceTabs.getByRole('tab', { name: /orders/ }).first().click();
+  await expectResultDocumentId(page, 'ord_1123');
+  await expect(resultDocumentIdCell(page, 'ord_1024')).toHaveCount(0);
+
+  await workspaceTabs.getByRole('tab', { name: /orders/ }).nth(1).click();
+  await expectResultDocumentId(page, 'ord_1024');
+
+  await resultsPanel(page).getByRole('tab', { name: 'Tree' }).click();
+  await expectResultView(page, 'Tree');
+
+  await workspaceTabs.getByRole('tab', { name: /orders/ }).first().click();
+  await expectResultView(page, 'Table');
+
+  await workspaceTabs.getByRole('tab', { name: /orders/ }).nth(1).click();
+  await expectResultView(page, 'Tree');
+  await resultsPanel(page).getByRole('tab', { name: 'Table' }).click();
+
+  await selectDocument(page, 'ord_1024');
+  await openFieldEdit(page, 'customer', 'Edit string');
+  const editDialog = page.getByRole('dialog', { name: 'Edit customer' });
+  await editDialog.getByLabel('Field string value').fill('Ada Lovelace updated in tab');
+  await editDialog.getByRole('button', { name: 'Save' }).click();
+  await expectDialogHidden(editDialog, 'Scoped results changed field dialog stayed open');
+  await expect(resultsChangedBanner(page)).toBeVisible();
+
+  await workspaceTabs.getByRole('tab', { name: /orders/ }).first().click();
+  await expect(resultsChangedBanner(page)).toHaveCount(0);
+
+  await workspaceTabs.getByRole('tab', { name: /orders/ }).nth(1).click();
+  await expect(resultsChangedBanner(page)).toBeVisible();
+
+  await openAuthentication(page);
+  await expect(workspaceTabs.getByRole('tab', { name: /Auth/ })).toBeVisible();
+  await expect(resultsChangedBanner(page)).toHaveCount(0);
+
+  await workspaceTabs.getByRole('tab', { name: /orders/ }).nth(1).click();
+  await expect(resultsChangedBanner(page)).toBeVisible();
+  await page.getByRole('button', { name: 'Run' }).click();
+  await expect(resultsChangedBanner(page)).toHaveCount(0);
 }
 
 async function createCollectionFromSidebar(page: Page, suffix: string): Promise<void> {
@@ -479,6 +548,13 @@ async function expectResultDocumentId(page: Page, documentId: string): Promise<v
   await expect(resultDocumentIdCell(page, documentId)).toBeVisible();
 }
 
+async function expectResultView(page: Page, view: 'JSON' | 'Table' | 'Tree'): Promise<void> {
+  await expect(resultsPanel(page).getByRole('tab', { name: view })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
+}
+
 function resultsPanel(page: Page) {
   return page.locator('section[aria-label="Results"]');
 }
@@ -523,9 +599,13 @@ async function openFieldMenu(page: Page, fieldName: string, menuItem: string): P
 }
 
 async function refreshChangedResults(page: Page): Promise<void> {
-  const bannerText = page.getByText('Results changed.');
+  const bannerText = resultsChangedBanner(page);
   await expect(bannerText).toBeVisible();
   await bannerText.locator('xpath=..').getByRole('button', { name: 'Refresh' }).click();
+}
+
+function resultsChangedBanner(page: Page) {
+  return resultsPanel(page).getByText('Results changed.');
 }
 
 async function openActivity(page: Page): Promise<void> {

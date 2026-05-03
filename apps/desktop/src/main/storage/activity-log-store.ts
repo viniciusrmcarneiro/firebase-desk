@@ -1,7 +1,7 @@
 import { ActivityLogEntrySchema } from '@firebase-desk/ipc-schemas';
 import type { ActivityLogEntry } from '@firebase-desk/repo-contracts';
 import { mkdir, readFile, unlink, writeFile } from 'node:fs/promises';
-import { dirname, join } from 'node:path';
+import { basename, dirname, join } from 'node:path';
 
 export class ActivityLogStore {
   private readonly filePath: string;
@@ -47,15 +47,29 @@ export class ActivityLogStore {
   private async readEntriesOldestFirst(): Promise<ReadonlyArray<ActivityLogEntry>> {
     try {
       const raw = await readFile(this.filePath, 'utf8');
-      return raw.split('\n').flatMap((line) => {
-        if (!line.trim()) return [];
+      const entries: ActivityLogEntry[] = [];
+      let invalidLineCount = 0;
+      for (const line of raw.split('\n')) {
+        if (!line.trim()) continue;
         try {
           const parsed = ActivityLogEntrySchema.safeParse(JSON.parse(line) as unknown);
-          return parsed.success ? [parsed.data] : [];
+          if (parsed.success) entries.push(parsed.data);
+          else invalidLineCount += 1;
         } catch {
-          return [];
+          invalidLineCount += 1;
         }
-      });
+      }
+      if (invalidLineCount > 0) {
+        const backupFileName = await backupInvalidLogFile(this.filePath, raw);
+        await this.writeEntries(entries);
+        const backupSuffix = backupFileName ? ` A backup was saved as ${backupFileName}.` : '';
+        throw new Error(
+          `Activity log contains ${invalidLineCount} invalid entr${
+            invalidLineCount === 1 ? 'y' : 'ies'
+          }.${backupSuffix}`,
+        );
+      }
+      return entries;
     } catch (error) {
       if (isNotFound(error)) return [];
       throw error;
@@ -104,6 +118,17 @@ function byteLength(value: string): number {
 
 function isNotFound(error: unknown): boolean {
   return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT');
+}
+
+async function backupInvalidLogFile(filePath: string, raw: string): Promise<string | null> {
+  const backupName = `activity-log.invalid-${new Date().toISOString().replaceAll(':', '-')}.jsonl`;
+  const backupPath = join(dirname(filePath), backupName);
+  try {
+    await writeFile(backupPath, raw, 'utf8');
+    return basename(backupPath);
+  } catch {
+    return null;
+  }
 }
 
 function reverseEntries(

@@ -19,12 +19,41 @@ describe('repo-mocks contract conformance', () => {
     const repo = new MockProjectsRepository();
     const initial = await repo.list();
     expect(initial.length).toBeGreaterThan(0);
+    await expect(repo.add({
+      name: ' ',
+      projectId: 'tmp',
+      target: 'emulator',
+      emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
+    })).rejects.toThrow('Project display name is required.');
+    await expect(repo.add({
+      name: 'Prod',
+      projectId: 'prod',
+      target: 'production',
+    })).rejects.toThrow('Service account JSON is required.');
+    await expect(repo.add({
+      name: 'Prod',
+      projectId: 'prod',
+      target: 'production',
+      credentialJson: serviceAccountJson('other-prod'),
+    })).rejects.toThrow('Service account project_id does not match the selected project ID.');
+    const prod = await repo.add({
+      name: 'Prod',
+      projectId: 'prod',
+      target: 'production',
+      credentialJson: serviceAccountJson('prod'),
+    });
+    expect(prod).toMatchObject({
+      hasCredential: true,
+      projectId: 'prod',
+      target: 'production',
+    });
+    expect(prod.emulator).toBeUndefined();
     const added = await repo.add({
       name: 'Tmp',
       projectId: 'tmp',
       target: 'emulator',
-      emulator: { firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' },
     });
+    expect(added.emulator).toEqual({ firestoreHost: '127.0.0.1:8080', authHost: '127.0.0.1:9099' });
     expect((await repo.get(added.id))?.id).toBe(added.id);
     const updated = await repo.update(added.id, {
       name: 'Tmp Renamed',
@@ -51,17 +80,29 @@ describe('repo-mocks contract conformance', () => {
     const docs = await repo.listDocuments('p', 'orders', { limit: 1 });
     expect(docs.items).toHaveLength(1);
     expect(docs.nextCursor?.token).toBe('1');
+    await expect(repo.listDocuments('p', 'orders/ord_1024')).rejects.toThrow(
+      'Invalid collection path',
+    );
 
     const page = await repo.runQuery({ connectionId: 'p', path: 'orders' }, { limit: 2 });
     expect(page.items).toHaveLength(2);
     expect(page.items[0]?.data).toBeDefined();
     expect(page.items[0]?.subcollections?.[0]?.path).toBe('orders/ord_1024/events');
+    await expect(repo.runQuery({ connectionId: 'p', path: 'orders/ord_1024' })).rejects.toThrow(
+      'Invalid collection path',
+    );
+    await expect(repo.runQuery(
+      { connectionId: 'p', path: 'orders' },
+      { cursor: { token: 'expired' } },
+    )).rejects.toThrow('Firestore pagination cursor expired.');
 
     const subcollections = await repo.listSubcollections('p', 'orders/ord_1024');
     expect(subcollections.map((collection) => collection.path)).toContain('orders/ord_1024/events');
+    await expect(repo.listSubcollections('p', 'orders')).rejects.toThrow('Invalid document path');
 
     const document = await repo.getDocument('p', 'orders/ord_1024');
     expect(document?.path).toBe('orders/ord_1024');
+    await expect(repo.getDocument('p', 'orders')).rejects.toThrow('Invalid document path');
 
     const savedResult = await repo.saveDocument('p', 'orders/ord_saved', { status: 'draft' });
     expect(savedResult.status).toBe('saved');
@@ -148,6 +189,18 @@ describe('repo-mocks contract conformance', () => {
       data: { status: 'paid', remote: 'old', meta: { count: 1 } },
     });
     expect((await repo.getDocument('p', 'orders/ord_patch'))?.data['a.b']).toBeUndefined();
+    const missingDeleteBase = await repo.getDocument('p', 'orders/ord_patch');
+    await repo.updateDocumentFields('p', 'orders/ord_patch', [{
+      baseValue: undefined,
+      fieldPath: ['meta', 'missing', 'nested'],
+      type: 'delete',
+    }], {
+      lastUpdateTime: missingDeleteBase!.updateTime!,
+      staleBehavior: 'save-and-notify',
+    });
+    await expect(repo.getDocument('p', 'orders/ord_patch')).resolves.toMatchObject({
+      data: { meta: { count: 1 }, remote: 'old', status: 'paid' },
+    });
 
     const staleBase = await repo.getDocument('p', 'orders/ord_patch');
     await repo.saveDocument('p', 'orders/ord_patch', {
@@ -232,6 +285,9 @@ describe('repo-mocks contract conformance', () => {
     await expect(repo.deleteDocument('p', 'orders/ord_nested', {
       deleteSubcollectionPaths: ['orders/ord_nested/events/'],
     })).rejects.toThrow('Invalid collection path');
+    await expect(repo.deleteDocument('p', 'orders/ord_nested', {
+      deleteSubcollectionPaths: ['orders/ord_nested/events/evt_1/logs'],
+    })).rejects.toThrow('Invalid subcollection path');
     await repo.deleteDocument('p', 'orders/ord_nested', {
       deleteSubcollectionPaths: ['orders/ord_nested/events'],
     });
@@ -248,6 +304,9 @@ describe('repo-mocks contract conformance', () => {
 
   it('auth repo: list + search + get', async () => {
     const repo = new MockAuthRepository();
+    const defaultPage = await repo.listUsers('p');
+    expect(defaultPage.items).toHaveLength(25);
+    expect(defaultPage.nextCursor?.token).toBe('25');
     const page = await repo.listUsers('p', { limit: 2 });
     expect(page.items).toHaveLength(2);
     expect(page.nextCursor?.token).toBe('2');
@@ -258,6 +317,8 @@ describe('repo-mocks contract conformance', () => {
     expect(user?.customClaims['permissions']).toEqual(['read', 'write', 'billing']);
     const updated = await repo.setCustomClaims('p', 'u_ada', { role: 'owner' });
     expect(updated.customClaims).toEqual({ role: 'owner' });
+    await expect(repo.setCustomClaims('p', 'u_ada', [] as unknown as Record<string, unknown>))
+      .rejects.toThrow('Custom claims JSON must be an object.');
     await expect(repo.getUser('p', 'u_ada')).resolves.toMatchObject({
       customClaims: { role: 'owner' },
     });
@@ -338,3 +399,13 @@ describe('repo-mocks contract conformance', () => {
     expect(createAuthUserFixture({ uid: 'u_x' }).email).toBe('u_x@example.com');
   });
 });
+
+function serviceAccountJson(projectId: string): string {
+  return JSON.stringify({
+    type: 'service_account',
+    project_id: projectId,
+    client_email: `firebase-adminsdk@example.${projectId}.iam.gserviceaccount.com`,
+    private_key: '-----BEGIN PRIVATE KEY-----\\nmock\\n-----END PRIVATE KEY-----\\n',
+    private_key_id: 'mock-key-id',
+  });
+}

@@ -169,3 +169,30 @@ export interface FirestoreRepository {
     options?: FirestoreDeleteDocumentOptions,
   ): Promise<void>;
 }
+
+export function assertFirestoreCollectionPath(path: string): void {
+  if (!isFirestoreCollectionPath(path)) {
+    throw new Error(`Invalid Firestore collection path: ${path}`);
+  }
+}
+
+export function assertFirestoreDocumentPath(path: string): void {
+  if (!isFirestoreDocumentPath(path)) {
+    throw new Error(`Invalid Firestore document path: ${path}`);
+  }
+}
+
+export function isFirestoreCollectionPath(path: string): boolean {
+  const parts = firestorePathParts(path);
+  return parts.length > 0 && parts.length % 2 === 1;
+}
+
+export function isFirestoreDocumentPath(path: string): boolean {
+  const parts = firestorePathParts(path);
+  return parts.length > 0 && parts.length % 2 === 0;
+}
+
+export function firestorePathParts(path: string): ReadonlyArray<string> {
+  const parts = path.split('/');
+  return parts.some((part) => part.length === 0) ? [] : parts;
+}

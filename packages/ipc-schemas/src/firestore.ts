@@ -1,17 +1,21 @@
 import { FIRESTORE_FIELD_STALE_BEHAVIORS } from '@firebase-desk/repo-contracts';
+import {
+  FIRESTORE_FIELD_PATH_SEGMENT_MAX_BYTES,
+  utf8ByteLength,
+} from '@firebase-desk/repo-contracts/firestore-field-patch';
 import { z } from 'zod';
 import { pageOf, PageRequestSchema } from './pagination.ts';
 
 const PathSegmentSchema = z.string().min(1);
 const FieldPathSegmentSchema = PathSegmentSchema.refine((value) => !/^__.*__$/.test(value), {
   message: 'Field path segments cannot match __.*__.',
-}).refine((value) => utf8ByteLength(value) <= 1500, {
+}).refine((value) => utf8ByteLength(value) <= FIRESTORE_FIELD_PATH_SEGMENT_MAX_BYTES, {
   message: 'Field path segments must be 1,500 bytes or less.',
 });
-const DocumentPathSchema = z.string().refine((path) => isDocumentPath(path), {
+export const DocumentPathSchema = z.string().refine((path) => isDocumentPath(path), {
   message: 'Document path must have an even number of path segments.',
 });
-const CollectionPathSchema = z.string().refine((path) => isCollectionPath(path), {
+export const CollectionPathSchema = z.string().refine((path) => isCollectionPath(path), {
   message: 'Collection path must have an odd number of path segments.',
 });
 const DocumentIdSchema = z.string().refine(
@@ -41,6 +45,11 @@ const FirestoreEncodedValueSchema: z.ZodType<unknown> = z.lazy(() =>
     z.object({
       __type__: z.literal('map'),
       value: z.record(z.string(), FirestoreEncodedValueSchema),
+    }),
+    z.object({
+      __type__: z.literal('truncated'),
+      sizeBytes: z.number().int().nonnegative(),
+      valueType: z.string(),
     }),
     z.record(z.string(), FirestoreEncodedValueSchema).superRefine((value, context) => {
       if (typeof value['__type__'] === 'string') {
@@ -93,7 +102,7 @@ export const FirestoreSortSchema = z.object({
 
 export const FirestoreQuerySchema = z.object({
   connectionId: z.string(),
-  path: z.string(),
+  path: CollectionPathSchema,
   filters: z.array(FirestoreFilterSchema).optional(),
   sorts: z.array(FirestoreSortSchema).optional(),
 });
@@ -167,8 +176,18 @@ export const FirestoreUpdateDocumentFieldsResultSchema = z.discriminatedUnion('s
 
 export const ListDocumentsRequestSchema = z.object({
   connectionId: z.string(),
-  collectionPath: z.string(),
+  collectionPath: CollectionPathSchema,
   request: PageRequestSchema.optional(),
+});
+
+export const ListSubcollectionsRequestSchema = z.object({
+  connectionId: z.string(),
+  documentPath: DocumentPathSchema,
+});
+
+export const GetDocumentRequestSchema = z.object({
+  connectionId: z.string(),
+  documentPath: DocumentPathSchema,
 });
 
 export const RunQueryRequestSchema = z.object({
@@ -230,17 +249,4 @@ function pathSegments(path: string): ReadonlyArray<string> {
 function isBase64(value: string): boolean {
   if (value === '') return true;
   return /^[A-Za-z0-9+/]+={0,2}$/.test(value) && value.length % 4 === 0;
-}
-
-function utf8ByteLength(value: string): number {
-  let bytes = 0;
-  for (let index = 0; index < value.length; index += 1) {
-    const codePoint = value.codePointAt(index) ?? 0;
-    if (codePoint > 0xffff) index += 1;
-    if (codePoint <= 0x7f) bytes += 1;
-    else if (codePoint <= 0x7ff) bytes += 2;
-    else if (codePoint <= 0xffff) bytes += 3;
-    else bytes += 4;
-  }
-  return bytes;
 }

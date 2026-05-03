@@ -10,7 +10,6 @@ export const DEFAULT_INSPECTOR_WIDTH = 360;
 
 export const initialSelectionState: SelectionState = {
   authUserId: null,
-  firestoreDocumentPath: null,
   treeItemId: null,
 };
 

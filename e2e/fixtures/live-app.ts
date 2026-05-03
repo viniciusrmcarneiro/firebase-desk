@@ -1,4 +1,5 @@
 import { type ElectronApplication, expect, type Page } from '@playwright/test';
+import { randomUUID } from 'node:crypto';
 import { mkdtemp, rm } from 'node:fs/promises';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
@@ -58,7 +59,9 @@ export async function expandEmulatorAccount(page: Page): Promise<void> {
   const tree = page.getByRole('tree', { name: 'Account tree' });
   const account = tree.getByRole('treeitem', { name: new RegExp(EMULATOR_ACCOUNT_NAME) });
   await expect(account).toBeVisible();
+  if (await tree.getByRole('treeitem', { name: /Firestore/ }).count()) return;
   await account.click();
+  await expect(tree.getByRole('treeitem', { name: /Firestore/ })).toBeVisible();
 }
 
 export async function openFirestore(page: Page): Promise<void> {
@@ -83,5 +86,5 @@ export async function openJavaScriptQuery(page: Page): Promise<void> {
 }
 
 export function uniqueSmokeId(prefix: string): string {
-  return `${prefix}-${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+  return `${prefix}-${randomUUID()}`;
 }

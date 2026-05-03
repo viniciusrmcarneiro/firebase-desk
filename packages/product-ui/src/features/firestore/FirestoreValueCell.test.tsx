@@ -57,6 +57,40 @@ describe('FirestoreValueCell', () => {
     expect(screen.getByText('{"nested":true}')).toBeTruthy();
     expect(screen.getByTitle('{"nested":true}')).toBeTruthy();
   });
+
+  it('renders truncated values with size and reload hint', () => {
+    render(
+      <FirestoreValueCell
+        value={{ __type__: 'truncated', sizeBytes: 1024 * 512, valueType: 'array' }}
+      />,
+    );
+
+    expect(screen.getByText('trunc')).toBeTruthy();
+    expect(screen.getByText(/array/)).toBeTruthy();
+    expect(screen.getByText(/512 KB/)).toBeTruthy();
+    expect(screen.getByTitle(/Reload the document to view it\./)).toBeTruthy();
+  });
+
+  it('caps primitive field values at 255 characters', () => {
+    const value = 'x'.repeat(300);
+
+    expect(formatFirestoreValue(value)).toHaveLength(255);
+    expect(formatFirestoreValue(value).endsWith('...')).toBe(true);
+  });
+
+  it('caps preview length for very large values without scanning the whole structure', () => {
+    const huge: Record<string, unknown> = {};
+    for (let i = 0; i < 50000; i += 1) huge[`field_${i}`] = `value_${i}`;
+    const start = performance.now();
+    const preview = formatFirestoreValue(huge);
+    const elapsed = performance.now() - start;
+
+    expect(preview.length).toBeLessThanOrEqual(255);
+    expect(preview.endsWith('...')).toBe(true);
+    // Should be much faster than fully stringifying the 50k-key object.
+    // Generous bound to avoid flakiness on busy CI machines.
+    expect(elapsed).toBeLessThan(500);
+  });
 });
 
 function expectedLocalTimestamp(iso: string): string {

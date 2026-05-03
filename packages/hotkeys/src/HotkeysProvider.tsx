@@ -12,20 +12,23 @@ const HotkeysContext = createContext<HotkeysContextValue>({ overrides: {} });
 export interface HotkeysProviderProps {
   readonly settings: SettingsRepository;
   readonly children: ReactNode;
+  readonly onError?: ((message: string) => void) | undefined;
 }
 
-export function HotkeysProvider({ settings, children }: HotkeysProviderProps) {
+export function HotkeysProvider({ settings, children, onError }: HotkeysProviderProps) {
   const [overrides, setOverrides] = useState<HotkeyOverrides>({});
 
   useEffect(() => {
     let cancelled = false;
     settings.getHotkeyOverrides().then((next) => {
       if (!cancelled) setOverrides(next);
+    }).catch((error) => {
+      if (!cancelled) onError?.(messageFromError(error, 'Could not load hotkey overrides.'));
     });
     return () => {
       cancelled = true;
     };
-  }, [settings]);
+  }, [onError, settings]);
 
   const value = useMemo<HotkeysContextValue>(() => ({ overrides }), [overrides]);
 
@@ -38,4 +41,8 @@ export function HotkeysProvider({ settings, children }: HotkeysProviderProps) {
 
 export function useHotkeyOverrides(): HotkeyOverrides {
   return useContext(HotkeysContext).overrides;
+}
+
+function messageFromError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }

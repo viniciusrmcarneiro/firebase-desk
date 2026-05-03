@@ -21,6 +21,7 @@ const DEFAULT_SNAPSHOT: SettingsSnapshot = {
   resultTableLayouts: {},
   firestoreFieldCatalogs: {},
   firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
+  workspaceState: null,
 };
 
 export class MockSettingsRepository implements SettingsRepository {
@@ -51,6 +52,9 @@ export class MockSettingsRepository implements SettingsRepository {
       firestoreWrites: normalizeFirestoreWriteSettings(
         patch.firestoreWrites ?? this.snapshot.firestoreWrites,
       ),
+      workspaceState: patch.workspaceState === undefined
+        ? cloneWorkspaceState(this.snapshot.workspaceState)
+        : cloneWorkspaceState(patch.workspaceState),
     };
     return this.load();
   }
@@ -72,7 +76,13 @@ function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
     resultTableLayouts: cloneResultTableLayouts(snapshot.resultTableLayouts),
     firestoreFieldCatalogs: cloneFirestoreFieldCatalogs(snapshot.firestoreFieldCatalogs),
     firestoreWrites: normalizeFirestoreWriteSettings(snapshot.firestoreWrites),
+    workspaceState: cloneWorkspaceState(snapshot.workspaceState),
   };
+}
+
+function cloneWorkspaceState(value: unknown | null): unknown | null {
+  if (value === null || value === undefined) return null;
+  return JSON.parse(JSON.stringify(value)) as unknown;
 }
 
 function cloneActivityLogSettings(settings: ActivityLogSettings): ActivityLogSettings {

@@ -1,11 +1,14 @@
 import type { FirestoreQueryDraft } from '@firebase-desk/repo-contracts';
+import type { SettingsRepository } from '@firebase-desk/repo-contracts';
 import { useEffect, useRef, useState } from 'react';
+import { restoreWorkspaceTabsCommand } from '../../app-core/workspace/workspaceCommands.ts';
 import { selectionActions } from '../stores/selectionStore.ts';
-import { tabActions, type TabsState } from '../stores/tabsStore.ts';
+import { type TabsState, tabsStore } from '../stores/tabsStore.ts';
 import { treeItemIdForTab } from '../workspaceModel.ts';
 import {
-  loadPersistedWorkspaceState,
+  loadPersistedWorkspaceStateResult,
   savePersistedWorkspaceState,
+  type WorkspacePersistenceFailure,
 } from '../workspacePersistence.ts';
 
 export interface PersistedWorkspaceSnapshot {
@@ -26,35 +29,108 @@ export interface WorkspacePersistenceSnapshot {
   readonly tabsState: TabsState;
 }
 
-export function usePersistedWorkspaceState(): PersistedWorkspaceStateResult {
-  const [persistedWorkspace] = useState(loadPersistedWorkspaceState);
-  const [restored, setRestored] = useState(() => !persistedWorkspace);
+export function usePersistedWorkspaceState(
+  options: {
+    readonly onError?: (error: WorkspacePersistenceFailure) => void;
+    readonly settings: Pick<SettingsRepository, 'load'>;
+  },
+): PersistedWorkspaceStateResult {
+  const { onError, settings } = options;
+  const [result, setResult] = useState<PersistedWorkspaceStateResult>({
+    restored: false,
+    snapshot: null,
+  });
   const restoredRef = useRef(false);
 
   useEffect(() => {
-    if (restoredRef.current) return;
-    restoredRef.current = true;
-    if (persistedWorkspace) {
-      tabActions.restore(persistedWorkspace.tabsState);
-      const activeRestoredTab = persistedWorkspace.tabsState.tabs.find((tab) =>
-        tab.id === persistedWorkspace.tabsState.activeTabId
-      ) ?? persistedWorkspace.tabsState.tabs[0];
-      if (activeRestoredTab) {
-        selectionActions.selectTreeItem(treeItemIdForTab(activeRestoredTab));
+    let cancelled = false;
+    void loadPersistedWorkspaceStateResult(settings).then((loadResult) => {
+      if (cancelled) return;
+      if (loadResult.error) onError?.(loadResult.error);
+      if (!restoredRef.current) {
+        restoredRef.current = true;
+        const persistedWorkspace = loadResult.snapshot;
+        if (persistedWorkspace) {
+          const restoreResult = restoreWorkspaceTabsCommand(persistedWorkspace.tabsState);
+          tabsStore.setState(() => restoreResult.state);
+          if (restoreResult.activeTab) {
+            selectionActions.selectTreeItem(treeItemIdForTab(restoreResult.activeTab));
+          }
+        }
       }
-    }
-    setRestored(true);
-  }, [persistedWorkspace]);
+      setResult({ restored: true, snapshot: loadResult.snapshot });
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [onError, settings]);
 
-  return { restored, snapshot: persistedWorkspace };
+  return result;
 }
 
 export function usePersistWorkspaceSnapshot(
   snapshot: WorkspacePersistenceSnapshot,
-  options: { readonly enabled: boolean; },
+  options: {
+    readonly debounceMs?: number | undefined;
+    readonly enabled: boolean;
+    readonly onError?: (error: WorkspacePersistenceFailure) => void;
+    readonly settings: Pick<SettingsRepository, 'save'>;
+  },
 ): void {
+  const { onError, settings } = options;
+  const skippedInitialSaveRef = useRef(false);
+  const lastQueuedSnapshotKeyRef = useRef<string | null>(null);
+  const pendingSnapshotRef = useRef<WorkspacePersistenceSnapshot | null>(null);
+  const saveTimerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  const latestSaveOptionsRef = useRef({ onError, settings });
+  latestSaveOptionsRef.current = { onError, settings };
+
   useEffect(() => {
-    if (!options.enabled) return;
-    savePersistedWorkspaceState(snapshot);
-  }, [options.enabled, snapshot]);
+    function clearPendingSave() {
+      if (!saveTimerRef.current) return;
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+
+    if (!options.enabled) {
+      skippedInitialSaveRef.current = false;
+      lastQueuedSnapshotKeyRef.current = null;
+      pendingSnapshotRef.current = null;
+      clearPendingSave();
+      return;
+    }
+    const snapshotKey = JSON.stringify(snapshot);
+    if (!skippedInitialSaveRef.current) {
+      skippedInitialSaveRef.current = true;
+      lastQueuedSnapshotKeyRef.current = snapshotKey;
+      return;
+    }
+    if (lastQueuedSnapshotKeyRef.current === snapshotKey) return;
+    lastQueuedSnapshotKeyRef.current = snapshotKey;
+    pendingSnapshotRef.current = snapshot;
+    clearPendingSave();
+    saveTimerRef.current = setTimeout(() => {
+      saveTimerRef.current = null;
+      const pendingSnapshot = pendingSnapshotRef.current;
+      pendingSnapshotRef.current = null;
+      if (!pendingSnapshot) return;
+      void savePersistedWorkspaceState(settings, pendingSnapshot).then((error) => {
+        if (error) latestSaveOptionsRef.current.onError?.(error);
+      });
+    }, options.debounceMs ?? 300);
+  }, [onError, options.debounceMs, options.enabled, settings, snapshot]);
+
+  useEffect(() => () => {
+    if (saveTimerRef.current) {
+      clearTimeout(saveTimerRef.current);
+      saveTimerRef.current = null;
+    }
+    const pendingSnapshot = pendingSnapshotRef.current;
+    pendingSnapshotRef.current = null;
+    if (!pendingSnapshot) return;
+    const latest = latestSaveOptionsRef.current;
+    void savePersistedWorkspaceState(latest.settings, pendingSnapshot).then((error) => {
+      if (error) latest.onError?.(error);
+    });
+  }, []);
 }

@@ -6,8 +6,8 @@ import {
   normalizeFirestoreWriteSettings,
   type SettingsSnapshot,
 } from '@firebase-desk/repo-contracts';
-import { readFile } from 'node:fs/promises';
-import { join } from 'node:path';
+import { readFile, rename } from 'node:fs/promises';
+import { basename, dirname, join } from 'node:path';
 import { writeJsonAtomic } from './atomic-write.ts';
 
 export const DEFAULT_SETTINGS_SNAPSHOT: SettingsSnapshot = {
@@ -20,6 +20,7 @@ export const DEFAULT_SETTINGS_SNAPSHOT: SettingsSnapshot = {
   resultTableLayouts: {},
   firestoreFieldCatalogs: {},
   firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
+  workspaceState: null,
 };
 
 export class SettingsStore {
@@ -45,14 +46,27 @@ export class SettingsStore {
   private async readFile(): Promise<SettingsSnapshot> {
     try {
       const raw = await readFile(this.filePath, 'utf8');
-      const parsed = JSON.parse(raw) as unknown;
+      let parsed: unknown;
+      try {
+        parsed = JSON.parse(raw) as unknown;
+      } catch (error) {
+        throw await this.corruptSettingsError(error);
+      }
       const settingsFile = SettingsFileSchema.safeParse(parsed);
-      if (!settingsFile.success) return cloneSnapshot(DEFAULT_SETTINGS_SNAPSHOT);
+      if (!settingsFile.success) throw await this.corruptSettingsError(settingsFile.error);
       return cloneSnapshot(settingsFile.data.snapshot);
     } catch (error) {
       if (isNotFound(error)) return cloneSnapshot(DEFAULT_SETTINGS_SNAPSHOT);
       throw error;
     }
+  }
+
+  private async corruptSettingsError(cause: unknown): Promise<Error> {
+    const backupFileName = await backupCorruptFile(this.filePath, 'settings.invalid');
+    const message = backupFileName
+      ? `Settings file is invalid. A backup was saved as ${backupFileName}.`
+      : 'Settings file is invalid.';
+    return new Error(message, { cause });
   }
 }
 
@@ -62,6 +76,7 @@ function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
     activityLog: cloneActivityLogSettings(snapshot.activityLog),
     firestoreWrites: normalizeFirestoreWriteSettings(snapshot.firestoreWrites),
     hotkeyOverrides: { ...snapshot.hotkeyOverrides },
+    workspaceState: cloneWorkspaceState(snapshot.workspaceState),
     firestoreFieldCatalogs: Object.fromEntries(
       Object.entries(snapshot.firestoreFieldCatalogs).map(([key, entries]) => [
         key,
@@ -84,10 +99,26 @@ function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
   };
 }
 
+function cloneWorkspaceState(value: unknown | null): unknown | null {
+  if (value === null || value === undefined) return null;
+  return JSON.parse(JSON.stringify(value)) as unknown;
+}
+
 function cloneActivityLogSettings(settings: ActivityLogSettings): ActivityLogSettings {
   return { ...settings };
 }
 
 function isNotFound(error: unknown): boolean {
   return Boolean(error && typeof error === 'object' && 'code' in error && error.code === 'ENOENT');
+}
+
+async function backupCorruptFile(filePath: string, prefix: string): Promise<string | null> {
+  const backupName = `${prefix}-${new Date().toISOString().replaceAll(':', '-')}.json`;
+  const backupPath = join(dirname(filePath), backupName);
+  try {
+    await rename(filePath, backupPath);
+    return basename(backupPath);
+  } catch {
+    return null;
+  }
 }

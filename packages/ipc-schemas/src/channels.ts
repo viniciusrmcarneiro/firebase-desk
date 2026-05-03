@@ -23,7 +23,9 @@ import {
   FirestoreSaveDocumentResultSchema,
   FirestoreUpdateDocumentFieldsResultSchema,
   GenerateDocumentIdRequestSchema,
+  GetDocumentRequestSchema,
   ListDocumentsRequestSchema,
+  ListSubcollectionsRequestSchema,
   RunQueryRequestSchema,
   SaveDocumentRequestSchema,
   UpdateDocumentFieldsRequestSchema,
@@ -115,7 +117,7 @@ export const IPC_CHANNELS = {
     response: FirestoreDocumentsPageSchema,
   },
   'firestore.listSubcollections': {
-    request: z.object({ connectionId: z.string(), documentPath: z.string() }),
+    request: ListSubcollectionsRequestSchema,
     response: z.array(FirestoreCollectionNodeSchema),
   },
   'firestore.runQuery': {
@@ -123,7 +125,7 @@ export const IPC_CHANNELS = {
     response: FirestoreResultsPageSchema,
   },
   'firestore.getDocument': {
-    request: z.object({ connectionId: z.string(), documentPath: z.string() }),
+    request: GetDocumentRequestSchema,
     response: FirestoreDocumentResultSchema.nullable(),
   },
   'firestore.generateDocumentId': {

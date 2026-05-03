@@ -43,6 +43,30 @@ describe('DataTable', () => {
     expect(onRowClick).toHaveBeenCalledWith({ id: '1', name: 'Ada' });
   });
 
+  it('exposes grid roles and selected row state', () => {
+    render(
+      <div className='h-60'>
+        <DataTable
+          columns={columns}
+          data={[
+            { id: '1', name: 'Ada' },
+            { id: '2', name: 'Grace' },
+          ]}
+          getRowId={(row) => row.id}
+          selectedRowId='2'
+        />
+      </div>,
+    );
+
+    expect(screen.getByRole('grid')).toBeTruthy();
+    expect(screen.getByRole('columnheader', { name: 'Name' })).toBeTruthy();
+    expect(screen.getAllByRole('gridcell').map((cell) => cell.textContent)).toEqual([
+      'Ada',
+      'Grace',
+    ]);
+    expect(screen.getAllByRole('row')[2]?.getAttribute('aria-selected')).toBe('true');
+  });
+
   it('applies row classes and allows empty row context menus', () => {
     const { container } = render(
       <div className='h-60'>

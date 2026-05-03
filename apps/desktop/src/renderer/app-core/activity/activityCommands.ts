@@ -3,6 +3,7 @@ import type {
   ActivityLogEntry,
   ActivityLogRepository,
 } from '@firebase-desk/repo-contracts';
+import { messageFromError } from '../shared/errors.ts';
 import { selectActivityListRequest } from './activitySelectors.ts';
 import type { ActivityStore } from './activityStore.ts';
 import { updateActivityStore } from './activityStore.ts';
@@ -119,9 +120,4 @@ export function createActivityOpenTargetIntent(
     return { connectionId: target.connectionId, type: 'auth', uid: target.uid ?? null };
   }
   return null;
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  if (error instanceof Error) return error.message;
-  return fallback;
 }

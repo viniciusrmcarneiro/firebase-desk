@@ -1,4 +1,4 @@
-import { type AppCoreStore, createAppCoreStore } from '../../shared/index.ts';
+import { type AppCoreStore, createAppCoreStore } from '../../shared/store.ts';
 import {
   createInitialFirestoreWriteState,
   type FirestoreWriteState,

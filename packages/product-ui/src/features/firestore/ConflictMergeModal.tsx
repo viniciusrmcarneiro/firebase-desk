@@ -3,6 +3,7 @@ import { Badge, Button, Dialog, DialogContent, InlineAlert, Tooltip } from '@fir
 import { AlertTriangle } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { DiffCodeEditor } from '../../code-editor/CodeEditor.tsx';
+import { messageFromError } from '../../shared/errors.ts';
 import { parseDocumentJson, validateFirestoreDocumentData } from './fieldEditModel.ts';
 import { stringifySortedJson } from './sortedJson.ts';
 
@@ -136,9 +137,4 @@ function DiffPaneLabel({ label, meta }: { readonly label: string; readonly meta:
       <Badge>{meta}</Badge>
     </div>
   );
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  if (error instanceof Error) return error.message;
-  return fallback;
 }

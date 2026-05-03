@@ -1,17 +1,25 @@
-import type {
-  FirestoreCollectionNode,
-  FirestoreDeleteDocumentOptions,
-  FirestoreDocumentNode,
-  FirestoreDocumentResult,
-  FirestoreFieldPatchOperation,
-  FirestoreRepository,
-  FirestoreSaveDocumentOptions,
-  FirestoreSaveDocumentResult,
-  FirestoreUpdateDocumentFieldsOptions,
-  FirestoreUpdateDocumentFieldsResult,
-  Page,
-  PageRequest,
+import {
+  assertFirestoreCollectionPath,
+  assertFirestoreDocumentPath,
+  DEFAULT_PAGE_LIMIT,
+  type FirestoreCollectionNode,
+  type FirestoreDeleteDocumentOptions,
+  type FirestoreDocumentNode,
+  type FirestoreDocumentResult,
+  type FirestoreFieldPatchOperation,
+  firestorePathParts,
+  type FirestoreRepository,
+  type FirestoreSaveDocumentOptions,
+  type FirestoreSaveDocumentResult,
+  type FirestoreUpdateDocumentFieldsOptions,
+  type FirestoreUpdateDocumentFieldsResult,
+  type Page,
+  type PageRequest,
 } from '@firebase-desk/repo-contracts';
+import {
+  fieldPatchHasChangedRemoteValue,
+  FIRESTORE_FIELD_PATH_SEGMENT_MAX_BYTES,
+} from '@firebase-desk/repo-contracts/firestore-field-patch';
 import {
   type CollectionReference,
   type DocumentSnapshot,
@@ -30,7 +38,6 @@ import type {
 import { FirestoreCursorCache } from './cursor-cache.ts';
 import { decodeAdminData, decodeFilterValue, encodeAdminData } from './value-codec.ts';
 
-const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 250;
 
 export class FirebaseFirestoreRepository implements FirestoreRepository {
@@ -317,22 +324,16 @@ function applyCursor(
 }
 
 function limitFor(request?: PageRequest): number {
-  const value = request?.limit ?? DEFAULT_LIMIT;
+  const value = request?.limit ?? DEFAULT_PAGE_LIMIT;
   return Math.max(1, Math.min(MAX_LIMIT, value));
 }
 
 function assertCollectionPath(path: string): void {
-  const parts = pathParts(path);
-  if (parts.length === 0 || parts.length % 2 === 0) {
-    throw new Error(`Invalid Firestore collection path: ${path}`);
-  }
+  assertFirestoreCollectionPath(path);
 }
 
 function assertDocumentPath(path: string): void {
-  const parts = pathParts(path);
-  if (parts.length === 0 || parts.length % 2 !== 0) {
-    throw new Error(`Invalid Firestore document path: ${path}`);
-  }
+  assertFirestoreDocumentPath(path);
 }
 
 function assertDocumentId(id: string): void {
@@ -348,7 +349,10 @@ function assertFieldPatchOperations(
   for (const operation of operations) {
     if (!operation.fieldPath.length) throw new Error('Firestore field path is required.');
     for (const segment of operation.fieldPath) {
-      if (!segment || /^__.*__$/.test(segment) || Buffer.byteLength(segment, 'utf8') > 1500) {
+      if (
+        !segment || /^__.*__$/.test(segment)
+        || Buffer.byteLength(segment, 'utf8') > FIRESTORE_FIELD_PATH_SEGMENT_MAX_BYTES
+      ) {
         throw new Error(`Invalid Firestore field path segment: ${segment}`);
       }
     }
@@ -363,61 +367,12 @@ function assertDirectSubcollectionPath(documentPath: string, collectionPath: str
       `Invalid Firestore subcollection path ${collectionPath} for document ${documentPath}`,
     );
   }
-  const remainingParts = pathParts(collectionPath.slice(parentPrefix.length));
+  const remainingParts = firestorePathParts(collectionPath.slice(parentPrefix.length));
   if (remainingParts.length !== 1) {
     throw new Error(
       `Invalid Firestore subcollection path ${collectionPath} for document ${documentPath}`,
     );
   }
-}
-
-function pathParts(path: string): ReadonlyArray<string> {
-  const parts = path.split('/');
-  return parts.some((part) => part.length === 0) ? [] : parts;
-}
-
-function fieldPatchHasChangedRemoteValue(
-  remoteData: Record<string, unknown>,
-  operations: ReadonlyArray<FirestoreFieldPatchOperation>,
-): boolean {
-  return operations.some((operation) =>
-    !deepEqual(getNestedValue(remoteData, operation.fieldPath), operation.baseValue)
-  );
-}
-
-function getNestedValue(
-  data: Record<string, unknown>,
-  fieldPath: ReadonlyArray<string>,
-): unknown {
-  let current: unknown = data;
-  for (const segment of fieldPath) {
-    if (!current || typeof current !== 'object' || Array.isArray(current)) return undefined;
-    current = (current as Record<string, unknown>)[segment];
-  }
-  return current;
-}
-
-function deepEqual(left: unknown, right: unknown): boolean {
-  return JSON.stringify(sortJson(left)) === JSON.stringify(sortJson(right));
-}
-
-function sortJson(value: unknown): unknown {
-  if (Array.isArray(value)) return value.map(sortJson);
-  if (!value || typeof value !== 'object') return value;
-  return Object.fromEntries(
-    sortedEntriesByKey(value as Record<string, unknown>)
-      .map(([key, entry]) => [key, sortJson(entry)]),
-  );
-}
-
-function sortedEntriesByKey(value: Record<string, unknown>): ReadonlyArray<[string, unknown]> {
-  const sorted: Array<[string, unknown]> = [];
-  for (const entry of Object.entries(value)) {
-    const index = sorted.findIndex(([key]) => entry[0].localeCompare(key) < 0);
-    if (index < 0) sorted.push(entry);
-    else sorted.splice(index, 0, entry);
-  }
-  return sorted;
 }
 
 function firestoreOperationError(caught: unknown, config: FirebaseConnectionConfig): Error {

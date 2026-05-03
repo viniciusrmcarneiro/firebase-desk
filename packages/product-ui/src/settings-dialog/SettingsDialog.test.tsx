@@ -338,7 +338,7 @@ describe('SettingsDialog', () => {
       })),
     );
     const settings = new MockSettingsRepository();
-    await settings.save({ sidebarWidth: 412, inspectorWidth: 388 });
+    await settings.save({ dataMode: 'live', sidebarWidth: 412, inspectorWidth: 388 });
     render(
       <AppearanceProvider settings={settings}>
         <SettingsDialog open onOpenChange={vi.fn()} />
@@ -348,8 +348,32 @@ describe('SettingsDialog', () => {
     expect(await screen.findByText('Saved settings')).toBeTruthy();
     expect(screen.getByText('412px')).toBeTruthy();
     expect(screen.getByText('Credential storage')).toBeTruthy();
+    expect(screen.getByText(/Live mode can read production service account files/)).toBeTruthy();
     expect(screen.getByText('Data safety')).toBeTruthy();
     expect(screen.getByText('About')).toBeTruthy();
+  });
+
+  it('uses mock-specific credential storage copy', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    await settings.save({ dataMode: 'mock' });
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    expect(
+      await screen.findByText('Mock mode uses local fixtures. No Firebase credentials are read.'),
+    )
+      .toBeTruthy();
   });
 });
 

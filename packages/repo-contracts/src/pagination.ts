@@ -15,3 +15,5 @@ export interface PageRequest {
   readonly limit?: number;
   readonly cursor?: PaginationCursor;
 }
+
+export const DEFAULT_PAGE_LIMIT = 25;

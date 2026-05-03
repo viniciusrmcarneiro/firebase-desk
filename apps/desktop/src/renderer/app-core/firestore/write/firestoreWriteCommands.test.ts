@@ -28,7 +28,7 @@ describe('firestore write commands', () => {
     expect(context.firestore.generateDocumentId).toHaveBeenCalledWith('emu', 'orders');
   });
 
-  it('creates documents, invalidates live queries, and records Activity', async () => {
+  it('creates documents, refreshes live Firestore state, and records Activity', async () => {
     const context = commandContext({ dataMode: 'live' });
     const result = await createFirestoreDocumentCommand(context.store, context.env, {
       collectionPath: 'orders',
@@ -43,7 +43,7 @@ describe('firestore write commands', () => {
       'ord_new',
       { status: 'new' },
     );
-    expect(context.invalidateFirestoreQueries).toHaveBeenCalledTimes(1);
+    expect(context.refreshAfterLiveWrite).toHaveBeenCalledTimes(1);
     expect(context.activity.at(-1)).toMatchObject({
       action: 'Create document',
       metadata: { documentId: 'ord_new', fieldCount: 1 },
@@ -123,7 +123,7 @@ describe('firestore write commands', () => {
     expect(context.activity).toEqual([]);
   });
 
-  it('returns full save conflicts without invalidating', async () => {
+  it('returns full save conflicts without refreshing live Firestore state', async () => {
     const conflict: FirestoreSaveDocumentResult = {
       remoteDocument: document({ status: 'remote' }),
       status: 'conflict',
@@ -139,7 +139,7 @@ describe('firestore write commands', () => {
       project,
     });
 
-    expect(context.invalidateFirestoreQueries).not.toHaveBeenCalled();
+    expect(context.refreshAfterLiveWrite).not.toHaveBeenCalled();
     expect(result.result).toBe(conflict);
     expect(result.lastAction).toBe('Save conflict: orders/ord_1');
     expect(result.notification).toBe('Save conflict: orders/ord_1');
@@ -193,7 +193,7 @@ describe('firestore write commands', () => {
     });
   });
 
-  it('records field conflicts and does not invalidate', async () => {
+  it('records field conflicts and does not refresh live Firestore state', async () => {
     const conflict: FirestoreUpdateDocumentFieldsResult = {
       remoteDocument: document({ status: 'remote' }),
       status: 'conflict',
@@ -215,7 +215,7 @@ describe('firestore write commands', () => {
       project,
     });
 
-    expect(context.invalidateFirestoreQueries).not.toHaveBeenCalled();
+    expect(context.refreshAfterLiveWrite).not.toHaveBeenCalled();
     expect(result.lastAction).toBe('Field conflict: orders/ord_1');
     expect(result.notification).toBe('Field conflict: orders/ord_1');
     expect(context.activity.at(-1)).toMatchObject({
@@ -296,18 +296,18 @@ function commandContext(
     | 'saveDocument'
     | 'updateDocumentFields'
   >;
-  const invalidateFirestoreQueries = vi.fn().mockResolvedValue(undefined);
+  const refreshAfterLiveWrite = vi.fn().mockResolvedValue(undefined);
   let time = 1000;
   const env: FirestoreWriteCommandEnvironment = {
     dataMode,
     firestore,
-    invalidateFirestoreQueries,
     now: () => time += 5,
     recordActivity: (input) => {
       activity.push(input);
     },
+    refreshAfterLiveWrite,
   };
-  return { activity, env, firestore, invalidateFirestoreQueries, store };
+  return { activity, env, firestore, refreshAfterLiveWrite, store };
 }
 
 function document(data: Record<string, unknown> = {}): FirestoreDocumentResult {

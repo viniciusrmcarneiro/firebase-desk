@@ -21,6 +21,10 @@
       "cache": false,
       "outputs": []
     },
+    "//#typecheck:scripts": {
+      "cache": false,
+      "outputs": []
+    },
     "typecheck": {
       "dependsOn": [
         "^typecheck"
@@ -28,6 +32,17 @@
       "outputs": [
         "**/*.tsbuildinfo"
       ]
+    },
+    "//#test:repo-invariants": {
+      "cache": false,
+      "outputs": []
+    },
+    "//#package:smoke:root": {
+      "cache": false,
+      "dependsOn": [
+        "@firebase-desk/desktop#package"
+      ],
+      "outputs": []
     },
     "test": {
       "dependsOn": [

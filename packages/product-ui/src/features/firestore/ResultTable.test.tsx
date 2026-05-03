@@ -169,6 +169,30 @@ describe('ResultTable', () => {
     expect(screen.getByTestId('headers').textContent).not.toContain('Subcollections');
   });
 
+  it('caps generated field columns and shows an overflow column', () => {
+    const data = Object.fromEntries(
+      Array.from({ length: 250 }, (_, index) => [`field_${String(index).padStart(3, '0')}`, index]),
+    );
+
+    render(
+      <ResultTable
+        hasMore={false}
+        isFetchingMore={false}
+        queryPath='orders'
+        rows={[{ id: 'ord_big', path: 'orders/ord_big', data, hasSubcollections: false }]}
+        selectedDocumentPath={null}
+        subcollectionStates={{}}
+        onLoadMore={() => {}}
+      />,
+    );
+
+    const header = screen.getByTestId('headers');
+    expect(header.textContent).toContain('+50 fields');
+    expect(header.textContent).toContain('field_000');
+    expect(header.textContent).not.toContain('field_249');
+    expect(screen.getByText('50 fields hidden')).toBeTruthy();
+  });
+
   it('does not render an open action column', () => {
     render(
       <ResultTable

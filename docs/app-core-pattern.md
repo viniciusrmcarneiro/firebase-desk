@@ -272,29 +272,11 @@ Every scheduled command must define:
 Activity logging should happen in the command path so background and user actions are recorded consistently.
 Commands must not enqueue hidden work unless there is an execution path outside the active React tab.
 
-## Migration Plan
+## Implementation Rule
 
-Track implementation in [app-core-refactor-tasks.md](app-core-refactor-tasks.md).
-
-1. Extract Activity first.
-   - Move drawer state, filters, loading, entries, unread issue, clear/export/load, and record behavior into `app-core/activity`.
-   - Keep existing AppShell tests passing.
-   - Add pure tests for all activity transitions.
-
-2. Extract Firestore query lifecycle.
-   - Move run, load more, refresh, stale result, and query activity behavior.
-   - Avoid `useEffect` watchers for query completion when command completion can record explicitly.
-
-3. Extract Firestore write workflows.
-   - Model create/save/field-patch/delete/conflict as explicit states.
-   - Keep full-document and field-patch behavior testable without rendering modals.
-
-4. Extract Auth and JS Query workflows.
-   - Share command shape with future schedulers.
-
-5. Clean AppShell.
-   - AppShell should compose layout, controllers, and feature surfaces.
-   - It should not infer domain events by watching unrelated state combinations.
+New renderer workflows should start in app-core when they represent domain behavior,
+workflow state, durable state, repository IO, or scheduler-compatible actions.
+React components should render app-core state and emit intent through adapters.
 
 ## Review Checklist
 

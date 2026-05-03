@@ -23,6 +23,7 @@ export interface ProcessScriptRunnerOptions {
 
 interface ActiveRun {
   readonly child: ChildProcess;
+  readonly cleanup: () => void;
   readonly errors: ScriptRunError[];
   readonly logs: ScriptLogEntry[];
   readonly startedAt: number;
@@ -62,8 +63,10 @@ export class ProcessScriptRunnerRepository implements ScriptRunnerRepository {
 
     return await new Promise<ScriptRunResult>((resolve) => {
       const child = this.forkWorker(this.workerPath);
+      let cleanup = noopCleanup;
       const active: ActiveRun = {
         child,
+        cleanup: () => cleanup(),
         cancelled: false,
         errors: [],
         logs: [],
@@ -74,7 +77,7 @@ export class ProcessScriptRunnerRepository implements ScriptRunnerRepository {
       };
       this.activeRuns.set(request.runId, active);
 
-      child.on('message', (message: unknown) => {
+      const handleMessage = (message: unknown) => {
         const event = eventFromWorkerMessage(message);
         if (event) {
           this.recordEvent(request.runId, event);
@@ -82,15 +85,17 @@ export class ProcessScriptRunnerRepository implements ScriptRunnerRepository {
         }
         const result = resultFromWorkerMessage(message);
         if (result) this.finish(request.runId, resultWithPartial(active, result));
-      });
-      child.once('error', (error) => {
+      };
+      const handleError = (error: Error) => {
         this.finish(request.runId, errorRunResult(error, this.duration(active), active));
-      });
-      child.once('exit', (code, signal) => {
+      };
+      const handleExit = (code: number | null, signal: NodeJS.Signals | null) => {
         const current = this.activeRuns.get(request.runId);
         if (!current || current.settled) return;
         if (current.cancelled) {
-          this.finish(request.runId, cancelledResult(this.duration(current), current));
+          this.finish(request.runId, cancelledResult(this.duration(current), current), {
+            killChild: false,
+          });
           return;
         }
         this.finish(
@@ -104,14 +109,28 @@ export class ProcessScriptRunnerRepository implements ScriptRunnerRepository {
             this.duration(current),
             current,
           ),
+          { killChild: false },
         );
-      });
+      };
+      cleanup = () => {
+        child.removeListener('message', handleMessage);
+        child.removeListener('error', handleError);
+        child.removeListener('exit', handleExit);
+      };
+
+      child.on('message', handleMessage);
+      child.once('error', handleError);
+      child.once('exit', handleExit);
 
       try {
+        if (!child.send) throw new Error('Script worker IPC channel is unavailable.');
+        if (child.killed) throw new Error('Script worker exited before run request was sent.');
+        if (child.connected === false) {
+          throw new Error('Script worker IPC channel is closed.');
+        }
         child.send?.({ type: 'run', request, connection });
       } catch (error) {
-        this.finish(request.runId, errorRunResult(error, this.duration(active)));
-        child.kill();
+        this.finish(request.runId, errorRunResult(error, this.duration(active), active));
       }
     });
   }
@@ -140,11 +159,17 @@ export class ProcessScriptRunnerRepository implements ScriptRunnerRepository {
     this.emit(event);
   }
 
-  private finish(runId: string, result: ScriptRunResult): void {
+  private finish(
+    runId: string,
+    result: ScriptRunResult,
+    options: { readonly killChild?: boolean; } = {},
+  ): void {
     const active = this.activeRuns.get(runId);
     if (!active || active.settled) return;
     active.settled = true;
     this.activeRuns.delete(runId);
+    active.cleanup();
+    if (options.killChild !== false) killChild(active.child);
     this.emit({ type: 'complete', runId, result });
     active.resolve(result);
   }
@@ -162,6 +187,17 @@ export class ProcessScriptRunnerRepository implements ScriptRunnerRepository {
         // A subscriber must not break child-process event handling.
       }
     }
+  }
+}
+
+function noopCleanup(): void {}
+
+function killChild(child: ChildProcess): void {
+  if (child.killed) return;
+  try {
+    child.kill();
+  } catch {
+    // The run is already complete; child shutdown failures should not change the result.
   }
 }
 

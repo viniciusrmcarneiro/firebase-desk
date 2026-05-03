@@ -1,5 +1,5 @@
 import type { ScriptRunResult } from '@firebase-desk/repo-contracts';
-import type { AppCoreCommandOptions } from '../shared/index.ts';
+import type { AppCoreCommandOptions } from '../shared/commandOptions.ts';
 
 export interface ActiveScriptRun {
   readonly commandOptions?: AppCoreCommandOptions | undefined;

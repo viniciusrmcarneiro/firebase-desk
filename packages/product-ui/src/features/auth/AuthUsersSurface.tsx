@@ -19,6 +19,8 @@ import {
 import { Pencil, ShieldCheck, UserRound, Users } from 'lucide-react';
 import { useEffect, useState } from 'react';
 import { CodeEditor } from '../../code-editor/CodeEditor.tsx';
+import { useMediaQuery } from '../../hooks/useMediaQuery.ts';
+import { messageFromError } from '../../shared/errors.ts';
 
 export interface AuthUsersSurfaceProps {
   readonly errorMessage?: string | null;
@@ -410,27 +412,4 @@ function parseClaimsJson(source: string): Record<string, unknown> {
     return value as Record<string, unknown>;
   }
   throw new Error('Custom claims JSON must be an object.');
-}
-
-function messageFromError(error: unknown, fallback: string): string {
-  if (error instanceof Error) return error.message;
-  return fallback;
-}
-
-function useMediaQuery(query: string): boolean {
-  const [matches, setMatches] = useState(() => {
-    if (typeof window === 'undefined') return true;
-    return window.matchMedia(query).matches;
-  });
-
-  useEffect(() => {
-    if (typeof window === 'undefined') return;
-    const media = window.matchMedia(query);
-    setMatches(media.matches);
-    const listener = (event: MediaQueryListEvent) => setMatches(event.matches);
-    media.addEventListener('change', listener);
-    return () => media.removeEventListener('change', listener);
-  }, [query]);
-
-  return matches;
 }

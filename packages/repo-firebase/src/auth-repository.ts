@@ -1,8 +1,13 @@
-import type { AuthRepository, AuthUser, Page, PageRequest } from '@firebase-desk/repo-contracts';
+import {
+  type AuthRepository,
+  type AuthUser,
+  DEFAULT_PAGE_LIMIT,
+  type Page,
+  type PageRequest,
+} from '@firebase-desk/repo-contracts';
 import type { UserRecord } from 'firebase-admin/auth';
 import type { AdminAuthProvider } from './admin-auth-provider.ts';
 
-const DEFAULT_LIMIT = 25;
 const MAX_LIMIT = 1000;
 
 export class FirebaseAuthRepository implements AuthRepository {
@@ -89,7 +94,7 @@ function toAuthUser(user: UserRecord): AuthUser {
 }
 
 function limitFor(request?: PageRequest): number {
-  const value = request?.limit ?? DEFAULT_LIMIT;
+  const value = request?.limit ?? DEFAULT_PAGE_LIMIT;
   return Math.max(1, Math.min(MAX_LIMIT, value));
 }
 

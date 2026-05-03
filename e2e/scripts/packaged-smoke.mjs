@@ -1,3 +1,5 @@
+// @ts-check
+
 import { spawn } from 'node:child_process';
 import { existsSync, readdirSync, statSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
@@ -12,6 +14,11 @@ const smokeTimeoutMs = Number.parseInt(
   10,
 );
 
+/**
+ * @param {string} directory
+ * @param {string} executableName
+ * @returns {string | undefined}
+ */
 function findNestedExecutable(directory, executableName) {
   if (!existsSync(directory)) return undefined;
 
@@ -28,10 +35,15 @@ function findNestedExecutable(directory, executableName) {
   return undefined;
 }
 
+/**
+ * @param {readonly string[]} paths
+ * @returns {string | undefined}
+ */
 function firstExisting(paths) {
   return paths.find((candidatePath) => existsSync(candidatePath));
 }
 
+/** @returns {string} */
 function resolvePackagedExecutable() {
   const explicitPath = process.env['FIREBASE_DESK_PACKAGED_BIN'];
   if (explicitPath) return explicitPath;
@@ -63,6 +75,36 @@ function resolvePackagedExecutable() {
   throw new Error(`Could not find packaged Firebase Desk executable under ${releaseDirectory}`);
 }
 
+/**
+ * @param {string} executablePath
+ * @returns {string}
+ */
+function resolvePackagedResourcesDirectory(executablePath) {
+  if (process.platform === 'darwin') {
+    return resolve(dirname(executablePath), '..', 'Resources');
+  }
+
+  return resolve(dirname(executablePath), 'resources');
+}
+
+/**
+ * @param {string} executablePath
+ * @returns {void}
+ */
+function assertPackagedResources(executablePath) {
+  const resourcesDirectory = resolvePackagedResourcesDirectory(executablePath);
+  const appArchivePath = resolve(resourcesDirectory, 'app.asar');
+
+  if (!existsSync(resourcesDirectory) || !statSync(resourcesDirectory).isDirectory()) {
+    throw new Error(`Packaged resources directory is missing: ${resourcesDirectory}`);
+  }
+
+  if (!existsSync(appArchivePath) || !statSync(appArchivePath).isFile()) {
+    throw new Error(`Packaged app archive is missing: ${appArchivePath}`);
+  }
+}
+
+/** @returns {NodeJS.ProcessEnv} */
 function createSmokeEnvironment() {
   return {
     ...process.env,
@@ -73,30 +115,43 @@ function createSmokeEnvironment() {
   };
 }
 
+/**
+ * @param {string} currentOutput
+ * @param {Buffer} chunk
+ * @returns {string}
+ */
 function appendBoundedOutput(currentOutput, chunk) {
   const nextOutput = `${currentOutput}${chunk.toString()}`;
   return nextOutput.length > 4000 ? nextOutput.slice(nextOutput.length - 4000) : nextOutput;
 }
 
+/**
+ * @param {import('node:child_process').ChildProcess} childProcess
+ * @returns {Promise<void>}
+ */
 function stopProcess(childProcess) {
   if (childProcess.exitCode !== null || childProcess.signalCode !== null) return Promise.resolve();
 
   childProcess.kill('SIGTERM');
-  return new Promise((resolvePromise) => {
-    const forceTimer = setTimeout(() => {
-      childProcess.kill('SIGKILL');
-      resolvePromise();
-    }, 2000);
+  return /** @type {Promise<void>} */ (
+    new Promise((resolvePromise) => {
+      const forceTimer = setTimeout(() => {
+        childProcess.kill('SIGKILL');
+        resolvePromise();
+      }, 2000);
 
-    childProcess.once('exit', () => {
-      clearTimeout(forceTimer);
-      resolvePromise();
-    });
-  });
+      childProcess.once('exit', () => {
+        clearTimeout(forceTimer);
+        resolvePromise();
+      });
+    })
+  );
 }
 
+/** @returns {Promise<void>} */
 async function runSmoke() {
   const executablePath = resolvePackagedExecutable();
+  assertPackagedResources(executablePath);
   console.log(`Launching packaged app: ${executablePath}`);
 
   let stderrOutput = '';
@@ -115,31 +170,33 @@ async function runSmoke() {
     stderrOutput = appendBoundedOutput(stderrOutput, chunk);
   });
 
-  await new Promise((resolvePromise, rejectPromise) => {
-    const readyTimer = setTimeout(async () => {
-      settled = true;
-      await stopProcess(childProcess);
-      resolvePromise();
-    }, smokeTimeoutMs);
+  await /** @type {Promise<void>} */ (
+    new Promise((resolvePromise, rejectPromise) => {
+      const readyTimer = setTimeout(async () => {
+        settled = true;
+        await stopProcess(childProcess);
+        resolvePromise();
+      }, smokeTimeoutMs);
 
-    childProcess.once('error', (error) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(readyTimer);
-      rejectPromise(error);
-    });
+      childProcess.once('error', (error) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(readyTimer);
+        rejectPromise(error);
+      });
 
-    childProcess.once('exit', (code, signal) => {
-      if (settled) return;
-      settled = true;
-      clearTimeout(readyTimer);
-      rejectPromise(
-        new Error(
-          `Packaged app exited before ${smokeTimeoutMs}ms (code=${code}, signal=${signal}).\nSTDOUT:\n${stdoutOutput}\nSTDERR:\n${stderrOutput}`,
-        ),
-      );
-    });
-  });
+      childProcess.once('exit', (code, signal) => {
+        if (settled) return;
+        settled = true;
+        clearTimeout(readyTimer);
+        rejectPromise(
+          new Error(
+            `Packaged app exited before ${smokeTimeoutMs}ms (code=${code}, signal=${signal}).\nSTDOUT:\n${stdoutOutput}\nSTDERR:\n${stderrOutput}`,
+          ),
+        );
+      });
+    })
+  );
 
   console.log(`Packaged app stayed alive for ${smokeTimeoutMs}ms.`);
 }

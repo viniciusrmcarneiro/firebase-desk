@@ -1,5 +1,9 @@
 import { FirestoreFilterOpSchema } from '@firebase-desk/ipc-schemas';
-import type { FirestoreQueryDraft, FirestoreQueryFilterDraft } from '@firebase-desk/repo-contracts';
+import type {
+  FirestoreQueryDraft,
+  FirestoreQueryFilterDraft,
+  SettingsRepository,
+} from '@firebase-desk/repo-contracts';
 import { z } from 'zod';
 import {
   type InteractionHistoryEntry,
@@ -7,8 +11,6 @@ import {
   WORKSPACE_TAB_KINDS,
   type WorkspaceTab,
 } from './stores/tabsStore.ts';
-
-export const WORKSPACE_STATE_STORAGE_KEY = 'firebase-desk.workspace.v1';
 
 const WorkspaceTabKindSchema = z.enum(WORKSPACE_TAB_KINDS);
 
@@ -61,15 +63,7 @@ const TabsStateSchema = z.object({
   if (!tabIds.has(state.activeTabId)) {
     context.addIssue({ code: 'custom', message: 'Active tab is not open' });
   }
-  if (state.interactionHistoryIndex >= state.interactionHistory.length) {
-    context.addIssue({ code: 'custom', message: 'Interaction index out of range' });
-  }
-  for (const entry of state.interactionHistory) {
-    if (!tabIds.has(entry.activeTabId)) {
-      context.addIssue({ code: 'custom', message: 'Interaction tab is not open' });
-    }
-  }
-}).transform((state): TabsState => state);
+}).transform((state): TabsState => sanitizeTabsState(state));
 
 const FirestoreQueryFilterDraftSchema = z.object({
   id: z.string().min(1),
@@ -116,37 +110,136 @@ export const PersistedWorkspaceStateSchema = z.object({
 
 export type PersistedWorkspaceState = z.infer<typeof PersistedWorkspaceStateSchema>;
 
-export function loadPersistedWorkspaceState(): PersistedWorkspaceState | null {
+export interface WorkspacePersistenceFailure {
+  readonly message: string;
+  readonly operation: 'load' | 'save';
+}
+
+export interface LoadPersistedWorkspaceStateResult {
+  readonly error: WorkspacePersistenceFailure | null;
+  readonly snapshot: PersistedWorkspaceState | null;
+}
+
+export async function loadPersistedWorkspaceState(
+  settings: Pick<SettingsRepository, 'load'>,
+): Promise<PersistedWorkspaceState | null> {
+  return (await loadPersistedWorkspaceStateResult(settings)).snapshot;
+}
+
+export async function loadPersistedWorkspaceStateResult(
+  settings: Pick<SettingsRepository, 'load'>,
+): Promise<LoadPersistedWorkspaceStateResult> {
   try {
-    const raw = window.localStorage.getItem(WORKSPACE_STATE_STORAGE_KEY);
-    if (!raw) return null;
-    const parsed = PersistedWorkspaceStateSchema.safeParse(JSON.parse(raw) as unknown);
-    return parsed.success ? parsed.data : null;
-  } catch {
-    return null;
+    const raw = (await settings.load()).workspaceState;
+    if (raw === null || raw === undefined) return { error: null, snapshot: null };
+    const parsed = PersistedWorkspaceStateSchema.safeParse(raw);
+    if (!parsed.success) {
+      return {
+        error: {
+          message: 'Saved workspace state is invalid and was not restored.',
+          operation: 'load',
+        },
+        snapshot: null,
+      };
+    }
+    return { error: null, snapshot: parsed.data };
+  } catch (error) {
+    return {
+      error: {
+        message: messageFromError(error, 'Could not load saved workspace state.'),
+        operation: 'load',
+      },
+      snapshot: null,
+    };
   }
 }
 
 export function savePersistedWorkspaceState(
+  settings: Pick<SettingsRepository, 'save'>,
   state: Omit<PersistedWorkspaceState, 'version'>,
-): void {
+): Promise<WorkspacePersistenceFailure | null> {
   try {
-    if (!state.tabsState.tabs.length) {
-      window.localStorage.removeItem(WORKSPACE_STATE_STORAGE_KEY);
-      return;
-    }
-    const tabIds = new Set(state.tabsState.tabs.map((tab) => tab.id));
-    const payload = PersistedWorkspaceStateSchema.parse({
-      version: 1,
-      authFilter: state.authFilter,
-      drafts: pickTabRecord(state.drafts, tabIds),
-      scripts: pickTabRecord(state.scripts, tabIds),
-      tabsState: state.tabsState,
+    return persistWorkspaceState(settings, state)
+      .then(() => null)
+      .catch((error: unknown) => ({
+        message: messageFromError(error, 'Could not save workspace state.'),
+        operation: 'save' as const,
+      }));
+  } catch (error) {
+    return Promise.resolve({
+      message: messageFromError(error, 'Could not save workspace state.'),
+      operation: 'save',
     });
-    window.localStorage.setItem(WORKSPACE_STATE_STORAGE_KEY, JSON.stringify(payload));
-  } catch {
-    // Best effort only.
   }
+}
+
+async function persistWorkspaceState(
+  settings: Pick<SettingsRepository, 'save'>,
+  state: Omit<PersistedWorkspaceState, 'version'>,
+): Promise<void> {
+  if (!state.tabsState.tabs.length) {
+    await settings.save({ workspaceState: null });
+    return;
+  }
+  const tabIds = new Set(state.tabsState.tabs.map((tab) => tab.id));
+  const payload = PersistedWorkspaceStateSchema.parse({
+    version: 1,
+    authFilter: state.authFilter,
+    drafts: pickTabRecord(state.drafts, tabIds),
+    scripts: pickTabRecord(state.scripts, tabIds),
+    tabsState: sanitizeTabsState(state.tabsState),
+  });
+  await settings.save({ workspaceState: payload });
+}
+
+export function parsePersistedWorkspaceState(
+  value: unknown,
+): LoadPersistedWorkspaceStateResult {
+  try {
+    if (value === null || value === undefined) return { error: null, snapshot: null };
+    const parsed = PersistedWorkspaceStateSchema.safeParse(value);
+    if (!parsed.success) {
+      return {
+        error: {
+          message: 'Saved workspace state is invalid and was not restored.',
+          operation: 'load',
+        },
+        snapshot: null,
+      };
+    }
+    return { error: null, snapshot: parsed.data };
+  } catch (error) {
+    return {
+      error: {
+        message: messageFromError(error, 'Could not load saved workspace state.'),
+        operation: 'load',
+      },
+      snapshot: null,
+    };
+  }
+}
+
+function sanitizeTabsState(state: TabsState): TabsState {
+  const tabIds = new Set(state.tabs.map((tab) => tab.id));
+  const interactionHistory = state.interactionHistory.filter((entry) =>
+    tabIds.has(entry.activeTabId)
+  );
+  return {
+    ...state,
+    interactionHistory,
+    interactionHistoryIndex: clampInteractionHistoryIndex(
+      state.interactionHistoryIndex,
+      interactionHistory,
+    ),
+  };
+}
+
+function clampInteractionHistoryIndex(
+  index: number,
+  history: ReadonlyArray<InteractionHistoryEntry>,
+): number {
+  if (!history.length) return 0;
+  return Math.max(0, Math.min(index, history.length - 1));
 }
 
 function pickTabRecord<T>(
@@ -158,4 +251,8 @@ function pickTabRecord<T>(
     if (tabIds.has(tabId)) picked[tabId] = value;
   }
   return picked;
+}
+
+function messageFromError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }

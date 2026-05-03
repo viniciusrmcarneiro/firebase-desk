@@ -1,6 +1,10 @@
 import type { QueryDocumentSnapshot } from 'firebase-admin/firestore';
-import { describe, expect, it } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { FirestoreCursorCache } from './cursor-cache.ts';
+
+afterEach(() => {
+  vi.useRealTimers();
+});
 
 describe('FirestoreCursorCache', () => {
   it('returns cached snapshots only for the matching connection', () => {
@@ -23,5 +27,17 @@ describe('FirestoreCursorCache', () => {
 
     expect(cache.get('connection-a', tokenA)).toBeNull();
     expect(cache.get('connection-b', tokenB)).toBe(snapshotB);
+  });
+
+  it('expires old cursors', () => {
+    vi.useFakeTimers();
+    vi.setSystemTime(new Date('2026-04-30T00:00:00.000Z'));
+    const cache = new FirestoreCursorCache({ ttlMs: 10 });
+    const snapshot = { id: 'doc-1' } as QueryDocumentSnapshot;
+    const token = cache.create('connection-a', snapshot);
+
+    vi.setSystemTime(new Date('2026-04-30T00:00:00.011Z'));
+
+    expect(cache.get('connection-a', token)).toBeNull();
   });
 });

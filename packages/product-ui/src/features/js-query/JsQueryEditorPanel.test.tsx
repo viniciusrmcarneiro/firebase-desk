@@ -5,16 +5,19 @@ import { JsQueryEditorPanel } from './JsQueryEditorPanel.tsx';
 vi.mock('../../code-editor/CodeEditor.tsx', () => ({
   CodeEditor: (
     {
+      extraLibs,
       onChange,
       readOnly,
       value,
     }: {
+      readonly extraLibs?: ReadonlyArray<unknown> | undefined;
       readonly onChange?: (value: string) => void;
       readonly readOnly?: boolean;
       readonly value: string;
     },
   ) => (
     <textarea
+      data-extra-lib-count={extraLibs?.length ?? 0}
       data-testid='editor'
       readOnly={readOnly}
       value={value}
@@ -44,6 +47,7 @@ describe('JsQueryEditorPanel', () => {
     expect(onRun).toHaveBeenCalledTimes(1);
     expect(onSourceChange).toHaveBeenCalledWith('return 2;');
     expect(screen.getByTestId('editor')).toHaveProperty('readOnly', false);
+    expect(screen.getByTestId('editor').getAttribute('data-extra-lib-count')).toBe('1');
   });
 
   it('cancels and locks editor while running', () => {

@@ -11,9 +11,10 @@ const workspaceRuntimePackages = [
   '@firebase-desk/ui',
 ];
 
+const bundledMainPackages = [...workspaceRuntimePackages, 'firebase-admin'];
+
 const mainExternalizeDeps = {
-  exclude: workspaceRuntimePackages,
-  include: ['firebase-admin'],
+  exclude: bundledMainPackages,
 };
 
-export { mainExternalizeDeps, workspaceRuntimePackages };
+export { bundledMainPackages, mainExternalizeDeps, workspaceRuntimePackages };

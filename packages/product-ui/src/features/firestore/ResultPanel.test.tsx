@@ -143,6 +143,7 @@ describe('ResultPanel', () => {
 
     expect(screen.getByTestId('expanded').textContent).toContain('root:orders');
     expect(screen.getByTestId('expanded').textContent).toContain('doc:orders/ord_1');
+    expect(screen.getByTestId('expanded').textContent).not.toContain('doc:orders/ord_1:fields');
 
     fireEvent.click(screen.getByRole('button', { name: 'tree' }));
     fireEvent.click(screen.getByRole('button', { name: 'tree' }));

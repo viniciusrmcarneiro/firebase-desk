@@ -44,6 +44,7 @@ async function finishProcess(exitCode: number): Promise<void> {
   await Promise.allSettled(pendingSends);
   process.exitCode = exitCode;
   if (process.connected) process.disconnect();
+  process.exit(exitCode);
 }
 
 async function send(message: ScriptWorkerResponse): Promise<void> {
