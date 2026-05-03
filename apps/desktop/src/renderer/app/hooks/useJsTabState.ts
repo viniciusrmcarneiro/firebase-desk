@@ -4,6 +4,7 @@ import { useEffect, useMemo, useRef } from 'react';
 import {
   cancelJsQueryCommand,
   clearJsQueryTabCommand,
+  clearJsQueryTabRuntimeCommand,
   type JsQueryCommandEnvironment,
   receiveJsQueryEventCommand,
   runJsQueryCommand,
@@ -35,6 +36,7 @@ export interface JsTabState {
   readonly scriptSource: string;
   readonly cancelScript: () => boolean;
   readonly clearTab: (tabId: string) => void;
+  readonly clearTabRuntime: (tabId: string) => void;
   readonly isTabRunning: (tabId: string) => boolean;
   readonly runScript: () => boolean;
   readonly setScriptSource: (source: string) => void;
@@ -94,6 +96,10 @@ export function useJsTabState(
     clearJsQueryTabCommand(store, env, tabId);
   }
 
+  function clearTabRuntime(tabId: string) {
+    clearJsQueryTabRuntimeCommand(store, env, tabId);
+  }
+
   return {
     isRunning: model.isRunning,
     scriptResult: model.result,
@@ -103,6 +109,7 @@ export function useJsTabState(
     scriptSource: activeTab ? model.source : JS_QUERY_SAMPLE_SOURCE,
     cancelScript,
     clearTab,
+    clearTabRuntime,
     isTabRunning,
     runScript,
     setScriptSource,

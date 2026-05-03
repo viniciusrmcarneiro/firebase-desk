@@ -411,6 +411,7 @@ export interface AppShellAuthFacade {
 export interface AppShellJsFacade {
   readonly cancelScript: () => boolean;
   readonly clearTab: (tabId: string) => void;
+  readonly clearTabRuntime: (tabId: string) => void;
   readonly isRunning: boolean;
   readonly isTabRunning: (tabId: string) => boolean;
   readonly runScript: () => boolean;
@@ -756,6 +757,8 @@ export function createAppShellController(
 
   function clearConnectionScopedTabState(tab: WorkspaceTab) {
     clearTabRuntimeState(tab);
+    if (tab.kind === 'js-query') input.jsTab.clearTabRuntime(tab.id);
+    else input.jsTab.clearTab(tab.id);
     input.ui.clearAuthSelection();
     input.authTab.clear();
   }
@@ -769,13 +772,17 @@ export function createAppShellController(
       successLabel,
       tabsToClose,
     });
-    for (const tab of result.tabsToCleanup) clearTabRuntimeState(tab);
+    for (const tab of result.tabsToCleanup) clearClosedTabRuntimeState(tab);
     input.ui.setTabsState(result.state);
     input.ui.setLastAction(result.lastAction);
   }
 
   function clearTabRuntimeState(tab: WorkspaceTab) {
     input.firestoreTab.clearTab(tab.id);
+  }
+
+  function clearClosedTabRuntimeState(tab: WorkspaceTab) {
+    clearTabRuntimeState(tab);
     input.jsTab.clearTab(tab.id);
   }
 

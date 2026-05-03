@@ -497,6 +497,7 @@ function createJsTab({ scripts = {} }: { readonly scripts?: Record<string, strin
   return {
     cancelScript: vi.fn(() => false),
     clearTab: vi.fn(),
+    clearTabRuntime: vi.fn(),
     isRunning: false,
     isTabRunning: vi.fn(() => false),
     runScript: vi.fn(() => false),

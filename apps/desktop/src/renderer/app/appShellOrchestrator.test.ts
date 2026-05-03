@@ -14,6 +14,7 @@ import {
   collectionNodeId,
   DEFAULT_FIRESTORE_DRAFT,
   firestoreNodeId,
+  scriptNodeId,
 } from './workspaceModel.ts';
 
 describe('createAppShellController', () => {
@@ -107,6 +108,30 @@ describe('createAppShellController', () => {
     expect(mocks.authTab.clear).toHaveBeenCalledTimes(1);
     expect(mocks.ui.selectTreeItem).toHaveBeenCalledWith(authNodeId('prod'));
     expect(mocks.ui.setLastAction).toHaveBeenCalledWith('Changed tab account');
+  });
+
+  it('keeps JavaScript query source when changing the active tab connection', () => {
+    const tab: WorkspaceTab = {
+      connectionId: 'emu',
+      history: ['scripts/default'],
+      historyIndex: 0,
+      id: 'tab-js',
+      inspectorWidth: 360,
+      kind: 'js-query',
+      title: 'JavaScript Query',
+    };
+    const { input, mocks } = createInput({
+      activeTab: tab,
+      tabsState: tabsState([tab], tab.id),
+    });
+    const controller = createAppShellController(input);
+
+    controller.workspace.onConnectionChange('prod');
+
+    expect(mocks.ui.updateActiveTabConnection).toHaveBeenCalledWith(tab.id, 'prod');
+    expect(mocks.jsTab.clearTabRuntime).toHaveBeenCalledWith(tab.id);
+    expect(mocks.jsTab.clearTab).not.toHaveBeenCalled();
+    expect(mocks.ui.selectTreeItem).toHaveBeenCalledWith(scriptNodeId('prod'));
   });
 
   it('opens Firestore targets from Activity', () => {
@@ -304,6 +329,7 @@ function createInput(
   const jsTabFacade = {
     cancelScript: vi.fn(() => true),
     clearTab: vi.fn(),
+    clearTabRuntime: vi.fn(),
     isRunning: false,
     isTabRunning: vi.fn(() => false),
     runScript: vi.fn(() => true),

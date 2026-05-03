@@ -19,6 +19,7 @@ import {
   jsQueryRunSucceeded,
   jsQuerySourceChanged,
   jsQueryTabCleared,
+  jsQueryTabRuntimeCleared,
   tabForRun,
 } from './jsQueryTransitions.ts';
 
@@ -138,6 +139,16 @@ export function clearJsQueryTabCommand(
   const run = store.get().activeRuns[tabId];
   if (run) void env.cancelScript(run.runId).catch(() => undefined);
   store.update((state) => jsQueryTabCleared(state, tabId));
+}
+
+export function clearJsQueryTabRuntimeCommand(
+  store: AppCoreStore<JsQueryState>,
+  env: Pick<JsQueryCommandEnvironment, 'cancelScript'>,
+  tabId: string,
+): void {
+  const run = store.get().activeRuns[tabId];
+  if (run) void env.cancelScript(run.runId).catch(() => undefined);
+  store.update((state) => jsQueryTabRuntimeCleared(state, tabId));
 }
 
 export function receiveJsQueryEventCommand(

@@ -1,4 +1,4 @@
-import type { DensityName } from '@firebase-desk/design-tokens';
+import { density as densityTokens, type DensityName } from '@firebase-desk/design-tokens';
 import { ChevronRight } from 'lucide-react';
 import {
   type KeyboardEvent,
@@ -50,6 +50,9 @@ export function ExplorerTree<TNode extends ExplorerTreeRowModel = ExplorerTreeRo
 ) {
   const [focusedIndex, setFocusedIndex] = useState(0);
   const clampedFocusedIndex = rows.length === 0 ? 0 : Math.min(focusedIndex, rows.length - 1);
+  const resolvedDensity = density ?? 'compact';
+  const rowHeight = densityTokens[resolvedDensity].treeRowHeight;
+  const estimateRowSize = estimateSize ?? (() => rowHeight);
 
   useEffect(() => {
     setFocusedIndex((current) => {
@@ -103,6 +106,7 @@ export function ExplorerTree<TNode extends ExplorerTreeRowModel = ExplorerTreeRo
             index={index}
             node={item}
             renderAction={renderAction}
+            rowHeight={rowHeight}
             setFocusedIndex={setFocusedIndex}
             onKeyDown={handleKeyDown}
             onOpen={onOpen}
@@ -110,8 +114,8 @@ export function ExplorerTree<TNode extends ExplorerTreeRowModel = ExplorerTreeRo
             onToggle={onToggle}
           />
         )}
-        {...(density ? { density } : {})}
-        {...(estimateSize ? { estimateSize } : {})}
+        density={resolvedDensity}
+        estimateSize={estimateRowSize}
       />
     </div>
   );
@@ -124,6 +128,7 @@ function ExplorerTreeRow<TNode extends ExplorerTreeRowModel>(
     index,
     node,
     renderAction,
+    rowHeight,
     setFocusedIndex,
     onKeyDown,
     onOpen,
@@ -135,6 +140,7 @@ function ExplorerTreeRow<TNode extends ExplorerTreeRowModel>(
     readonly index: number;
     readonly node: TNode;
     readonly renderAction?: ((node: TNode) => ReactNode) | undefined;
+    readonly rowHeight: number;
     readonly setFocusedIndex: (index: number) => void;
     readonly onKeyDown: (
       event: KeyboardEvent<HTMLDivElement>,
@@ -158,10 +164,10 @@ function ExplorerTreeRow<TNode extends ExplorerTreeRowModel>(
 
   const row = (
     <div
-      className='grid min-h-8 grid-cols-[16px_16px_minmax(140px,0.8fr)_minmax(160px,1fr)_112px_auto] items-center gap-2 border-b border-border-subtle pr-3 text-text-primary transition-colors hover:bg-action-ghost-hover'
+      className='grid grid-cols-[16px_16px_minmax(140px,0.8fr)_minmax(160px,1fr)_112px_auto] items-center gap-2 border-b border-border-subtle pr-3 text-text-primary transition-colors hover:bg-action-ghost-hover'
       role='treeitem'
       tabIndex={focused ? 0 : -1}
-      style={{ paddingLeft: 12 + node.level * 22 }}
+      style={{ minHeight: rowHeight, paddingLeft: 12 + node.level * 22 }}
       aria-expanded={node.hasChildren ? Boolean(node.expanded) : undefined}
       aria-level={node.level + 1}
       ref={rowRef}

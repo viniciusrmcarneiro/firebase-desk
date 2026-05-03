@@ -139,6 +139,15 @@ export function jsQueryTabCleared(state: JsQueryState, tabId: string): JsQuerySt
   };
 }
 
+export function jsQueryTabRuntimeCleared(state: JsQueryState, tabId: string): JsQueryState {
+  return {
+    ...state,
+    activeRuns: omitKey(state.activeRuns, tabId),
+    results: omitKey(state.results, tabId),
+    runIds: omitKey(state.runIds, tabId),
+  };
+}
+
 export function jsQueryRunActivityRecorded(state: JsQueryState, runId: string): JsQueryState {
   if (state.loggedRunIds.includes(runId)) return state;
   return {
