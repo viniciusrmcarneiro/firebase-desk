@@ -33,6 +33,8 @@ interface BackgroundJobNotifierDeps {
   ) => void;
 }
 
+const MAX_NOTIFIED_BACKGROUND_JOB_IDS = 500;
+
 export function installNativeAppBehavior(): void {
   nativeTheme.themeSource = 'system';
   Menu.setApplicationMenu(Menu.buildFromTemplate(applicationMenuTemplate()));
@@ -81,12 +83,27 @@ export function createBackgroundJobNotifier(
 ): (event: BackgroundJobEvent) => void {
   const notifiedJobIds = new Set<string>();
   return (event) => {
+    if (event.type === 'job-removed') {
+      notifiedJobIds.delete(event.id);
+      return;
+    }
+    if (event.type === 'job-updated' && event.job.acknowledgedAt) {
+      notifiedJobIds.delete(event.job.id);
+      return;
+    }
     const notification = backgroundJobNotificationForEvent(event);
     if (!notification || notifiedJobIds.has(notification.jobId)) return;
-    notifiedJobIds.add(notification.jobId);
+    rememberNotifiedBackgroundJobId(notifiedJobIds, notification.jobId);
     if (deps.isAppFocused() || !deps.isNotificationSupported()) return;
     deps.showNotification(notification, deps.focusApp);
   };
+}
+
+function rememberNotifiedBackgroundJobId(ids: Set<string>, id: string): void {
+  ids.add(id);
+  if (ids.size <= MAX_NOTIFIED_BACKGROUND_JOB_IDS) return;
+  const oldestId = ids.values().next().value;
+  if (typeof oldestId === 'string') ids.delete(oldestId);
 }
 
 function applicationMenuTemplate(): MenuItemConstructorOptions[] {
