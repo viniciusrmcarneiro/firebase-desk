@@ -173,6 +173,126 @@ describe('SettingsDialog', () => {
     expect(onSettingsSaved).toHaveBeenCalled();
   });
 
+  it('deletes saved Firestore metadata for one collection key', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    await settings.save({
+      firestoreFieldCatalogs: {
+        orders: [{ count: 2, field: 'status', types: ['string'] }],
+        users: [{ count: 1, field: 'displayName', types: ['string'] }],
+      },
+      resultTableLayouts: {
+        orders: { columnOrder: ['status'], columnSizing: { status: 140 } },
+        users: { columnOrder: ['displayName'], columnSizing: { displayName: 180 } },
+      },
+    });
+    const onSettingsSaved = vi.fn();
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} onSettingsSaved={onSettingsSaved} />
+      </AppearanceProvider>,
+    );
+
+    await screen.findByText('orders');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Firestore metadata for orders' }));
+
+    await waitFor(async () => {
+      const snapshot = await settings.load();
+      expect(snapshot.firestoreFieldCatalogs.orders).toBeUndefined();
+      expect(snapshot.resultTableLayouts.orders).toBeUndefined();
+      expect(snapshot.firestoreFieldCatalogs.users).toBeDefined();
+      expect(snapshot.resultTableLayouts.users).toBeDefined();
+    });
+    expect(screen.queryByText('orders')).toBeNull();
+    expect(screen.getByText('users')).toBeTruthy();
+    expect(onSettingsSaved).toHaveBeenCalledWith(
+      expect.objectContaining({
+        firestoreFieldCatalogs: expect.not.objectContaining({ orders: expect.anything() }),
+        resultTableLayouts: expect.not.objectContaining({ orders: expect.anything() }),
+      }),
+      expect.objectContaining({
+        firestoreFieldCatalogs: expect.objectContaining({ users: expect.anything() }),
+        resultTableLayouts: expect.objectContaining({ users: expect.anything() }),
+      }),
+    );
+  });
+
+  it('clears saved Firestore metadata', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    await settings.save({
+      firestoreFieldCatalogs: {
+        orders: [{ count: 2, field: 'status', types: ['string'] }],
+      },
+      resultTableLayouts: {
+        orders: { columnOrder: ['status'], columnSizing: { status: 140 } },
+      },
+    });
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    await screen.findByText('orders');
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Firestore metadata' }));
+
+    await waitFor(async () =>
+      expect(await settings.load()).toMatchObject({
+        firestoreFieldCatalogs: {},
+        resultTableLayouts: {},
+      })
+    );
+    expect(await screen.findByText('No saved Firestore metadata.')).toBeTruthy();
+  });
+
+  it('restores Firestore metadata when delete save fails', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    await settings.save({
+      firestoreFieldCatalogs: {
+        orders: [{ count: 2, field: 'status', types: ['string'] }],
+      },
+      resultTableLayouts: {
+        orders: { columnOrder: ['status'], columnSizing: { status: 140 } },
+      },
+    });
+    vi.spyOn(settings, 'save').mockRejectedValueOnce(new Error('metadata locked'));
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    await screen.findByText('orders');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Firestore metadata for orders' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('metadata locked');
+    expect(screen.getByText('orders')).toBeTruthy();
+    expect((await settings.load()).firestoreFieldCatalogs.orders).toBeDefined();
+  });
+
   it('defaults Firestore write settings for older saved settings', async () => {
     vi.stubGlobal(
       'matchMedia',

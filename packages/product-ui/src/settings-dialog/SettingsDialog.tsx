@@ -8,7 +8,7 @@ import type {
 } from '@firebase-desk/repo-contracts';
 import { normalizeFirestoreWriteSettings } from '@firebase-desk/repo-contracts';
 import { Button, Dialog, DialogContent, InlineAlert, Input } from '@firebase-desk/ui';
-import { FolderOpen } from 'lucide-react';
+import { Database, FolderOpen, Trash2 } from 'lucide-react';
 import { useActionState, useEffect, useRef, useState } from 'react';
 import { useAppearance } from '../appearance/AppearanceProvider.tsx';
 import { messageFromError } from '../shared/errors.ts';
@@ -142,6 +142,46 @@ export function SettingsDialog(
     } catch (caught) {
       applySettingsSnapshot(currentSnapshot);
       setSettingsError(messageFromError(caught, 'Could not save settings.'));
+    }
+  }
+
+  async function handleDeleteFirestoreMetadata(key: string) {
+    const currentSnapshot = settingsSnapshotRef.current ?? settingsSnapshot;
+    if (!currentSnapshot) return;
+    setSettingsError(null);
+    const patchToSave = {
+      firestoreFieldCatalogs: omitRecordKey(currentSnapshot.firestoreFieldCatalogs, key),
+      resultTableLayouts: omitRecordKey(currentSnapshot.resultTableLayouts, key),
+    };
+    const optimisticSnapshot = { ...currentSnapshot, ...patchToSave };
+    applySettingsSnapshot(optimisticSnapshot);
+    try {
+      const next = await appearance.settings.save(patchToSave);
+      applySettingsSnapshot(next);
+      onSettingsSaved?.(patchToSave, next);
+    } catch (caught) {
+      applySettingsSnapshot(currentSnapshot);
+      setSettingsError(messageFromError(caught, 'Could not delete Firestore metadata.'));
+    }
+  }
+
+  async function handleClearFirestoreMetadata() {
+    const currentSnapshot = settingsSnapshotRef.current ?? settingsSnapshot;
+    if (!currentSnapshot) return;
+    setSettingsError(null);
+    const patchToSave = {
+      firestoreFieldCatalogs: {},
+      resultTableLayouts: {},
+    };
+    const optimisticSnapshot = { ...currentSnapshot, ...patchToSave };
+    applySettingsSnapshot(optimisticSnapshot);
+    try {
+      const next = await appearance.settings.save(patchToSave);
+      applySettingsSnapshot(next);
+      onSettingsSaved?.(patchToSave, next);
+    } catch (caught) {
+      applySettingsSnapshot(currentSnapshot);
+      setSettingsError(messageFromError(caught, 'Could not clear Firestore metadata.'));
     }
   }
 
@@ -293,6 +333,15 @@ export function SettingsDialog(
             </div>
           )
           : null}
+        {settingsSnapshot
+          ? (
+            <FirestoreMetadataSettings
+              rows={firestoreMetadataRows(settingsSnapshot)}
+              onClear={() => void handleClearFirestoreMetadata()}
+              onDelete={(key) => void handleDeleteFirestoreMetadata(key)}
+            />
+          )
+          : null}
         {settingsError ? <InlineAlert variant='danger'>{settingsError}</InlineAlert> : null}
         <SettingsSummary snapshot={settingsSnapshot} />
         {dataDirectoryPath !== undefined || onOpenDataDirectory
@@ -317,6 +366,78 @@ export function SettingsDialog(
         </div>
       </DialogContent>
     </Dialog>
+  );
+}
+
+interface FirestoreMetadataRow {
+  readonly fieldCount: number;
+  readonly hasLayout: boolean;
+  readonly key: string;
+}
+
+function FirestoreMetadataSettings(
+  {
+    onClear,
+    onDelete,
+    rows,
+  }: {
+    readonly onClear: () => void;
+    readonly onDelete: (key: string) => void;
+    readonly rows: ReadonlyArray<FirestoreMetadataRow>;
+  },
+) {
+  return (
+    <div className='grid gap-2 rounded-md border border-border-subtle bg-bg-subtle p-3 text-sm'>
+      <div className='flex items-center justify-between gap-3'>
+        <div className='flex min-w-0 items-center gap-2 font-medium text-text-primary'>
+          <Database size={14} aria-hidden='true' />
+          <span>Firestore metadata</span>
+        </div>
+        <Button
+          aria-label='Clear Firestore metadata'
+          disabled={rows.length === 0}
+          size='xs'
+          variant='danger'
+          onClick={onClear}
+        >
+          <Trash2 size={13} aria-hidden='true' />
+          Clear all
+        </Button>
+      </div>
+      <div className='text-xs text-text-secondary'>
+        Local field catalogs and table layouts saved from collection views.
+      </div>
+      {rows.length === 0
+        ? <div className='text-xs text-text-muted'>No saved Firestore metadata.</div>
+        : (
+          <div aria-label='Saved Firestore metadata' className='grid max-h-56 overflow-auto'>
+            {rows.map((row) => (
+              <div
+                key={row.key}
+                className='grid grid-cols-[minmax(0,1fr)_auto] gap-3 border-t border-border-subtle py-2 first:border-t-0'
+              >
+                <div className='min-w-0'>
+                  <code className='block truncate font-mono text-xs text-text-primary'>
+                    {row.key}
+                  </code>
+                  <div className='text-xs text-text-muted'>
+                    {row.fieldCount} fields, {row.hasLayout ? 'table layout' : 'no layout'}
+                  </div>
+                </div>
+                <Button
+                  aria-label={`Delete Firestore metadata for ${row.key}`}
+                  size='xs'
+                  variant='ghost'
+                  onClick={() => onDelete(row.key)}
+                >
+                  <Trash2 size={13} aria-hidden='true' />
+                  Delete
+                </Button>
+              </div>
+            ))}
+          </div>
+        )}
+    </div>
   );
 }
 
@@ -406,6 +527,33 @@ function SettingsSummary({ snapshot }: { readonly snapshot: SettingsSnapshot | n
       />
     </div>
   );
+}
+
+function firestoreMetadataRows(snapshot: SettingsSnapshot): FirestoreMetadataRow[] {
+  const keys = new Set([
+    ...Object.keys(snapshot.firestoreFieldCatalogs),
+    ...Object.keys(snapshot.resultTableLayouts),
+  ]);
+  const sortedKeys: string[] = [];
+  for (const key of keys) {
+    const nextIndex = sortedKeys.findIndex((existing) => key.localeCompare(existing) < 0);
+    if (nextIndex === -1) sortedKeys.push(key);
+    else sortedKeys.splice(nextIndex, 0, key);
+  }
+  return sortedKeys.map((key) => ({
+    fieldCount: snapshot.firestoreFieldCatalogs[key]?.length ?? 0,
+    hasLayout: Boolean(snapshot.resultTableLayouts[key]),
+    key,
+  }));
+}
+
+function omitRecordKey<TValue>(
+  record: Readonly<Record<string, TValue>>,
+  keyToDelete: string,
+): Record<string, TValue> {
+  const next = { ...record };
+  delete next[keyToDelete];
+  return next;
 }
 
 function CredentialStorageSummary({ snapshot }: { readonly snapshot: SettingsSnapshot | null; }) {
