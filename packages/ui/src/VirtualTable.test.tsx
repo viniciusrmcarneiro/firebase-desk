@@ -113,7 +113,7 @@ describe('VirtualTable', () => {
     expect(document.activeElement).toBe(dataRows[1]);
   });
 
-  it('uses row click as the double-click action when no double-click action is provided', () => {
+  it('runs row click once for a real browser double-click sequence', () => {
     const onRowClick = vi.fn();
     render(
       <VirtualTable
@@ -124,9 +124,36 @@ describe('VirtualTable', () => {
       />,
     );
 
-    fireEvent.doubleClick(screen.getAllByRole('row')[1]!);
+    const row = screen.getAllByRole('row')[1]!;
+    fireEvent.click(row, { detail: 1 });
+    fireEvent.click(row, { detail: 2 });
+    fireEvent.doubleClick(row, { detail: 2 });
 
     expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs explicit row double-click once after the first row click', () => {
+    const onRowClick = vi.fn();
+    const onRowDoubleClick = vi.fn();
+    render(
+      <VirtualTable
+        rows={rows}
+        columns={columns}
+        onRowClick={onRowClick}
+        onRowDoubleClick={onRowDoubleClick}
+        rowHeight={24}
+      />,
+    );
+
+    const row = screen.getAllByRole('row')[1]!;
+    fireEvent.click(row, { detail: 1 });
+    fireEvent.click(row, { detail: 2 });
+    fireEvent.doubleClick(row, { detail: 2 });
+
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+    expect(onRowDoubleClick).toHaveBeenCalledWith(rows[0]);
+    expect(onRowDoubleClick).toHaveBeenCalledTimes(1);
   });
 
   it('prevents repeated mouse down from selecting row text', () => {

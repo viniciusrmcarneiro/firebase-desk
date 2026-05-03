@@ -190,10 +190,13 @@ export function VirtualTable<T>(
                 height: resolvedRowHeight,
               }}
               tabIndex={onRowClick ? 0 : undefined}
-              onClick={() => onRowClick?.(item)}
+              onClick={(event) => {
+                if (event.detail > 1) return;
+                onRowClick?.(item);
+              }}
               onDoubleClick={(event) => {
                 event.preventDefault();
-                (onRowDoubleClick ?? onRowClick)?.(item);
+                onRowDoubleClick?.(item);
               }}
               onKeyDown={(event) => {
                 handleRowKeyDown({
