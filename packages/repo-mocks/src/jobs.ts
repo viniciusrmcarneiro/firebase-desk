@@ -14,6 +14,19 @@ export class MockBackgroundJobRepository implements BackgroundJobRepository {
   private readonly listeners = new Set<(event: BackgroundJobEvent) => void>();
   private nextId = 1;
 
+  async acknowledgeIssues(ids: ReadonlyArray<string>): Promise<void> {
+    const idSet = new Set(ids);
+    const acknowledgedAt = now();
+    const updated: BackgroundJob[] = [];
+    this.jobs = this.jobs.map((job) => {
+      if (!idSet.has(job.id) || !isIssue(job.status) || job.acknowledgedAt) return job;
+      const acknowledged = { ...job, acknowledgedAt, updatedAt: acknowledgedAt };
+      updated.push(acknowledged);
+      return acknowledged;
+    });
+    for (const job of updated) this.emit({ job: cloneJob(job), type: 'job-updated' });
+  }
+
   async cancel(id: string): Promise<void> {
     const job = this.jobs.find((entry) => entry.id === id);
     if (!job || isFinal(job.status)) return;
@@ -115,6 +128,10 @@ function isFinal(status: BackgroundJob['status']): boolean {
     || status === 'failed'
     || status === 'interrupted'
     || status === 'succeeded';
+}
+
+function isIssue(status: BackgroundJob['status']): boolean {
+  return status === 'failed' || status === 'interrupted';
 }
 
 function cloneJob(job: BackgroundJob): BackgroundJob {

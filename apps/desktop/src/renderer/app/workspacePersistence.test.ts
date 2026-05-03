@@ -125,6 +125,35 @@ describe('workspacePersistence', () => {
     });
   });
 
+  it('restores workspace state with duplicate tab ids by renaming duplicates', async () => {
+    const settings = settingsWithWorkspace({
+      ...persistedWorkspace,
+      tabsState: {
+        ...persistedWorkspace.tabsState,
+        tabs: [
+          persistedWorkspace.tabsState.tabs[0]!,
+          {
+            ...persistedWorkspace.tabsState.tabs[0]!,
+            history: ['admin-leagues'],
+            title: 'admin-leagues',
+          },
+          persistedWorkspace.tabsState.tabs[1]!,
+        ],
+      },
+    });
+
+    await expect(loadPersistedWorkspaceState(settings)).resolves.toMatchObject({
+      tabsState: {
+        activeTabId: 'tab-firestore-1',
+        tabs: [
+          { id: 'tab-firestore-1', title: 'orders' },
+          { id: 'tab-firestore-1-2', title: 'admin-leagues' },
+          { id: 'tab-js-1', title: 'JS Query' },
+        ],
+      },
+    });
+  });
+
   it('does not restore invalid draft state', async () => {
     const settings = settingsWithWorkspace({
       ...persistedWorkspace,

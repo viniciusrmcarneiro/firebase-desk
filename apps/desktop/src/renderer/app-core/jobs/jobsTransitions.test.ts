@@ -48,6 +48,14 @@ describe('jobsTransitions', () => {
     expect(updated.acknowledgedIssueJobIds).toEqual(['job-1']);
     expect(selectJobsButtonModel(updated)).toEqual({ badge: null, variant: 'secondary' });
   });
+
+  it('does not badge failed jobs that were acknowledged before reload', () => {
+    const state = jobsLoadSucceeded(createInitialJobsState(), [
+      { ...job('job-1', 'failed'), acknowledgedAt: '2026-04-29T00:01:00.000Z' },
+    ]);
+
+    expect(selectJobsButtonModel(state)).toEqual({ badge: null, variant: 'ghost' });
+  });
 });
 
 const deleteRequest: FirestoreCollectionJobRequest = {

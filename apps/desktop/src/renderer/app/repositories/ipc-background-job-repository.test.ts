@@ -6,6 +6,7 @@ describe('IpcBackgroundJobRepository', () => {
   it('forwards job calls to the desktop API', async () => {
     const unsubscribe = vi.fn();
     const jobs = {
+      acknowledgeIssues: vi.fn().mockResolvedValue(undefined),
       cancel: vi.fn().mockResolvedValue(undefined),
       clearCompleted: vi.fn().mockResolvedValue(undefined),
       list: vi.fn().mockResolvedValue([]),
@@ -31,6 +32,7 @@ describe('IpcBackgroundJobRepository', () => {
     const listener = vi.fn();
 
     await expect(repository.list({ limit: 10 })).resolves.toEqual([]);
+    await expect(repository.acknowledgeIssues(['job-1'])).resolves.toBeUndefined();
     await expect(repository.start(deleteRequest)).resolves.toMatchObject({ id: 'job-1' });
     await expect(repository.cancel('job-1')).resolves.toBeUndefined();
     await expect(repository.clearCompleted()).resolves.toBeUndefined();
@@ -45,6 +47,7 @@ describe('IpcBackgroundJobRepository', () => {
     expect(repository.subscribe(listener)).toBe(unsubscribe);
 
     expect(jobs.list).toHaveBeenCalledWith({ limit: 10 });
+    expect(jobs.acknowledgeIssues).toHaveBeenCalledWith({ ids: ['job-1'] });
     expect(jobs.start).toHaveBeenCalledWith(deleteRequest);
     expect(jobs.cancel).toHaveBeenCalledWith({ id: 'job-1' });
     expect(jobs.pickExportFile).toHaveBeenCalledWith({ format: 'jsonl' });

@@ -32,6 +32,7 @@ import {
 } from './firestore.ts';
 import { HealthCheckRequestSchema, HealthCheckResponseSchema } from './health.ts';
 import {
+  BackgroundJobAcknowledgeIssuesRequestSchema,
   BackgroundJobListRequestSchema,
   BackgroundJobPickExportFileRequestSchema,
   BackgroundJobPickFileResultSchema,
@@ -89,6 +90,10 @@ export const IPC_CHANNELS = {
   },
   'jobs.cancel': {
     request: z.object({ id: z.string() }),
+    response: z.void(),
+  },
+  'jobs.acknowledgeIssues': {
+    request: BackgroundJobAcknowledgeIssuesRequestSchema,
     response: z.void(),
   },
   'jobs.clearCompleted': {

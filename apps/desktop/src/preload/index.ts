@@ -31,6 +31,8 @@ const api = {
     list: (request: IpcRequest<'activity.list'>) => invoke('activity.list', request),
   },
   jobs: {
+    acknowledgeIssues: (request: IpcRequest<'jobs.acknowledgeIssues'>) =>
+      invoke('jobs.acknowledgeIssues', request),
     cancel: (request: IpcRequest<'jobs.cancel'>) => invoke('jobs.cancel', request),
     clearCompleted: () => invoke('jobs.clearCompleted', {}),
     list: (request: IpcRequest<'jobs.list'>) => invoke('jobs.list', request),

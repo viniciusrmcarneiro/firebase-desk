@@ -32,6 +32,24 @@ describe('JobsStore', () => {
     const updated = await store.update('running', (entry) => ({ ...entry, summary: 'checked' }));
     expect(updated).toMatchObject({ summary: 'checked' });
 
+    const acknowledged = await store.acknowledgeIssues(
+      ['running'],
+      '2026-04-29T00:02:00.000Z',
+    );
+    expect(acknowledged).toMatchObject([{
+      acknowledgedAt: '2026-04-29T00:02:00.000Z',
+      id: 'running',
+      status: 'interrupted',
+    }]);
+    await expect(store.list()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          acknowledgedAt: '2026-04-29T00:02:00.000Z',
+          id: 'running',
+        }),
+      ]),
+    );
+
     const removed = await store.clearCompleted();
     expect(removed).toEqual(['done', 'running']);
     await expect(store.list()).resolves.toEqual([]);

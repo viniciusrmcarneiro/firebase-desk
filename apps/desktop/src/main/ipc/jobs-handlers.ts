@@ -5,6 +5,7 @@ export function createJobsHandlers(
   jobsRepository: BackgroundJobRepository,
 ): Pick<
   IpcHandlerMap,
+  | 'jobs.acknowledgeIssues'
   | 'jobs.cancel'
   | 'jobs.clearCompleted'
   | 'jobs.list'
@@ -13,6 +14,9 @@ export function createJobsHandlers(
   | 'jobs.start'
 > {
   return {
+    'jobs.acknowledgeIssues': async ({ ids }) => {
+      await jobsRepository.acknowledgeIssues(ids);
+    },
     'jobs.cancel': async ({ id }) => {
       await jobsRepository.cancel(id);
     },

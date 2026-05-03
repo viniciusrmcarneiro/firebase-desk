@@ -7,6 +7,7 @@ import type {
 } from '@firebase-desk/repo-contracts/jobs';
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
+import { createInitialJobsState } from './jobsState.ts';
 import { createJobsStore } from './jobsStore.ts';
 import { useJobsController } from './useJobsController.ts';
 
@@ -40,6 +41,15 @@ describe('useJobsController', () => {
       badge: { label: '1', variant: 'warning' },
       variant: 'secondary',
     });
+    expect(repository.acknowledged).toEqual([['job-2']]);
+  });
+
+  it('persists failed job acknowledgement after loading while drawer is open', async () => {
+    const repository = new FakeJobsRepository([job('job-1', 'failed')]);
+    const store = createJobsStore(createInitialJobsState({ open: true }));
+    renderHook(() => useJobsController({ repository, store }));
+
+    await waitFor(() => expect(repository.acknowledged).toEqual([['job-1']]));
   });
 
   it('starts, cancels, and clears through the repository with status updates', async () => {
@@ -62,12 +72,17 @@ describe('useJobsController', () => {
 });
 
 class FakeJobsRepository implements BackgroundJobRepository {
+  readonly acknowledged: string[][] = [];
   readonly cancelled: string[] = [];
   readonly listeners = new Set<(event: BackgroundJobEvent) => void>();
   readonly started: FirestoreCollectionJobRequest[] = [];
   clearCompletedCount = 0;
 
   constructor(private readonly rows: ReadonlyArray<BackgroundJob>) {}
+
+  async acknowledgeIssues(ids: ReadonlyArray<string>): Promise<void> {
+    this.acknowledged.push(Array.from(ids));
+  }
 
   async cancel(id: string): Promise<void> {
     this.cancelled.push(id);
