@@ -324,19 +324,33 @@ jobs:
                     exit 1
                   fi
 
+                  expected_sha="$(git rev-parse HEAD)"
                   tag_ref="repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION_TAG"
                   if tag_json="$(gh api "$tag_ref" 2>/dev/null)"; then
-                    tag_sha="$(printf '%s' "$tag_json" | jq -r '.object.sha')"
-                    if [ "$tag_sha" != "$GITHUB_SHA" ]; then
-                      echo "::error::Tag $VERSION_TAG points to $tag_sha, expected $GITHUB_SHA."
+                    resolved_sha="$(printf '%s' "$tag_json" | jq -r '.object.sha')"
+                    resolved_type="$(printf '%s' "$tag_json" | jq -r '.object.type')"
+
+                    while [ "$resolved_type" = "tag" ]; do
+                      tag_object="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$resolved_sha")"
+                      resolved_sha="$(printf '%s' "$tag_object" | jq -r '.object.sha')"
+                      resolved_type="$(printf '%s' "$tag_object" | jq -r '.object.type')"
+                    done
+
+                    if [ "$resolved_type" != "commit" ]; then
+                      echo "::error::Tag $VERSION_TAG resolves to $resolved_type $resolved_sha, expected commit $expected_sha."
                       exit 1
                     fi
-                    echo "Tag $VERSION_TAG already points to $GITHUB_SHA."
+
+                    if [ "$resolved_sha" != "$expected_sha" ]; then
+                      echo "::error::Tag $VERSION_TAG resolves to $resolved_sha, expected $expected_sha."
+                      exit 1
+                    fi
+                    echo "Tag $VERSION_TAG already resolves to $expected_sha."
                   else
                     gh api "repos/$GITHUB_REPOSITORY/git/refs" \
                       -f ref="refs/tags/$VERSION_TAG" \
-                      -f sha="$GITHUB_SHA" >/dev/null
-                    echo "Created tag $VERSION_TAG at $GITHUB_SHA."
+                      -f sha="$expected_sha" >/dev/null
+                    echo "Created tag $VERSION_TAG at $expected_sha."
                   fi
             - name: Publish version release
               env:
