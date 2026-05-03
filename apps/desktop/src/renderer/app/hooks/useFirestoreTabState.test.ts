@@ -227,6 +227,42 @@ describe('useFirestoreTabState', () => {
     expect(result.current.activeDraft.filters?.[0]?.value).toBe('"paid"');
   });
 
+  it('keeps results changed state scoped to the query tab and clears it on rerun', () => {
+    const secondTab: WorkspaceTab = { ...tab, id: 'tab-firestore-query-2' };
+    let activeTab = tab;
+    const { rerender, result } = renderHook(() =>
+      useFirestoreTabState({
+        activeProject: project,
+        activeTab,
+        selectedTreeItemId: 'collection:emu:orders',
+      })
+    );
+
+    act(() => result.current.setResultsStale(tab.id, true));
+
+    expect(result.current.resultsStale).toBe(true);
+
+    activeTab = secondTab;
+    rerender();
+
+    expect(result.current.resultsStale).toBe(false);
+
+    act(() => result.current.setResultsStale(secondTab.id, true));
+
+    expect(result.current.resultsStale).toBe(true);
+
+    activeTab = tab;
+    rerender();
+
+    expect(result.current.resultsStale).toBe(true);
+
+    act(() => {
+      result.current.runQuery();
+    });
+
+    expect(result.current.resultsStale).toBe(false);
+  });
+
   it('keeps selected document scoped to current query rows', async () => {
     tabActions.restore({
       activeTabId: tab.id,

@@ -452,11 +452,13 @@ function createFirestoreTab(
     queryRows: [],
     refreshQuery: vi.fn(() => 'orders'),
     resetDraft: vi.fn(),
+    resultsStale: false,
     runQuery: vi.fn(() => 'orders'),
     selectDocument: vi.fn(),
     selectedDocument: null,
     selectedDocumentPath: null,
     setDraft: vi.fn(),
+    setResultsStale: vi.fn(),
   };
 }
 

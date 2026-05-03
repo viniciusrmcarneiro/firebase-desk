@@ -164,6 +164,26 @@ describe('createAppShellController', () => {
 
     expect(mocks.ui.setLastAction).toHaveBeenCalledWith('Choose a connection item first');
   });
+
+  it('scopes results changed state to the active Firestore tab', () => {
+    const tab = firestoreTab({ id: 'tab-firestore-1' });
+    const { input, mocks } = createInput({
+      activeTab: tab,
+      tabsState: tabsState([tab], tab.id),
+    });
+    const controller = createAppShellController(input);
+
+    controller.tabView?.firestore.onResultsStaleChange(true);
+
+    expect(mocks.firestoreTab.setResultsStale).toHaveBeenCalledWith(tab.id, true);
+
+    controller.tabView?.firestore.onResultsStaleChange(false, 'tab-firestore-2');
+
+    expect(mocks.firestoreTab.setResultsStale).toHaveBeenLastCalledWith(
+      'tab-firestore-2',
+      false,
+    );
+  });
 });
 
 function createInput(
@@ -228,11 +248,13 @@ function createInput(
     queryRows: [],
     refreshQuery: vi.fn(() => 'orders'),
     resetDraft: vi.fn(),
+    resultsStale: false,
     runQuery: vi.fn(() => 'orders'),
     selectDocument: vi.fn(),
     selectedDocument: null,
     selectedDocumentPath: null,
     setDraft: vi.fn(),
+    setResultsStale: vi.fn(),
   };
   const firestoreWriteFacade = {
     createDocument: vi.fn(),

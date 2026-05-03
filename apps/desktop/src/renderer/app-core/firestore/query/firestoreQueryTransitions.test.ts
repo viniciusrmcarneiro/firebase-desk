@@ -119,9 +119,12 @@ describe('firestore query transitions and selectors', () => {
     const viewChanged = firestoreResultViewChanged(selected, 'json');
     expect(viewChanged.resultView).toBe('json');
 
-    const stale = firestoreResultsMarkedStale(viewChanged);
+    const stale = firestoreResultsMarkedStale(viewChanged, 'tab-1');
     expect(stale.resultsStale).toBe(true);
-    expect(firestoreResultsRefreshed(stale).resultsStale).toBe(false);
+    expect(stale.resultsByTab['tab-1']?.resultsStale).toBe(true);
+    const refreshed = firestoreResultsRefreshed(stale, 'tab-1');
+    expect(refreshed.resultsStale).toBe(false);
+    expect(refreshed.resultsByTab['tab-1']?.resultsStale).toBe(false);
 
     const clearedReload = firestorePendingPageReloadCleared(
       { ...stale, pendingPageReloads: { 'tab-1': 2 } },

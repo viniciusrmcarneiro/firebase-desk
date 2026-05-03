@@ -11,7 +11,7 @@ import type {
   SettingsRepository,
 } from '@firebase-desk/repo-contracts';
 import { normalizeFirestoreWriteSettings } from '@firebase-desk/repo-contracts';
-import { useEffect, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { messageFromError } from '../../shared/errors.ts';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
 import { ConflictMergeModal } from './ConflictMergeModal.tsx';
@@ -63,6 +63,7 @@ export interface FirestoreQuerySurfaceProps {
   readonly onOpenDocumentInNewTab: (documentPath: string) => void;
   readonly onReset: () => void;
   readonly onRefreshResults?: () => void;
+  readonly onResultsStaleChange?: ((stale: boolean, scopeKey?: string) => void) | undefined;
   readonly onRun: () => void;
   readonly onSaveDocument?: (
     documentPath: string,
@@ -79,6 +80,8 @@ export interface FirestoreQuerySurfaceProps {
     | void;
   readonly onSelectDocument: (documentPath: string) => void;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
+  readonly resultsScopeKey?: string | undefined;
+  readonly resultsStale?: boolean | undefined;
   readonly selectedDocument?: FirestoreDocumentResult | null;
   readonly selectedDocumentPath?: string | null;
   readonly settings?: SettingsRepository | undefined;
@@ -128,11 +131,14 @@ export function FirestoreQuerySurface(
     onOpenDocumentInNewTab,
     onReset,
     onRefreshResults,
+    onResultsStaleChange,
     onRun,
     onSaveDocument,
     onUpdateDocumentFields,
     onSelectDocument,
     rows,
+    resultsScopeKey,
+    resultsStale,
     selectedDocument = null,
     selectedDocumentPath = null,
     settings,
@@ -151,9 +157,12 @@ export function FirestoreQuerySurface(
   const [pendingStaleFieldPatch, setPendingStaleFieldPatch] = useState<
     PendingStaleFieldPatch | null
   >(null);
-  const [resultsStale, setResultsStale] = useState(false);
+  const [uncontrolledResultsStale, setUncontrolledResultsStale] = useState(false);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const [actionNoticeMessage, setActionNoticeMessage] = useState<string | null>(null);
+  const effectiveResultsStale = resultsStale ?? uncontrolledResultsStale;
+  const onResultsStaleChangeRef = useRef(onResultsStaleChange);
+  const resultsScopeKeyRef = useRef(resultsScopeKey);
   const fieldSuggestions = useFirestoreFieldCatalog({
     onSettingsError: setActionErrorMessage,
     queryPath: draft.path,
@@ -175,6 +184,11 @@ export function FirestoreQuerySurface(
     onCreateDocumentRequestHandled?.(createDocumentRequest.requestId);
   }, [createDocumentRequest, handledCreateRequestId, onCreateDocumentRequestHandled]);
 
+  useEffect(() => {
+    onResultsStaleChangeRef.current = onResultsStaleChange;
+    resultsScopeKeyRef.current = resultsScopeKey;
+  }, [onResultsStaleChange, resultsScopeKey]);
+
   async function createDocument(
     collectionPath: string,
     documentId: string,
@@ -182,7 +196,7 @@ export function FirestoreQuerySurface(
   ) {
     validateFirestoreDocumentData(data);
     await onCreateDocument?.(collectionPath, documentId, data);
-    setResultsStale(true);
+    setResultsStaleState(true);
     setActionErrorMessage(null);
     setActionNoticeMessage(null);
   }
@@ -206,7 +220,7 @@ export function FirestoreQuerySurface(
       setActionNoticeMessage(null);
       return false;
     }
-    setResultsStale(true);
+    setResultsStaleState(true);
     setActionErrorMessage(null);
     setActionNoticeMessage(null);
     conflictContext?.onResolve?.();
@@ -252,7 +266,7 @@ export function FirestoreQuerySurface(
       }
       return false;
     }
-    setResultsStale(true);
+    setResultsStaleState(true);
     setActionErrorMessage(null);
     setActionNoticeMessage(
       result?.status === 'saved' && result.documentChanged
@@ -328,7 +342,7 @@ export function FirestoreQuerySurface(
   async function deleteDocument(documentPath: string, options: DeleteDocumentOptions) {
     try {
       await onDeleteDocument?.(documentPath, options);
-      setResultsStale(true);
+      setResultsStaleState(true);
       setActionErrorMessage(null);
     } catch (caught) {
       setActionErrorMessage(messageFromError(caught, 'Could not delete document.'));
@@ -345,10 +359,27 @@ export function FirestoreQuerySurface(
   }
 
   function refreshResults() {
-    setResultsStale(false);
+    setResultsStaleState(false);
     setActionErrorMessage(null);
     setActionNoticeMessage(null);
     (onRefreshResults ?? onRun)();
+  }
+
+  function runQuery() {
+    setResultsStaleState(false);
+    onRun();
+  }
+
+  function setResultsStaleState(stale: boolean) {
+    setUncontrolledResultsStale(stale);
+    const onChange = onResultsStaleChangeRef.current;
+    if (!onChange) return;
+    const scopeKey = resultsScopeKeyRef.current;
+    if (scopeKey === undefined) {
+      onChange(stale);
+      return;
+    }
+    onChange(stale, scopeKey);
   }
 
   function openCreateDocument(collectionPath: string) {
@@ -413,7 +444,7 @@ export function FirestoreQuerySurface(
             isLoading={isLoading}
             onDraftChange={onDraftChange}
             onReset={onReset}
-            onRun={onRun}
+            onRun={runQuery}
           />
         }
         isFetchingMore={isFetchingMore}
@@ -422,7 +453,7 @@ export function FirestoreQuerySurface(
         actionNoticeMessage={actionNoticeMessage}
         queryPath={draft.path}
         resultView={resultView}
-        resultsStale={resultsStale}
+        resultsStale={effectiveResultsStale}
         rows={rows}
         selectedDocument={selectedDocument}
         selectedDocumentPath={selectedDocumentPath}

@@ -30,6 +30,8 @@ import {
 import {
   firestoreDocumentSelected,
   firestoreDraftChanged,
+  firestoreResultsMarkedStale,
+  firestoreResultsRefreshed,
   firestoreTabCleared,
 } from '../../app-core/firestore/query/firestoreQueryTransitions.ts';
 import { useRepositories } from '../RepositoryProvider.tsx';
@@ -58,6 +60,7 @@ export interface FirestoreTabState {
   readonly isLoading: boolean;
   readonly isTabLoading: (tabId: string) => boolean;
   readonly queryRows: ReadonlyArray<FirestoreDocumentResult>;
+  readonly resultsStale: boolean;
   readonly selectedDocument: FirestoreDocumentResult | null;
   readonly selectedDocumentPath: string | null;
   readonly clearTab: (tabId: string) => void;
@@ -69,6 +72,7 @@ export interface FirestoreTabState {
   readonly runQuery: () => string | null;
   readonly selectDocument: (tabId: string, path: string | null) => void;
   readonly setDraft: (draft: FirestoreQueryDraft) => void;
+  readonly setResultsStale: (tabId: string, stale: boolean) => void;
 }
 
 export function useFirestoreTabState(
@@ -252,6 +256,14 @@ export function useFirestoreTabState(
     if (tabId === tabsStore.state.activeTabId) selectionActions.selectDocument(path);
   }
 
+  function setResultsStale(tabId: string, stale: boolean) {
+    updateQueryState((current) =>
+      stale
+        ? firestoreResultsMarkedStale(current, tabId)
+        : firestoreResultsRefreshed(current, tabId)
+    );
+  }
+
   function loadMore() {
     const result = loadMoreFirestoreQueryCommand(queryState, {
       isDocumentQuery: queryRequestIsDocument,
@@ -279,6 +291,7 @@ export function useFirestoreTabState(
     isLoading: activeResult.isLoading,
     isTabLoading,
     queryRows,
+    resultsStale: activeResult.resultsStale,
     selectedDocument,
     selectedDocumentPath,
     clearTab,
@@ -290,6 +303,7 @@ export function useFirestoreTabState(
     runQuery,
     selectDocument,
     setDraft,
+    setResultsStale,
   };
 
   function isTabLoading(tabId: string): boolean {

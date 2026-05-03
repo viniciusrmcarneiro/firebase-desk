@@ -362,11 +362,13 @@ export interface AppShellFirestoreTabFacade {
   readonly queryRows: ReadonlyArray<FirestoreDocumentResult>;
   readonly refreshQuery: () => string | null;
   readonly resetDraft: () => void;
+  readonly resultsStale: boolean;
   readonly runQuery: () => string | null;
   readonly selectDocument: (tabId: string, path: string | null) => void;
   readonly selectedDocument: FirestoreDocumentResult | null;
   readonly selectedDocumentPath: string | null;
   readonly setDraft: (draft: FirestoreQueryDraft) => void;
+  readonly setResultsStale: (tabId: string, stale: boolean) => void;
 }
 
 export interface AppShellFirestoreWriteFacade {
@@ -581,6 +583,13 @@ export function createAppShellController(
     if (path) input.ui.setLastAction(`Refreshed results ${path}`);
   }
 
+  function handleResultsStaleChange(stale: boolean, scopeKey?: string) {
+    const tabId = scopeKey
+      ?? (input.activeTab?.kind === 'firestore-query' ? input.activeTab.id : null);
+    if (!tabId) return;
+    input.firestoreTab.setResultsStale(tabId, stale);
+  }
+
   function handleLoadMoreFirestore() {
     input.firestoreTab.loadMore();
     input.ui.setLastAction(`Requested more results from ${input.firestoreTab.activeDraft.path}`);
@@ -765,12 +774,14 @@ export function createAppShellController(
           input.ui.setLastAction(`Opened ${path} in new tab`);
         },
         onRefreshResults: handleRefreshResults,
+        onResultsStaleChange: handleResultsStaleChange,
         onReset: input.firestoreTab.resetDraft,
         onRunQuery: handleRunQuery,
         onSaveDocument: input.firestoreWrite.saveDocument,
         onSelectDocument: (path) => input.firestoreTab.selectDocument(input.activeTab!.id, path),
         onUpdateDocumentFields: input.firestoreWrite.updateDocumentFields,
         rows: input.firestoreTab.queryRows,
+        resultsStale: input.firestoreTab.resultsStale,
         selectedDocument: input.firestoreTab.selectedDocument,
         selectedDocumentPath: input.firestoreTab.selectedDocumentPath,
         settings: input.repositories.settings,

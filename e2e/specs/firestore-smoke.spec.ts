@@ -9,6 +9,7 @@ import {
 } from '../fixtures/firestore-rest.ts';
 import {
   addLocalEmulatorAccount,
+  openAuthentication,
   openFirestore,
   openLiveApp,
   uniqueSmokeId,
@@ -148,6 +149,29 @@ async function querySameCollectionInTwoTabs(page: Page): Promise<void> {
 
   await workspaceTabs.getByRole('tab', { name: /orders/ }).nth(1).click();
   await expectResultDocumentId(page, 'ord_1024');
+
+  await selectDocument(page, 'ord_1024');
+  await openFieldEdit(page, 'customer', 'Edit string');
+  const editDialog = page.getByRole('dialog', { name: 'Edit customer' });
+  await editDialog.getByLabel('Field string value').fill('Ada Lovelace updated in tab');
+  await editDialog.getByRole('button', { name: 'Save' }).click();
+  await expectDialogHidden(editDialog, 'Scoped results changed field dialog stayed open');
+  await expect(resultsChangedBanner(page)).toBeVisible();
+
+  await workspaceTabs.getByRole('tab', { name: /orders/ }).first().click();
+  await expect(resultsChangedBanner(page)).toHaveCount(0);
+
+  await workspaceTabs.getByRole('tab', { name: /orders/ }).nth(1).click();
+  await expect(resultsChangedBanner(page)).toBeVisible();
+
+  await openAuthentication(page);
+  await expect(workspaceTabs.getByRole('tab', { name: /Auth/ })).toBeVisible();
+  await expect(resultsChangedBanner(page)).toHaveCount(0);
+
+  await workspaceTabs.getByRole('tab', { name: /orders/ }).nth(1).click();
+  await expect(resultsChangedBanner(page)).toBeVisible();
+  await page.getByRole('button', { name: 'Run' }).click();
+  await expect(resultsChangedBanner(page)).toHaveCount(0);
 }
 
 async function createCollectionFromSidebar(page: Page, suffix: string): Promise<void> {
@@ -558,9 +582,13 @@ async function openFieldMenu(page: Page, fieldName: string, menuItem: string): P
 }
 
 async function refreshChangedResults(page: Page): Promise<void> {
-  const bannerText = page.getByText('Results changed.');
+  const bannerText = resultsChangedBanner(page);
   await expect(bannerText).toBeVisible();
   await bannerText.locator('xpath=..').getByRole('button', { name: 'Refresh' }).click();
+}
+
+function resultsChangedBanner(page: Page) {
+  return resultsPanel(page).getByText('Results changed.');
 }
 
 async function openActivity(page: Page): Promise<void> {

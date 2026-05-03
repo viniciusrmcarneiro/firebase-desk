@@ -203,13 +203,21 @@ function mergeSubcollectionsIntoPages(
 
 export function firestoreResultsMarkedStale(
   state: FirestoreQueryRuntimeState,
+  tabId?: string | undefined,
 ): FirestoreQueryRuntimeState {
+  if (tabId) {
+    return updateTabResult(state, tabId, (current) => ({ ...current, resultsStale: true }));
+  }
   return { ...state, resultsStale: true };
 }
 
 export function firestoreResultsRefreshed(
   state: FirestoreQueryRuntimeState,
+  tabId?: string | undefined,
 ): FirestoreQueryRuntimeState {
+  if (tabId) {
+    return updateTabResult(state, tabId, (current) => ({ ...current, resultsStale: false }));
+  }
   return { ...state, resultsStale: false };
 }
 

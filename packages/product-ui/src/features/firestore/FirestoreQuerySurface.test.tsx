@@ -223,6 +223,33 @@ describe('FirestoreQuerySurface editing UX', () => {
     expect(await screen.findByText('Results changed.')).toBeTruthy();
   });
 
+  it('uses controlled results changed state and clears it before running query', () => {
+    const onResultsStaleChange = vi.fn();
+    const onRun = vi.fn();
+    renderSurface({
+      onResultsStaleChange,
+      onRun,
+      resultsStale: true,
+    });
+
+    expect(screen.getByText('Results changed.')).toBeTruthy();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Run' }));
+
+    expect(onResultsStaleChange).toHaveBeenCalledWith(false);
+    expect(onRun).toHaveBeenCalledTimes(1);
+  });
+
+  it('reports controlled results changed state after field writes', async () => {
+    const onResultsStaleChange = vi.fn();
+    const onUpdateDocumentFields = vi.fn<UpdateDocumentFields>();
+    renderSurface({ onResultsStaleChange, onUpdateDocumentFields });
+
+    fireEvent.click(screen.getAllByRole('button', { name: 'set null active' })[0]!);
+
+    await waitFor(() => expect(onResultsStaleChange).toHaveBeenCalledWith(true));
+  });
+
   it('defaults stale behavior when settings predate Firestore write settings', async () => {
     const onUpdateDocumentFields = vi.fn<UpdateDocumentFields>();
     renderSurface({
@@ -504,8 +531,11 @@ function renderSurface(
     onDeleteDocument,
     onCreateDocument,
     onGenerateDocumentId,
+    onResultsStaleChange,
+    onRun,
     onSaveDocument,
     onUpdateDocumentFields,
+    resultsStale,
     settings = new MockSettingsRepository(),
   }: {
     readonly createDocumentRequest?: {
@@ -517,8 +547,11 @@ function renderSurface(
     readonly onCreateDocument?: CreateDocument;
     readonly onDeleteDocument?: DeleteDocument;
     readonly onGenerateDocumentId?: (collectionPath: string) => Promise<string> | string;
+    readonly onResultsStaleChange?: (stale: boolean) => void;
+    readonly onRun?: () => void;
     readonly onSaveDocument?: SaveDocument;
     readonly onUpdateDocumentFields?: UpdateDocumentFields;
+    readonly resultsStale?: boolean;
     readonly settings?: SettingsRepository;
   },
 ) {
@@ -531,6 +564,7 @@ function renderSurface(
         rows={[inputDocument]}
         selectedDocument={inputDocument}
         selectedDocumentPath={inputDocument.path}
+        resultsStale={resultsStale}
         {...(onCreateDocument ? { onCreateDocument } : {})}
         {...(onDeleteDocument ? { onDeleteDocument } : {})}
         {...(onGenerateDocumentId ? { onGenerateDocumentId } : {})}
@@ -538,7 +572,8 @@ function renderSurface(
         onLoadMore={() => {}}
         onOpenDocumentInNewTab={() => {}}
         onReset={() => {}}
-        onRun={() => {}}
+        onResultsStaleChange={onResultsStaleChange}
+        onRun={onRun ?? (() => {})}
         onSaveDocument={onSaveDocument ?? vi.fn<SaveDocument>()}
         {...(onUpdateDocumentFields ? { onUpdateDocumentFields } : {})}
         onSelectDocument={() => {}}

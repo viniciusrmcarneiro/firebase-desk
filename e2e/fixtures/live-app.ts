@@ -59,7 +59,9 @@ export async function expandEmulatorAccount(page: Page): Promise<void> {
   const tree = page.getByRole('tree', { name: 'Account tree' });
   const account = tree.getByRole('treeitem', { name: new RegExp(EMULATOR_ACCOUNT_NAME) });
   await expect(account).toBeVisible();
+  if (await tree.getByRole('treeitem', { name: /Firestore/ }).count()) return;
   await account.click();
+  await expect(tree.getByRole('treeitem', { name: /Firestore/ })).toBeVisible();
 }
 
 export async function openFirestore(page: Page): Promise<void> {

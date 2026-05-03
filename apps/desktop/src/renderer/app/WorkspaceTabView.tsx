@@ -71,6 +71,7 @@ export interface FirestoreTabSurfaceModel {
   readonly onOpenDocumentInNewTab: (documentPath: string) => void;
   readonly onReset: () => void;
   readonly onRefreshResults: () => void;
+  readonly onResultsStaleChange: (stale: boolean, scopeKey?: string) => void;
   readonly onRunQuery: () => void;
   readonly onSaveDocument: (
     documentPath: string,
@@ -86,6 +87,7 @@ export interface FirestoreTabSurfaceModel {
     | FirestoreUpdateDocumentFieldsResult
     | void;
   readonly onSelectDocument: (documentPath: string) => void;
+  readonly resultsStale: boolean;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocument: FirestoreDocumentResult | null;
   readonly selectedDocumentPath: string | null;
@@ -140,6 +142,7 @@ export function WorkspaceTabView(props: WorkspaceTabViewProps) {
   }
   return (
     <FirestoreQuerySurface
+      key={props.activeTab.id}
       createDocumentRequest={props.firestore.createDocumentRequest}
       draft={props.firestore.draft}
       errorMessage={props.firestore.errorMessage}
@@ -147,6 +150,8 @@ export function WorkspaceTabView(props: WorkspaceTabViewProps) {
       isFetchingMore={props.firestore.isFetchingMore}
       isLoading={props.firestore.isLoading}
       rows={props.firestore.rows}
+      resultsScopeKey={props.activeTab.id}
+      resultsStale={props.firestore.resultsStale}
       selectedDocument={props.firestore.selectedDocument}
       selectedDocumentPath={props.firestore.selectedDocumentPath}
       settings={props.firestore.settings}
@@ -160,6 +165,7 @@ export function WorkspaceTabView(props: WorkspaceTabViewProps) {
       onOpenDocumentInNewTab={props.firestore.onOpenDocumentInNewTab}
       onReset={props.firestore.onReset}
       onRefreshResults={props.firestore.onRefreshResults}
+      onResultsStaleChange={props.firestore.onResultsStaleChange}
       onRun={props.firestore.onRunQuery}
       onSaveDocument={props.firestore.onSaveDocument}
       onUpdateDocumentFields={props.firestore.onUpdateDocumentFields}
