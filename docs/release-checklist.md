@@ -33,7 +33,7 @@ Use this for unsigned releases. `latest` is a rolling prerelease. Version tags a
 ## First Versioned Release
 
 - [ ] Confirm `latest` artifacts open on each OS.
-- [ ] Update root and desktop package versions.
+- [ ] Confirm root and desktop package versions are `0.0.1`.
 - [ ] Create tag: `git tag v0.0.1 && git push origin v0.0.1`.
 - [ ] Confirm `release.yml` creates a published GitHub release for `v0.0.1`.
 - [ ] Download each versioned asset.
