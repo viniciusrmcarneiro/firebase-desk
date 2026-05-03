@@ -1,6 +1,6 @@
 # Release Checklist
 
-Use this for unsigned releases. `latest` is a rolling prerelease. Version tags are stable releases with SHA-256 checksums. Signing/notarization/code-signing are intentionally out of scope.
+Use this for unsigned releases. Merges with a desktop version bump publish stable releases automatically. `latest` mirrors the newest versioned `main` release. Signing/notarization/code-signing are intentionally out of scope.
 
 ## Before Merge
 
@@ -15,26 +15,30 @@ Use this for unsigned releases. `latest` is a rolling prerelease. Version tags a
 - [ ] macOS packaged smoke passed if the PR ran the full matrix.
 - [ ] Windows unpacked-app check passed if the PR ran the full matrix.
 
-## Rolling Main Build
+## Main Release
 
 - [ ] Merge to `main`.
 - [ ] Confirm merged PR changed `apps/desktop/package.json`; otherwise no rolling release is expected.
 - [ ] `release.yml` package job green on macOS, Windows, and Linux.
+- [ ] Version tag `vX.Y.Z` created from `apps/desktop/package.json`.
+- [ ] Stable GitHub release `vX.Y.Z` created or updated.
+- [ ] `release-manifest.json` attached to `vX.Y.Z`.
+- [ ] Package manager manifest workflow artifact exists.
 - [ ] `latest` tag exists.
 - [ ] `latest` prerelease created or updated.
-- [ ] Release assets attached for macOS, Windows, and Linux targets.
+- [ ] Release assets attached for macOS, Windows, and Linux targets on `vX.Y.Z` and `latest`.
 - [ ] Matching `SHA256SUMS*.txt` assets attached for macOS, Windows, and Linux packages.
-- [ ] Download each `latest` asset.
+- [ ] Download each `vX.Y.Z` asset.
 - [ ] Verify every downloaded asset against the matching `SHA256SUMS*.txt` file.
 - [ ] Install/open macOS asset.
 - [ ] Install/open Windows asset.
 - [ ] Install/open Linux asset.
 
-## First Versioned Release
+## First Release
 
-- [ ] Confirm `latest` artifacts open on each OS.
 - [ ] Confirm root and desktop package versions are `0.0.1`.
-- [ ] Create tag: `git tag v0.0.1 && git push origin v0.0.1`.
+- [ ] Merge the release PR.
+- [ ] Confirm `release.yml` creates tag `v0.0.1`.
 - [ ] Confirm `release.yml` creates a published GitHub release for `v0.0.1`.
 - [ ] Download each versioned asset.
 - [ ] Verify every downloaded asset against the matching `SHA256SUMS*.txt` file.

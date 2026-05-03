@@ -1,13 +1,14 @@
 # Package Managers
 
-Firebase Desk starts package-manager distribution with self-owned manifests generated from stable version tags.
+Firebase Desk starts package-manager distribution with self-owned manifests generated from stable version releases.
 
 ## Channels
 
 - GitHub Releases remain the source of binaries and checksums.
-- `latest` is a rolling prerelease for smoke testing.
-- `vX.Y.Z` tags are stable releases for package managers.
-- Generated package-manager manifests are workflow artifacts on tag releases.
+- `latest` mirrors the newest versioned `main` release for smoke testing.
+- Merges to `main` with a desktop version bump create `vX.Y.Z` tags and stable releases.
+- Manually pushed `vX.Y.Z` tags can publish or repair stable releases.
+- Generated package-manager manifests are workflow artifacts on stable version releases.
 
 ## First Targets
 

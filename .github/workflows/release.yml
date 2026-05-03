@@ -24,6 +24,7 @@ jobs:
             release_channel: ${{ steps.plan.outputs.release_channel }}
             retention_days: ${{ steps.plan.outputs.retention_days }}
             should_package: ${{ steps.plan.outputs.should_package }}
+            version_tag: ${{ steps.plan.outputs.version_tag }}
         steps:
             - uses: actions/github-script@v8
               id: plan
@@ -62,6 +63,7 @@ jobs:
                       let retentionDays = '14';
                       let includeAllPlatforms = eventName === 'workflow_dispatch';
                       let shouldPackage = true;
+                      let versionTag = '';
 
                       if (eventName === 'pull_request') {
                           const pullRequest = context.payload.pull_request;
@@ -82,27 +84,29 @@ jobs:
                           core.info(`PR package-all label: ${hasPackageAllLabel}`);
                           core.info(`PR touches package paths: ${touchesPackagePaths}`);
                       } else if (eventName === 'push' && ref === 'refs/heads/main') {
-                          releaseChannel = 'latest';
                           retentionDays = '90';
                           includeAllPlatforms = true;
+                          async function desktopVersionAt(ref) {
+                              const response = await github.rest.repos.getContent({
+                                  owner: context.repo.owner,
+                                  repo: context.repo.repo,
+                                  path: 'apps/desktop/package.json',
+                                  ref,
+                              });
+                              if (!('content' in response.data)) {
+                                  throw new Error('apps/desktop/package.json is not a file.');
+                              }
+                              return JSON.parse(
+                                  Buffer.from(response.data.content, 'base64').toString('utf8'),
+                              ).version;
+                          }
+                          const headVersion = await desktopVersionAt(context.sha);
+                          versionTag = `v${headVersion}`;
+                          releaseChannel = versionTag;
+
                           const before = context.payload.before;
                           if (before && !/^0+$/.test(before)) {
-                              async function desktopVersionAt(ref) {
-                                  const response = await github.rest.repos.getContent({
-                                      owner: context.repo.owner,
-                                      repo: context.repo.repo,
-                                      path: 'apps/desktop/package.json',
-                                      ref,
-                                  });
-                                  if (!('content' in response.data)) {
-                                      throw new Error('apps/desktop/package.json is not a file.');
-                                  }
-                                  return JSON.parse(
-                                      Buffer.from(response.data.content, 'base64').toString('utf8'),
-                                  ).version;
-                              }
                               const beforeVersion = await desktopVersionAt(before);
-                              const headVersion = await desktopVersionAt(context.sha);
                               shouldPackage = beforeVersion !== headVersion;
                               const comparison = await github.rest.repos.compareCommitsWithBasehead({
                                   owner: context.repo.owner,
@@ -118,6 +122,7 @@ jobs:
                           }
                       } else if (eventName === 'push' && ref.startsWith('refs/tags/')) {
                           releaseChannel = ref.replace('refs/tags/', '');
+                          versionTag = releaseChannel;
                           retentionDays = '90';
                           includeAllPlatforms = true;
                       }
@@ -127,6 +132,7 @@ jobs:
                       };
 
                       core.info(`Release channel: ${releaseChannel}`);
+                      core.info(`Version tag: ${versionTag}`);
                       core.info(`Retention days: ${retentionDays}`);
                       core.info(`Package matrix: ${JSON.stringify(matrix)}`);
                       core.info(`Should package: ${shouldPackage}`);
@@ -134,6 +140,7 @@ jobs:
                       core.setOutput('release_channel', releaseChannel);
                       core.setOutput('retention_days', retentionDays);
                       core.setOutput('should_package', String(shouldPackage));
+                      core.setOutput('version_tag', versionTag);
 
     ci:
         uses: ./.github/workflows/ci.yml
@@ -147,7 +154,7 @@ jobs:
             matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
         env:
             GCLOUD_PROJECT: demo-local
-            RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
+            RELEASE_TAG: ${{ needs.prepare.outputs.version_tag }}
             RELEASE_CHANNEL: ${{ needs.prepare.outputs.release_channel }}
         steps:
             - uses: actions/checkout@v6
@@ -246,7 +253,7 @@ jobs:
                   ROLLING_RELEASE_TAG: latest
               run: |
                   cat > release-notes.md <<'NOTES'
-                  Rolling unsigned development build from the latest `main` commit.
+                  Rolling unsigned build mirrored from the latest versioned `main` release.
 
                   These binaries are published intentionally for development smoke testing. They are unsigned, so OS warning prompts are expected. Verify downloads with the matching SHA256SUMS asset.
                   NOTES
@@ -265,10 +272,13 @@ jobs:
                   fi
                   find artifacts -type f -print0 | xargs -0 -I {} gh release upload "$ROLLING_RELEASE_TAG" {} --repo "$GITHUB_REPOSITORY" --clobber
 
-    publish-tag:
+    publish-version:
         needs: [ prepare, package ]
         runs-on: ubuntu-latest
-        if: github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v')
+        if: >
+            (github.event_name == 'push' && startsWith(github.ref, 'refs/tags/v'))
+            || (github.event_name == 'push' && github.ref == 'refs/heads/main'
+            && needs.prepare.outputs.should_package == 'true')
         permissions:
             contents: write
         steps:
@@ -288,26 +298,78 @@ jobs:
               run: pnpm release:manifest
               env:
                   RELEASE_ARTIFACTS_DIR: artifacts
-                  RELEASE_CHANNEL: ${{ github.ref_name }}
+                  RELEASE_CHANNEL: ${{ needs.prepare.outputs.version_tag }}
                   RELEASE_MANIFEST_FILE: artifacts/release-manifest.json
-                  RELEASE_TAG: ${{ github.ref_name }}
-                  RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+                  RELEASE_TAG: ${{ needs.prepare.outputs.version_tag }}
+                  RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ needs.prepare.outputs.version_tag }}
             - name: Write package manager manifests
               run: pnpm package-managers:manifests
               env:
                   PACKAGE_MANAGER_MANIFEST_DIR: package-manager-manifests
                   RELEASE_MANIFEST_FILE: artifacts/release-manifest.json
-                  RELEASE_TAG: ${{ github.ref_name }}
+                  RELEASE_TAG: ${{ needs.prepare.outputs.version_tag }}
             - uses: actions/upload-artifact@v7
               with:
-                  name: package-manager-manifests-${{ github.ref_name }}
+                  name: package-manager-manifests-${{ needs.prepare.outputs.version_tag }}
                   path: package-manager-manifests
                   if-no-files-found: error
                   retention-days: 90
-            - uses: softprops/action-gh-release@v3
-              with:
-                  draft: false
-                  prerelease: false
-                  body: |
-                      Unsigned Firebase Desk build. OS warning prompts are expected. Verify downloads with the matching SHA256SUMS asset.
-                  files: artifacts/**/*
+            - name: Ensure version tag
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  VERSION_TAG: ${{ needs.prepare.outputs.version_tag }}
+              run: |
+                  if [ -z "$VERSION_TAG" ]; then
+                    echo "::error::Missing version tag."
+                    exit 1
+                  fi
+
+                  expected_sha="$(git rev-parse HEAD)"
+                  tag_ref="repos/$GITHUB_REPOSITORY/git/ref/tags/$VERSION_TAG"
+                  if tag_json="$(gh api "$tag_ref" 2>/dev/null)"; then
+                    resolved_sha="$(printf '%s' "$tag_json" | jq -r '.object.sha')"
+                    resolved_type="$(printf '%s' "$tag_json" | jq -r '.object.type')"
+
+                    while [ "$resolved_type" = "tag" ]; do
+                      tag_object="$(gh api "repos/$GITHUB_REPOSITORY/git/tags/$resolved_sha")"
+                      resolved_sha="$(printf '%s' "$tag_object" | jq -r '.object.sha')"
+                      resolved_type="$(printf '%s' "$tag_object" | jq -r '.object.type')"
+                    done
+
+                    if [ "$resolved_type" != "commit" ]; then
+                      echo "::error::Tag $VERSION_TAG resolves to $resolved_type $resolved_sha, expected commit $expected_sha."
+                      exit 1
+                    fi
+
+                    if [ "$resolved_sha" != "$expected_sha" ]; then
+                      echo "::error::Tag $VERSION_TAG resolves to $resolved_sha, expected $expected_sha."
+                      exit 1
+                    fi
+                    echo "Tag $VERSION_TAG already resolves to $expected_sha."
+                  else
+                    gh api "repos/$GITHUB_REPOSITORY/git/refs" \
+                      -f ref="refs/tags/$VERSION_TAG" \
+                      -f sha="$expected_sha" >/dev/null
+                    echo "Created tag $VERSION_TAG at $expected_sha."
+                  fi
+            - name: Publish version release
+              env:
+                  GH_TOKEN: ${{ github.token }}
+                  MARK_LATEST: ${{ github.ref == 'refs/heads/main' && 'true' || 'false' }}
+                  VERSION_TAG: ${{ needs.prepare.outputs.version_tag }}
+              run: |
+                  cat > release-notes.md <<'NOTES'
+                  Unsigned Firebase Desk build. OS warning prompts are expected. Verify downloads with the matching SHA256SUMS asset.
+                  NOTES
+
+                  latest_args=()
+                  if [ "$MARK_LATEST" = "true" ]; then
+                    latest_args=(--latest)
+                  fi
+
+                  if gh release view "$VERSION_TAG" --repo "$GITHUB_REPOSITORY" >/dev/null 2>&1; then
+                    gh release edit "$VERSION_TAG" --repo "$GITHUB_REPOSITORY" "${latest_args[@]}" --title "$VERSION_TAG" --notes-file release-notes.md
+                  else
+                    gh release create "$VERSION_TAG" --repo "$GITHUB_REPOSITORY" "${latest_args[@]}" --verify-tag --title "$VERSION_TAG" --notes-file release-notes.md
+                  fi
+                  find artifacts -type f -print0 | xargs -0 -I {} gh release upload "$VERSION_TAG" {} --repo "$GITHUB_REPOSITORY" --clobber
