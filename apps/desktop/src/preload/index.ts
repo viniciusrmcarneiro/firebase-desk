@@ -113,4 +113,8 @@ const api = {
 
 export type DesktopApi = typeof api;
 
+window.addEventListener('DOMContentLoaded', () => {
+  document.documentElement.dataset.platform = process.platform;
+});
+
 contextBridge.exposeInMainWorld('firebaseDesk', api);
