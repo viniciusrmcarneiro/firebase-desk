@@ -129,7 +129,7 @@ function JobRow(
           : null}
         {job.result?.filePath ? <Detail label='File' value={job.result.filePath} /> : null}
         {job.error ? <InlineAlert variant='danger'>{job.error.message}</InlineAlert> : null}
-        <pre className='max-h-28 overflow-auto rounded-md border border-border-subtle bg-bg-panel p-2 font-mono text-xs text-text-secondary'>
+        <pre className='max-h-28 select-text overflow-auto rounded-md border border-border-subtle bg-bg-panel p-2 font-mono text-xs text-text-secondary'>
           {JSON.stringify(job.request, null, 2)}
         </pre>
       </div>
@@ -141,7 +141,7 @@ function Detail({ label, value }: { readonly label: string; readonly value: stri
   return (
     <div className='grid grid-cols-[72px_minmax(0,1fr)] gap-2'>
       <span className='text-text-muted'>{label}</span>
-      <span className='break-all font-mono text-text-secondary'>{value}</span>
+      <span className='select-text break-all font-mono text-text-secondary'>{value}</span>
     </div>
   );
 }

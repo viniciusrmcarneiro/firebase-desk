@@ -18,9 +18,10 @@
     color: var(--color-text-primary);
     font-family: var(--font-family-sans);
     font-size: var(--font-size-base);
+    user-select: none;
   }
 
-  :where(input, textarea, code, pre, [contenteditable='true'], .select-text) {
+  :where(input, textarea, [contenteditable='true'], .select-text, .select-text *, .monaco-editor, .monaco-editor *) {
     user-select: text;
   }
 

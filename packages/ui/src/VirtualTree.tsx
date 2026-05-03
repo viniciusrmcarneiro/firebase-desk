@@ -8,7 +8,6 @@ import {
   useRef,
   useState,
 } from 'react';
-import { preventRepeatedMouseSelection } from './preventRepeatedMouseSelection.ts';
 import { visibleVirtualRows } from './virtualRows.ts';
 
 export interface VirtualTreeNode {
@@ -23,7 +22,6 @@ export interface VirtualTreeProps {
   readonly flattenedNodes: ReadonlyArray<VirtualTreeNode>;
   readonly density?: DensityName | undefined;
   readonly rowHeight?: number;
-  readonly textSelection?: 'content' | 'navigation' | undefined;
   readonly onToggle: (id: string) => void;
   readonly onOpen?: (id: string) => void;
   readonly onSelect?: (id: string) => void;
@@ -40,7 +38,6 @@ export function VirtualTree(
     onSelect,
     onToggle,
     renderNode,
-    textSelection = 'content',
     rowHeight,
   }: VirtualTreeProps,
 ) {
@@ -63,7 +60,6 @@ export function VirtualTree(
     flattenedNodes.length,
     resolvedRowHeight,
   );
-  const preventTextSelection = textSelection === 'navigation';
 
   useEffect(() => {
     setFocusedIndex((current) => clampIndex(current, flattenedNodes.length));
@@ -139,19 +135,14 @@ export function VirtualTree(
                 width: '100%',
                 transform: `translateY(${row.start}px)`,
               }}
-              className={preventTextSelection ? 'select-none' : undefined}
               onClick={(event) => {
                 if (event.detail > 1) return;
                 setFocusedIndex(row.index);
                 onSelect?.(node.id);
                 if (node.hasChildren) onToggle(node.id);
               }}
-              onDoubleClick={(event) => {
-                if (preventTextSelection) event.preventDefault();
-                onOpen?.(node.id);
-              }}
+              onDoubleClick={() => onOpen?.(node.id)}
               onKeyDown={(e) => handleKeyDown(e, row.index, node)}
-              onMouseDown={preventTextSelection ? preventRepeatedMouseSelection : undefined}
             >
               {renderNode
                 ? renderNode(node)

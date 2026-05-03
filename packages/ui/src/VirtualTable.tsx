@@ -10,7 +10,6 @@ import {
   useState,
 } from 'react';
 import { cn } from './cn.ts';
-import { preventRepeatedMouseSelection } from './preventRepeatedMouseSelection.ts';
 import { visibleVirtualRows } from './virtualRows.ts';
 
 export interface VirtualTableColumn<T> {
@@ -217,7 +216,6 @@ export function VirtualTable<T>(
                   rowCount: rows.length,
                 });
               }}
-              onMouseDown={preventRepeatedMouseSelection}
             >
               {columns.map((c, columnIndex) => {
                 const cellElement = (

@@ -1,4 +1,4 @@
-import { createEvent, fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@tanstack/react-virtual', () => ({
@@ -180,15 +180,5 @@ describe('VirtualTable', () => {
     fireEvent(screen.getAllByRole('row')[1]!, event);
 
     expect(event.defaultPrevented).toBe(false);
-  });
-
-  it('prevents repeated mouse down from selecting row text', () => {
-    render(<VirtualTable rows={rows} columns={columns} rowHeight={24} />);
-
-    const row = screen.getAllByRole('row')[1]!;
-    const event = createEvent.mouseDown(row, { detail: 2 });
-    fireEvent(row, event);
-
-    expect(event.defaultPrevented).toBe(true);
   });
 });

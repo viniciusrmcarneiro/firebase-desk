@@ -107,7 +107,6 @@ export function AccountTree(
           ariaLabel='Account tree'
           density={density}
           flattenedNodes={items}
-          textSelection='navigation'
           renderNode={(node) => (
             <AccountTreeRow
               item={node as AccountTreeItem}

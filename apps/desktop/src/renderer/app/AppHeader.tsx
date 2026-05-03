@@ -31,7 +31,7 @@ export function AppHeader(
   }: AppHeaderProps,
 ) {
   return (
-    <header className='flex min-w-0 select-none items-center gap-2 border-b border-border-subtle bg-bg-panel px-2'>
+    <header className='flex min-w-0 items-center gap-2 border-b border-border-subtle bg-bg-panel px-2'>
       <div className='flex h-full shrink-0 items-center gap-1 border-r border-border-subtle pr-2'>
         <IconButton
           disabled={!canGoBack}
@@ -54,9 +54,7 @@ export function AppHeader(
         <span className='grid size-6 shrink-0 place-items-center overflow-hidden rounded-md border border-border-subtle bg-bg-surface shadow-sm'>
           <img src={appIconUrl} alt='' className='size-full object-cover' />
         </span>
-        <strong className='select-none truncate text-sm font-semibold text-text-primary'>
-          Firebase Desk
-        </strong>
+        <strong className='truncate text-sm font-semibold text-text-primary'>Firebase Desk</strong>
         <Badge variant={dataMode === 'live' ? 'warning' : 'neutral'}>{dataMode}</Badge>
       </div>
       <div className='ml-auto flex shrink-0 items-center gap-2'>

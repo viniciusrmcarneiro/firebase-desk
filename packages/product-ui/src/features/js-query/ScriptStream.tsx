@@ -24,7 +24,7 @@ export function ScriptStream(
   }
 
   return (
-    <div className='grid content-start gap-2 p-3'>
+    <div className='grid select-text content-start gap-2 p-3'>
       {items.map((item) => <ScriptStreamCard key={item.id} item={item} settings={settings} />)}
     </div>
   );
@@ -41,7 +41,7 @@ function ScriptStreamCard(
 ) {
   return (
     <details className='overflow-hidden rounded-md border border-border-subtle bg-bg-panel shadow-sm'>
-      <summary className='flex cursor-pointer list-inside flex-wrap items-center justify-between gap-2 border-b border-border-subtle bg-bg-subtle px-3 py-2 text-sm font-semibold text-text-primary'>
+      <summary className='flex cursor-pointer select-text list-inside flex-wrap items-center justify-between gap-2 border-b border-border-subtle bg-bg-subtle px-3 py-2 text-sm font-semibold text-text-primary'>
         <span>{item.label}</span>
         <Badge>{item.badge}</Badge>
       </summary>

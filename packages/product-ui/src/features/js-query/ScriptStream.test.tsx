@@ -24,6 +24,7 @@ describe('ScriptStream', () => {
 
     expect(screen.getByText('yield 1')).toBeTruthy();
     expect(screen.getByText('Object(1)')).toBeTruthy();
+    expect(screen.getByText('yield 1').closest('summary')?.className).toContain('select-text');
     expect(await screen.findByText(/"ok": true/)).toBeTruthy();
   });
 });

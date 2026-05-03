@@ -17,11 +17,13 @@ export function JsonTreeView(
 ) {
   const flattened = useMemo(() => flatten(value, '$', 0, expandedPaths), [value, expandedPaths]);
   return (
-    <VirtualTree
-      flattenedNodes={flattened}
-      rowHeight={rowHeight}
-      onToggle={(id) => onTogglePath(id)}
-    />
+    <div className='h-full select-text'>
+      <VirtualTree
+        flattenedNodes={flattened}
+        rowHeight={rowHeight}
+        onToggle={(id) => onTogglePath(id)}
+      />
+    </div>
   );
 }
 

@@ -10,7 +10,6 @@ import {
 } from 'react';
 import { cn } from '../cn.ts';
 import { ContextMenu, ContextMenuTrigger } from '../context-menu/index.ts';
-import { preventRepeatedMouseSelection } from '../preventRepeatedMouseSelection.ts';
 import { VirtualList } from '../VirtualList.tsx';
 
 export interface ExplorerTreeRowModel {
@@ -165,7 +164,7 @@ function ExplorerTreeRow<TNode extends ExplorerTreeRowModel>(
 
   const row = (
     <div
-      className='grid select-none grid-cols-[16px_16px_minmax(140px,0.8fr)_minmax(160px,1fr)_112px_auto] items-center gap-2 border-b border-border-subtle pr-3 text-text-primary transition-colors hover:bg-action-ghost-hover'
+      className='grid grid-cols-[16px_16px_minmax(140px,0.8fr)_minmax(160px,1fr)_112px_auto] items-center gap-2 border-b border-border-subtle pr-3 text-text-primary transition-colors hover:bg-action-ghost-hover'
       role='treeitem'
       tabIndex={focused ? 0 : -1}
       style={{ minHeight: rowHeight, paddingLeft: 12 + node.level * 22 }}
@@ -183,7 +182,6 @@ function ExplorerTreeRow<TNode extends ExplorerTreeRowModel>(
         onOpen?.(node.id);
       }}
       onKeyDown={(event) => onKeyDown(event, index, node)}
-      onMouseDown={preventRepeatedMouseSelection}
     >
       <span>
         {node.hasChildren

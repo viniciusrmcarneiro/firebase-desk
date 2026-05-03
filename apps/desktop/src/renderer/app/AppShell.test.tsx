@@ -67,7 +67,6 @@ describe('desktop AppShell', () => {
     expect((await screen.findAllByText('No tab')).length).toBeGreaterThan(0);
     expect(screen.getByRole('button', { name: 'Settings' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'Add account' })).toBeTruthy();
-    expect(screen.getByText('Firebase Desk').className).toContain('select-none');
     expect(listUsers).not.toHaveBeenCalled();
     expect(runQuery).not.toHaveBeenCalled();
   });
