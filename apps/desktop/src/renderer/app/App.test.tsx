@@ -14,8 +14,13 @@ vi.mock('@firebase-desk/product-ui', () => ({
   AppearanceProvider: ({ children }: { readonly children: ReactNode; }) => <>{children}</>,
 }));
 
+const appShellProps = vi.hoisted(() => vi.fn());
+
 vi.mock('./AppShell.tsx', () => ({
-  AppShell: () => <div data-testid='app-shell' />,
+  AppShell: (props: { readonly appVersion?: string | undefined; }) => {
+    appShellProps(props);
+    return <div data-testid='app-shell' />;
+  },
 }));
 
 vi.mock('./RepositoryProvider.tsx', () => ({
@@ -28,6 +33,7 @@ vi.mock('./RepositoryProvider.tsx', () => ({
 describe('desktop App', () => {
   beforeEach(() => {
     settingsLoad.mockReset();
+    appShellProps.mockReset();
     vi.stubGlobal('firebaseDesk', undefined);
   });
 
@@ -46,13 +52,14 @@ describe('desktop App', () => {
     render(<App />);
 
     await waitFor(() => expect(screen.getByTestId('app-shell')).toBeTruthy());
+    expect(appShellProps).toHaveBeenCalledWith(expect.objectContaining({ appVersion: '0.0.0' }));
     expect(screen.queryByLabelText('Loading Firebase Desk')).toBeNull();
   });
 
   it('shows a retryable boot failure when config load fails', async () => {
     const getConfig = vi.fn()
       .mockRejectedValueOnce(new Error('config unavailable'))
-      .mockResolvedValue({ dataMode: 'mock' });
+      .mockResolvedValue({ appVersion: '0.1.0', dataMode: 'mock' });
     settingsLoad.mockResolvedValue(settingsSnapshot());
     vi.stubGlobal('firebaseDesk', { app: { getConfig } });
 

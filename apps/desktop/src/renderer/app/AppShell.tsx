@@ -10,6 +10,7 @@ import { DEFAULT_SIDEBAR_WIDTH, MIN_WORKSPACE_WIDTH } from './workspaceModel.ts'
 import { WorkspaceTabView } from './WorkspaceTabView.tsx';
 
 export interface AppShellProps {
+  readonly appVersion?: string | undefined;
   readonly activityStore?: ActivityStore | undefined;
   readonly dataMode?: 'live' | 'mock';
   readonly initialSidebarWidth?: number;
@@ -18,11 +19,17 @@ export interface AppShellProps {
 export function AppShell(
   {
     activityStore,
+    appVersion,
     dataMode = 'mock',
     initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH,
   }: AppShellProps,
 ) {
-  const controller = useAppShellController({ activityStore, dataMode, initialSidebarWidth });
+  const controller = useAppShellController({
+    activityStore,
+    appVersion,
+    dataMode,
+    initialSidebarWidth,
+  });
   const activeView = controller.tabView ? <WorkspaceTabView {...controller.tabView} /> : null;
 
   return (

@@ -313,7 +313,7 @@ describe('SettingsDialog', () => {
     vi.spyOn(settings, 'save').mockRejectedValueOnce(new Error('metadata locked'));
     render(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} />
+        <SettingsDialog appVersion='0.1.0' open onOpenChange={vi.fn()} />
       </AppearanceProvider>,
     );
 
@@ -511,7 +511,7 @@ describe('SettingsDialog', () => {
     await settings.save({ dataMode: 'live', sidebarWidth: 412, inspectorWidth: 388 });
     render(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} />
+        <SettingsDialog appVersion='0.1.0' open onOpenChange={vi.fn()} />
       </AppearanceProvider>,
     );
 
@@ -521,6 +521,7 @@ describe('SettingsDialog', () => {
     expect(screen.getByText(/Live mode can read production service account files/)).toBeTruthy();
     expect(screen.getByText('Data safety')).toBeTruthy();
     expect(screen.getByText('About')).toBeTruthy();
+    expect(screen.getByText('0.1.0')).toBeTruthy();
   });
 
   it('uses mock-specific credential storage copy', async () => {

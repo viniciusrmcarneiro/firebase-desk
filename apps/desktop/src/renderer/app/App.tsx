@@ -8,6 +8,11 @@ import { AppShell } from './AppShell.tsx';
 import { RenderErrorBoundary } from './RenderErrorBoundary.tsx';
 import { createRepositories, RepositoryProvider } from './RepositoryProvider.tsx';
 
+interface AppConfig {
+  readonly appVersion: string;
+  readonly dataMode: DataMode;
+}
+
 function SplashScreen() {
   return (
     <section
@@ -58,18 +63,21 @@ function BootFailureScreen(
 
 export function App() {
   const [dataMode, setDataMode] = useState<DataMode | null>(null);
+  const [appVersion, setAppVersion] = useState<string | null>(null);
   const [snapshot, setSnapshot] = useState<SettingsSnapshot | null>(null);
   const [bootAttempt, setBootAttempt] = useState(0);
   const [bootError, setBootError] = useState<string | null>(null);
 
   const handleDataModeChange = useCallback((nextDataMode: DataMode) => {
     setBootError(null);
+    setAppVersion(null);
     setSnapshot(null);
     setDataMode(nextDataMode);
   }, []);
 
   const retryBoot = useCallback(() => {
     setBootError(null);
+    setAppVersion(null);
     setDataMode(null);
     setSnapshot(null);
     setBootAttempt((attempt) => attempt + 1);
@@ -96,8 +104,11 @@ export function App() {
   useEffect(() => {
     let cancelled = false;
     setBootError(null);
-    loadInitialDataMode().then((config) => {
-      if (!cancelled) setDataMode(config.dataMode);
+    loadAppConfig().then((config) => {
+      if (!cancelled) {
+        setAppVersion(config.appVersion);
+        setDataMode(config.dataMode);
+      }
     }).catch((error) => {
       if (!cancelled) {
         setBootError(messageFromError(error, 'Could not load app configuration.'));
@@ -140,6 +151,7 @@ export function App() {
           >
             <RenderErrorBoundary label='Firebase Desk' resetKey={dataMode ?? 'mock'}>
               <AppShell
+                appVersion={appVersion ?? undefined}
                 dataMode={dataMode ?? 'mock'}
                 initialSidebarWidth={snapshot.sidebarWidth}
               />
@@ -155,9 +167,9 @@ function messageFromError(error: unknown, fallback: string): string {
   return error instanceof Error ? error.message : fallback;
 }
 
-async function loadInitialDataMode(): Promise<{ readonly dataMode: DataMode; }> {
+async function loadAppConfig(): Promise<AppConfig> {
   if (typeof window !== 'undefined' && window.firebaseDesk?.app?.getConfig) {
     return await window.firebaseDesk.app.getConfig();
   }
-  return { dataMode: 'mock' };
+  return { appVersion: '0.0.0', dataMode: 'mock' };
 }

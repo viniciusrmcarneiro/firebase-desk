@@ -15,6 +15,7 @@ import type { RepositorySet } from './RepositoryProvider.tsx';
 
 interface AppDialogsProps {
   readonly addProjectOpen: boolean;
+  readonly appVersion?: string | undefined;
   readonly canOpenDataDirectory: boolean;
   readonly credentialWarning: string | null;
   readonly dataDirectoryPath: string | null | undefined;
@@ -42,6 +43,7 @@ interface AppDialogsProps {
 export function AppDialogs(
   {
     addProjectOpen,
+    appVersion,
     canOpenDataDirectory,
     credentialWarning,
     dataDirectoryPath,
@@ -66,6 +68,7 @@ export function AppDialogs(
   return (
     <>
       <SettingsDialog
+        appVersion={appVersion}
         {...(canOpenDataDirectory
           ? {
             dataDirectoryPath,

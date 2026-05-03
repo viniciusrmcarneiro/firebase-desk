@@ -57,6 +57,10 @@ describe('IPC handler registry', () => {
         appVersion: '0.0.0',
         pong: 'pong',
       });
+    await expect(registered.get('app.config')?.({}, {})).resolves.toMatchObject({
+      appVersion: '0.0.0',
+      dataDirectory: '/tmp/firebase-desk-test',
+    });
     stderrWrite.mockRestore();
   });
 });

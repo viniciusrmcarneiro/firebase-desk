@@ -20,6 +20,7 @@ export function createAppHandlers(
     }),
     'app.config': async () => ({
       ...await resolveDataMode(deps.settingsRepository),
+      appVersion: deps.appVersion,
       dataDirectory: deps.dataDirectory,
     }),
     'app.openDataDirectory': async () => {

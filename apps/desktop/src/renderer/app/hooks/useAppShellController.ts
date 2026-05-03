@@ -29,6 +29,7 @@ import { useProjects } from './useProjects.ts';
 import { useWorkspaceTree } from './useWorkspaceTree.ts';
 
 export interface UseAppShellControllerInput {
+  readonly appVersion?: string | undefined;
   readonly activityStore?: ActivityStore | undefined;
   readonly dataMode?: 'live' | 'mock';
   readonly initialSidebarWidth?: number;
@@ -37,6 +38,7 @@ export interface UseAppShellControllerInput {
 export function useAppShellController(
   {
     activityStore,
+    appVersion,
     dataMode = 'mock',
     initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH,
   }: UseAppShellControllerInput = {},
@@ -208,6 +210,7 @@ export function useAppShellController(
       toggle: activity.toggle,
     },
     addProjectOpen,
+    appVersion,
     appearance: {
       mode: appearance.mode,
       resolvedTheme: appearance.resolvedTheme,

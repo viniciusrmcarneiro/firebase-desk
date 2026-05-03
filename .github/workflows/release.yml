@@ -23,6 +23,7 @@ jobs:
             matrix: ${{ steps.plan.outputs.matrix }}
             release_channel: ${{ steps.plan.outputs.release_channel }}
             retention_days: ${{ steps.plan.outputs.retention_days }}
+            should_package: ${{ steps.plan.outputs.should_package }}
         steps:
             - uses: actions/github-script@v8
               id: plan
@@ -43,12 +44,16 @@ jobs:
                           '.dockerignore',
                           '.github/workflows/ci.yml',
                           '.github/workflows/release.yml',
+                          '.github/workflows/release-gate.yml',
                           'package.json',
                           'pnpm-lock.yaml',
+                          'scripts/check-release-version.ts',
                           'scripts/generate-icons.mjs',
                           'scripts/package-desktop.mjs',
                           'scripts/package-linux-docker.sh',
+                          'scripts/write-package-manager-manifests.ts',
                           'scripts/write-package-checksums.mjs',
+                          'scripts/write-release-manifest.ts',
                       ]);
 
                       const eventName = context.eventName;
@@ -56,6 +61,7 @@ jobs:
                       let releaseChannel = `dispatch-${context.runId}`;
                       let retentionDays = '14';
                       let includeAllPlatforms = eventName === 'workflow_dispatch';
+                      let shouldPackage = true;
 
                       if (eventName === 'pull_request') {
                           const pullRequest = context.payload.pull_request;
@@ -79,6 +85,37 @@ jobs:
                           releaseChannel = 'latest';
                           retentionDays = '90';
                           includeAllPlatforms = true;
+                          const before = context.payload.before;
+                          if (before && !/^0+$/.test(before)) {
+                              async function desktopVersionAt(ref) {
+                                  const response = await github.rest.repos.getContent({
+                                      owner: context.repo.owner,
+                                      repo: context.repo.repo,
+                                      path: 'apps/desktop/package.json',
+                                      ref,
+                                  });
+                                  if (!('content' in response.data)) {
+                                      throw new Error('apps/desktop/package.json is not a file.');
+                                  }
+                                  return JSON.parse(
+                                      Buffer.from(response.data.content, 'base64').toString('utf8'),
+                                  ).version;
+                              }
+                              const beforeVersion = await desktopVersionAt(before);
+                              const headVersion = await desktopVersionAt(context.sha);
+                              shouldPackage = beforeVersion !== headVersion;
+                              const comparison = await github.rest.repos.compareCommitsWithBasehead({
+                                  owner: context.repo.owner,
+                                  repo: context.repo.repo,
+                                  basehead: `${before}...${context.sha}`,
+                              });
+                              const files = comparison.data.files ?? [];
+                              const touchedDesktopPackage = files.some((file) => {
+                                  return file.filename === 'apps/desktop/package.json';
+                              });
+                              core.info(`Desktop package changed: ${touchedDesktopPackage}`);
+                              core.info(`Desktop version: ${beforeVersion} -> ${headVersion}`);
+                          }
                       } else if (eventName === 'push' && ref.startsWith('refs/tags/')) {
                           releaseChannel = ref.replace('refs/tags/', '');
                           retentionDays = '90';
@@ -92,21 +129,25 @@ jobs:
                       core.info(`Release channel: ${releaseChannel}`);
                       core.info(`Retention days: ${retentionDays}`);
                       core.info(`Package matrix: ${JSON.stringify(matrix)}`);
+                      core.info(`Should package: ${shouldPackage}`);
                       core.setOutput('matrix', JSON.stringify(matrix));
                       core.setOutput('release_channel', releaseChannel);
                       core.setOutput('retention_days', retentionDays);
+                      core.setOutput('should_package', String(shouldPackage));
 
     ci:
         uses: ./.github/workflows/ci.yml
 
     package:
         needs: [ prepare, ci ]
+        if: needs.prepare.outputs.should_package == 'true'
         runs-on: ${{ matrix.os }}
         strategy:
             fail-fast: false
             matrix: ${{ fromJSON(needs.prepare.outputs.matrix) }}
         env:
             GCLOUD_PROJECT: demo-local
+            RELEASE_TAG: ${{ startsWith(github.ref, 'refs/tags/') && github.ref_name || '' }}
             RELEASE_CHANNEL: ${{ needs.prepare.outputs.release_channel }}
         steps:
             - uses: actions/checkout@v6
@@ -128,6 +169,7 @@ jobs:
                   sudo apt-get update
                   sudo apt-get install -y xvfb libnss3 libatk1.0-0 libatk-bridge2.0-0 libcups2 libdrm2 libxkbcommon0 libxcomposite1 libxdamage1 libxfixes3 libxrandr2 libgbm1 libpango-1.0-0 libcairo2 libasound2t64 libgtk-3-0 libsecret-1-0 libnotify4 libxss1 libxtst6 xdg-utils
             - run: pnpm install --frozen-lockfile
+            - run: pnpm test:release-version
             - run: pnpm package
             - name: Resolve package names
               id: package_names
@@ -175,13 +217,29 @@ jobs:
     publish-latest:
         needs: [ prepare, package ]
         runs-on: ubuntu-latest
-        if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+        if: github.event_name == 'push' && github.ref == 'refs/heads/main' && needs.prepare.outputs.should_package == 'true'
         permissions:
             contents: write
         steps:
+            - uses: actions/checkout@v6
+            - uses: pnpm/action-setup@v5
+              with:
+                  version: 10.33.2
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile
             - uses: actions/download-artifact@v7
               with:
                   path: artifacts
+            - name: Write release manifest
+              run: pnpm release:manifest
+              env:
+                  RELEASE_ARTIFACTS_DIR: artifacts
+                  RELEASE_CHANNEL: latest
+                  RELEASE_MANIFEST_FILE: artifacts/release-manifest.json
+                  RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/latest
             - name: Publish rolling prerelease
               env:
                   GH_TOKEN: ${{ github.token }}
@@ -214,13 +272,42 @@ jobs:
         permissions:
             contents: write
         steps:
+            - uses: actions/checkout@v6
+            - uses: pnpm/action-setup@v5
+              with:
+                  version: 10.33.2
+            - uses: actions/setup-node@v6
+              with:
+                  node-version: 24
+                  cache: pnpm
+            - run: pnpm install --frozen-lockfile
             - uses: actions/download-artifact@v7
               with:
                   path: artifacts
+            - name: Write release manifest
+              run: pnpm release:manifest
+              env:
+                  RELEASE_ARTIFACTS_DIR: artifacts
+                  RELEASE_CHANNEL: ${{ github.ref_name }}
+                  RELEASE_MANIFEST_FILE: artifacts/release-manifest.json
+                  RELEASE_TAG: ${{ github.ref_name }}
+                  RELEASE_URL: https://github.com/${{ github.repository }}/releases/tag/${{ github.ref_name }}
+            - name: Write package manager manifests
+              run: pnpm package-managers:manifests
+              env:
+                  PACKAGE_MANAGER_MANIFEST_DIR: package-manager-manifests
+                  RELEASE_MANIFEST_FILE: artifacts/release-manifest.json
+                  RELEASE_TAG: ${{ github.ref_name }}
+            - uses: actions/upload-artifact@v7
+              with:
+                  name: package-manager-manifests-${{ github.ref_name }}
+                  path: package-manager-manifests
+                  if-no-files-found: error
+                  retention-days: 90
             - uses: softprops/action-gh-release@v3
               with:
                   draft: false
-                  prerelease: true
+                  prerelease: false
                   body: |
-                      Unsigned development build. OS warning prompts are expected. Verify downloads with the matching SHA256SUMS asset.
+                      Unsigned Firebase Desk build. OS warning prompts are expected. Verify downloads with the matching SHA256SUMS asset.
                   files: artifacts/**/*
