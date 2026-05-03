@@ -33,6 +33,5 @@ export interface OpenTabInput {
 
 export interface SelectionState {
   readonly authUserId: string | null;
-  readonly firestoreDocumentPath: string | null;
   readonly treeItemId: string | null;
 }

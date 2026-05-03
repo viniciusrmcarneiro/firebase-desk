@@ -4,13 +4,11 @@ import { selectionActions, selectionStore } from './selectionStore.ts';
 describe('selectionStore', () => {
   beforeEach(() => selectionActions.reset());
 
-  it('tracks tree, document, and auth selections independently', () => {
+  it('tracks tree and auth selections independently', () => {
     selectionActions.selectTreeItem('collection:emu:orders');
-    selectionActions.selectDocument('orders/ord_1024');
     selectionActions.selectAuthUser('u_ada');
     expect(selectionStore.state).toEqual({
       authUserId: 'u_ada',
-      firestoreDocumentPath: 'orders/ord_1024',
       treeItemId: 'collection:emu:orders',
     });
   });

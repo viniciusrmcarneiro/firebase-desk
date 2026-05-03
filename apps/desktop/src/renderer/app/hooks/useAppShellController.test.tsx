@@ -302,7 +302,6 @@ function createScenario(
     scripts = {},
     selection = {
       authUserId: 'u_ada',
-      firestoreDocumentPath: null,
       treeItemId: 'collection:emu:orders',
     },
     tabsState: state = tabsState([firestoreTab('tab-orders', 'emu')], 'tab-orders'),

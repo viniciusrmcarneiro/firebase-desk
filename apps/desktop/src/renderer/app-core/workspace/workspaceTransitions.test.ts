@@ -4,7 +4,6 @@ import { initialSelectionState } from './workspaceState.ts';
 import {
   allTabsClosed,
   authUserSelected,
-  firestoreDocumentSelected,
   interactionMovedBack,
   interactionRecorded,
   otherTabsClosed,
@@ -157,16 +156,12 @@ describe('workspace transitions', () => {
 
   it('tracks selection slices independently', () => {
     const state = authUserSelected(
-      firestoreDocumentSelected(
-        treeItemSelected(initialSelectionState, 'collection:emu:orders'),
-        'orders/ord_1024',
-      ),
+      treeItemSelected(initialSelectionState, 'collection:emu:orders'),
       'u_ada',
     );
 
     expect(state).toEqual({
       authUserId: 'u_ada',
-      firestoreDocumentPath: 'orders/ord_1024',
       treeItemId: 'collection:emu:orders',
     });
   });

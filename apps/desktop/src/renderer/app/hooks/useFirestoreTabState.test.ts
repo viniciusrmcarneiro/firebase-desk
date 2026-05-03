@@ -8,7 +8,7 @@ import type {
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { useRepositories } from '../RepositoryProvider.tsx';
-import { selectionActions, selectionStore } from '../stores/selectionStore.ts';
+import { selectionActions } from '../stores/selectionStore.ts';
 import { tabActions, type WorkspaceTab } from '../stores/tabsStore.ts';
 import { DEFAULT_FIRESTORE_DRAFT } from '../workspaceModel.ts';
 import { useFirestoreTabState } from './useFirestoreTabState.ts';
@@ -320,7 +320,6 @@ describe('useFirestoreTabState', () => {
 
     act(() => result.current.selectDocument(tab.id, 'orders/ord_1024'));
 
-    expect(selectionStore.state.firestoreDocumentPath).toBe('orders/ord_1024');
     expect(result.current.selectedDocument?.id).toBe('ord_1024');
     expect(result.current.selectedDocumentPath).toBe('orders/ord_1024');
 

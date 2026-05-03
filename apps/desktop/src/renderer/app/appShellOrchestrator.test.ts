@@ -378,7 +378,6 @@ function createInput(
     },
     selection: {
       authUserId: null,
-      firestoreDocumentPath: null,
       treeItemId: collectionNodeId('emu', 'orders'),
     },
     settings: {

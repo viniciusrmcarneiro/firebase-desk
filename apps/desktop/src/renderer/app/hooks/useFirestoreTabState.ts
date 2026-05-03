@@ -37,8 +37,7 @@ import {
   firestoreTabCleared,
 } from '../../app-core/firestore/query/firestoreQueryTransitions.ts';
 import { useRepositories } from '../RepositoryProvider.tsx';
-import { selectionActions } from '../stores/selectionStore.ts';
-import { activePath, tabActions, tabsStore, type WorkspaceTab } from '../stores/tabsStore.ts';
+import { activePath, tabActions, type WorkspaceTab } from '../stores/tabsStore.ts';
 import { DEFAULT_FIRESTORE_DRAFT, draftToQuery, isDocumentPath } from '../workspaceModel.ts';
 
 interface UseFirestoreTabStateInput {
@@ -254,7 +253,6 @@ export function useFirestoreTabState(
 
   function selectDocument(tabId: string, path: string | null) {
     updateQueryState((current) => firestoreDocumentSelected(current, tabId, path));
-    if (tabId === tabsStore.state.activeTabId) selectionActions.selectDocument(path);
   }
 
   function setResultView(tabId: string, resultView: FirestoreResultView) {
