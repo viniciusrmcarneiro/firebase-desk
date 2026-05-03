@@ -62,14 +62,14 @@ The Docker wrapper runs the Ubuntu image as `linux/amd64` and grants the Chromiu
 
 Firebase Desk publishes unsigned binaries with SHA-256 checksums. We do not plan to sign binaries; package-manager distribution starts with self-owned Homebrew and Scoop manifests.
 
-| Event           | Output                                                                                                                   |
-| --------------- | ------------------------------------------------------------------------------------------------------------------------ |
-| PR to `main`    | CI, package Linux; package macOS/Windows when `package-all` or package paths change; upload temporary workflow artifacts |
-| Merge to `main` | CI, package macOS/Windows/Linux, publish/update prerelease `latest` when the desktop version changed                     |
-| Tag `v*.*.*`    | CI, package macOS/Windows/Linux, publish a stable versioned release                                                      |
-| Manual dispatch | Ad-hoc package smoke run with temporary workflow artifacts                                                               |
+| Event           | Output                                                                                                                                      |
+| --------------- | ------------------------------------------------------------------------------------------------------------------------------------------- |
+| PR to `main`    | CI, package Linux; package macOS/Windows when `package-all` or package paths change; upload temporary workflow artifacts                    |
+| Merge to `main` | CI, package macOS/Windows/Linux, create `vX.Y.Z`, publish a stable release, and update prerelease `latest` when the desktop version changed |
+| Tag `v*.*.*`    | CI, package macOS/Windows/Linux, publish or repair a stable versioned release                                                               |
+| Manual dispatch | Ad-hoc package smoke run with temporary workflow artifacts                                                                                  |
 
-Use PR artifacts to block broken packaging before merge. Use GitHub Release assets from `latest` and version tags as the long-lived download links. The rolling `latest` tag is created once and kept stable; the release assets and notes are updated only when the desktop package version changes.
+Use PR artifacts to block broken packaging before merge. Use GitHub Release assets from version tags as stable download links. The rolling `latest` tag is created once and kept stable; the release assets and notes mirror the newest versioned `main` release only when the desktop package version changes.
 
 Pull requests to `main` must change `apps/desktop/package.json` version unless the title includes `[skip release]`. Version tags must match the desktop package version, for example `v0.1.0` requires `apps/desktop/package.json` version `0.1.0`.
 
@@ -80,7 +80,7 @@ Pull requests to `main` must change `apps/desktop/package.json` version unless t
 
 Artifact names include channel/version, OS, architecture, and target extension. PR and manual-dispatch artifacts are temporary workflow artifacts, not release assets. Each package artifact set includes a matching `SHA256SUMS*.txt` file.
 
-Versioned releases also include `release-manifest.json`. Tag workflows generate Homebrew cask and Scoop manifests as workflow artifacts for self-owned package manager distribution.
+Versioned releases also include `release-manifest.json`. Version release workflows generate Homebrew cask and Scoop manifests as workflow artifacts for self-owned package manager distribution.
 
 ## Checksums
 
