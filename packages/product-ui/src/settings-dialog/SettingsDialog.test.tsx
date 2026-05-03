@@ -1,6 +1,6 @@
 import type { SettingsRepository, SettingsSnapshot } from '@firebase-desk/repo-contracts';
 import { MockSettingsRepository } from '@firebase-desk/repo-mocks';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AppearanceProvider } from '../appearance/AppearanceProvider.tsx';
 import { SettingsDialog } from './SettingsDialog.tsx';
@@ -171,6 +171,38 @@ describe('SettingsDialog', () => {
       expect((await settings.load()).firestoreWrites.fieldStaleBehavior).toBe('block')
     );
     expect(onSettingsSaved).toHaveBeenCalled();
+  });
+
+  it('lists saved Firestore metadata alphabetically', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    await settings.save({
+      firestoreFieldCatalogs: {
+        zeta: [{ count: 1, field: 'last', types: ['string'] }],
+        alpha: [{ count: 1, field: 'first', types: ['string'] }],
+      },
+      resultTableLayouts: {
+        gamma: { columnOrder: ['middle'], columnSizing: { middle: 140 } },
+      },
+    });
+
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} onSettingsSaved={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    const metadata = await screen.findByLabelText('Saved Firestore metadata');
+    expect(
+      within(metadata).getAllByText(/^(alpha|gamma|zeta)$/).map((item) => item.textContent),
+    ).toEqual(['alpha', 'gamma', 'zeta']);
   });
 
   it('deletes saved Firestore metadata for one collection key', async () => {

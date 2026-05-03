@@ -7,7 +7,7 @@ const inputVariants = cva(
   {
     variants: {
       density: {
-        compact: 'h-[var(--density-control-height)] text-sm',
+        compact: 'h-[var(--density-compact-control-height)] text-sm',
         comfortable: 'h-[var(--density-comfortable-control-height)] text-sm',
       },
     },

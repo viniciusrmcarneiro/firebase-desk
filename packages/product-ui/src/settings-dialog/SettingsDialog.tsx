@@ -534,17 +534,39 @@ function firestoreMetadataRows(snapshot: SettingsSnapshot): FirestoreMetadataRow
     ...Object.keys(snapshot.firestoreFieldCatalogs),
     ...Object.keys(snapshot.resultTableLayouts),
   ]);
-  const sortedKeys: string[] = [];
-  for (const key of keys) {
-    const nextIndex = sortedKeys.findIndex((existing) => key.localeCompare(existing) < 0);
-    if (nextIndex === -1) sortedKeys.push(key);
-    else sortedKeys.splice(nextIndex, 0, key);
-  }
+  const sortedKeys = mergeSortStrings(Array.from(keys));
   return sortedKeys.map((key) => ({
     fieldCount: snapshot.firestoreFieldCatalogs[key]?.length ?? 0,
     hasLayout: Boolean(snapshot.resultTableLayouts[key]),
     key,
   }));
+}
+
+function mergeSortStrings(values: ReadonlyArray<string>): string[] {
+  if (values.length < 2) return [...values];
+  const midpoint = Math.floor(values.length / 2);
+  return mergeStrings(
+    mergeSortStrings(values.slice(0, midpoint)),
+    mergeSortStrings(values.slice(midpoint)),
+  );
+}
+
+function mergeStrings(left: ReadonlyArray<string>, right: ReadonlyArray<string>): string[] {
+  const merged: string[] = [];
+  let leftIndex = 0;
+  let rightIndex = 0;
+  while (leftIndex < left.length && rightIndex < right.length) {
+    const leftValue = left[leftIndex]!;
+    const rightValue = right[rightIndex]!;
+    if (leftValue.localeCompare(rightValue) <= 0) {
+      merged.push(leftValue);
+      leftIndex += 1;
+    } else {
+      merged.push(rightValue);
+      rightIndex += 1;
+    }
+  }
+  return merged.concat(left.slice(leftIndex), right.slice(rightIndex));
 }
 
 function omitRecordKey<TValue>(

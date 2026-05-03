@@ -114,9 +114,17 @@ export function useAppShellController(
   });
   useEffect(() => {
     let cancelled = false;
-    void repositories.settings.load().then((snapshot) => {
-      if (!cancelled) setDensity(snapshot.density);
-    });
+    void repositories.settings.load()
+      .then((snapshot) => {
+        if (!cancelled) setDensity(snapshot.density);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setDensity(defaultDensity);
+        setLastAction(
+          `Settings load failed: ${messageFromError(error, 'Could not load settings.')}`,
+        );
+      });
     return () => {
       cancelled = true;
     };
@@ -321,4 +329,8 @@ function persistSidebarWidth(repositories: RepositorySet, size: number) {
   const width = clampSidebarWidth(size);
   document.documentElement.style.setProperty('--sidebar-width', `${width}px`);
   void repositories.settings.save({ sidebarWidth: width });
+}
+
+function messageFromError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }
