@@ -106,6 +106,7 @@ export interface FirestoreImportCollectionJobRequest {
 }
 
 export interface BackgroundJob {
+  readonly acknowledgedAt?: string | undefined;
   readonly cancelRequested?: boolean | undefined;
   readonly createdAt: string;
   readonly error?: BackgroundJobError | undefined;
@@ -138,6 +139,7 @@ export interface BackgroundJobPickFileResult {
 }
 
 export interface BackgroundJobRepository {
+  acknowledgeIssues(ids: ReadonlyArray<string>): Promise<void>;
   cancel(id: string): Promise<void>;
   clearCompleted(): Promise<void>;
   list(request?: BackgroundJobListRequest): Promise<ReadonlyArray<BackgroundJob>>;

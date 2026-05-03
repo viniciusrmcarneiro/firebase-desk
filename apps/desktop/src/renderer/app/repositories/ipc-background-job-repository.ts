@@ -9,6 +9,10 @@ import type {
 } from '@firebase-desk/repo-contracts/jobs';
 
 export class IpcBackgroundJobRepository implements BackgroundJobRepository {
+  async acknowledgeIssues(ids: ReadonlyArray<string>): Promise<void> {
+    await window.firebaseDesk.jobs.acknowledgeIssues({ ids: Array.from(ids) });
+  }
+
   async cancel(id: string): Promise<void> {
     await window.firebaseDesk.jobs.cancel({ id });
   }

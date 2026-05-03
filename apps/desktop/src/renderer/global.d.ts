@@ -28,6 +28,9 @@ declare global {
   }
 
   interface DesktopJobsApi {
+    readonly acknowledgeIssues: (
+      request: IpcRequest<'jobs.acknowledgeIssues'>,
+    ) => Promise<IpcResponse<'jobs.acknowledgeIssues'>>;
     readonly cancel: (request: IpcRequest<'jobs.cancel'>) => Promise<IpcResponse<'jobs.cancel'>>;
     readonly clearCompleted: () => Promise<IpcResponse<'jobs.clearCompleted'>>;
     readonly list: (request: IpcRequest<'jobs.list'>) => Promise<IpcResponse<'jobs.list'>>;

@@ -16,6 +16,7 @@ export function selectJobsButtonModel(state: JobsState): JobsButtonModel {
   const failedCount =
     state.jobs.filter((job) =>
       (job.status === 'failed' || job.status === 'interrupted')
+      && !job.acknowledgedAt
       && !acknowledgedIssueIds.has(job.id)
     ).length;
   if (failedCount > 0) {

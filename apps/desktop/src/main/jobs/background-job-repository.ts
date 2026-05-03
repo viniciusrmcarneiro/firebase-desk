@@ -45,6 +45,11 @@ export class MainBackgroundJobRepository implements BackgroundJobRepository {
     void this.drainQueue();
   }
 
+  async acknowledgeIssues(ids: ReadonlyArray<string>): Promise<void> {
+    const updated = await this.store.acknowledgeIssues(ids, this.now());
+    for (const job of updated) this.emit({ job, type: 'job-updated' });
+  }
+
   async cancel(id: string): Promise<void> {
     const running = this.running;
     if (running?.id === id) {

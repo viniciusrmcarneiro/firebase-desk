@@ -163,6 +163,7 @@ function fakeDeps(): CreateIpcHandlersDeps {
       updateDocumentFields: vi.fn(),
     },
     jobsRepository: {
+      acknowledgeIssues: vi.fn(),
       cancel: vi.fn(),
       clearCompleted: vi.fn(),
       list: vi.fn(),

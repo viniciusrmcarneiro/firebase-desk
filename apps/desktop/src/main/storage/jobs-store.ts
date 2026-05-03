@@ -24,6 +24,24 @@ export class JobsStore {
     });
   }
 
+  async acknowledgeIssues(ids: ReadonlyArray<string>, acknowledgedAt: string): Promise<
+    ReadonlyArray<BackgroundJob>
+  > {
+    const idSet = new Set(ids);
+    const updated: BackgroundJob[] = [];
+    await this.runMutation(async () => {
+      const jobs = await this.readJobs();
+      const next = jobs.map((job) => {
+        if (!idSet.has(job.id) || !isIssueStatus(job.status) || job.acknowledgedAt) return job;
+        const acknowledged = { ...job, acknowledgedAt, updatedAt: acknowledgedAt };
+        updated.push(acknowledged);
+        return acknowledged;
+      });
+      await this.writeJobs(next);
+    });
+    return updated;
+  }
+
   async clearCompleted(): Promise<ReadonlyArray<string>> {
     let removed: ReadonlyArray<string> = [];
     await this.runMutation(async () => {
@@ -123,6 +141,10 @@ function isFinalStatus(status: BackgroundJob['status']): boolean {
     || status === 'failed'
     || status === 'interrupted'
     || status === 'succeeded';
+}
+
+function isIssueStatus(status: BackgroundJob['status']): boolean {
+  return status === 'failed' || status === 'interrupted';
 }
 
 function sortByCreatedAt(

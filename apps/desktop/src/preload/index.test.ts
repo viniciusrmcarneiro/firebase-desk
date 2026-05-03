@@ -167,6 +167,7 @@ describe('preload script runner api', () => {
     const listener = vi.fn();
     electronMocks.invoke
       .mockResolvedValueOnce([])
+      .mockResolvedValueOnce(undefined)
       .mockResolvedValueOnce({
         createdAt: '2026-04-29T00:00:00.000Z',
         id: 'job-1',
@@ -213,6 +214,7 @@ describe('preload script runner api', () => {
     unsubscribe();
 
     await expect(api.jobs.list({ limit: 20 })).resolves.toEqual([]);
+    await expect(api.jobs.acknowledgeIssues({ ids: ['job-1'] })).resolves.toBeUndefined();
     await expect(api.jobs.start({
       collectionPath: 'orders',
       connectionId: 'emu',
@@ -234,6 +236,9 @@ describe('preload script runner api', () => {
     expect(listener).toHaveBeenCalledWith(expect.objectContaining({ type: 'job-updated' }));
     expect(electronMocks.removeListener).toHaveBeenCalledWith(JOB_EVENT_CHANNEL, handler);
     expect(electronMocks.invoke).toHaveBeenCalledWith('jobs.list', { limit: 20 });
+    expect(electronMocks.invoke).toHaveBeenCalledWith('jobs.acknowledgeIssues', {
+      ids: ['job-1'],
+    });
     expect(electronMocks.invoke).toHaveBeenCalledWith('jobs.cancel', { id: 'job-1' });
   });
 });

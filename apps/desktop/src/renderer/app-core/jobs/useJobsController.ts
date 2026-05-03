@@ -1,4 +1,5 @@
 import type {
+  BackgroundJob,
   BackgroundJobRepository,
   FirestoreCollectionJobRequest,
 } from '@firebase-desk/repo-contracts/jobs';
@@ -10,7 +11,6 @@ import { createJobsStore, type JobsStore } from './jobsStore.ts';
 import {
   jobsDrawerClosed,
   jobsDrawerOpened,
-  jobsDrawerToggled,
   jobsEventReceived,
   jobsExpandedChanged,
   jobsLoadFailed,
@@ -31,26 +31,40 @@ export function useJobsController(
   const store = inputStore ?? ownedStore;
   const state = useAppCoreStore(store);
 
+  const acknowledgeIssueJobs = useCallback((jobs: ReadonlyArray<BackgroundJob>) => {
+    const ids = jobs.filter(isUnacknowledgedIssueJob).map((job) => job.id);
+    if (ids.length === 0) return;
+    void repository.acknowledgeIssues(ids).catch((error: unknown) => {
+      onStatus?.(messageFromError(error, 'Could not acknowledge jobs.'));
+    });
+  }, [onStatus, repository]);
+
   const load = useCallback(() => {
     store.update(jobsLoadStarted);
     repository.list({ limit: 200 })
-      .then((jobs) => store.update((current) => jobsLoadSucceeded(current, jobs)))
+      .then((jobs) => {
+        store.update((current) => jobsLoadSucceeded(current, jobs));
+        if (store.get().open) acknowledgeIssueJobs(jobs);
+      })
       .catch((error: unknown) => {
         const message = messageFromError(error, 'Could not load jobs.');
         store.update((current) => jobsLoadFailed(current, message));
         onStatus?.(message);
       });
-  }, [onStatus, repository, store]);
+  }, [acknowledgeIssueJobs, onStatus, repository, store]);
 
   useEffect(() => {
     load();
     return repository.subscribe((event) => {
       store.update((current) => jobsEventReceived(current, event));
-      if (event.type === 'job-updated' && isFinalStatus(event.job.status)) {
+      if (store.get().open && event.type !== 'job-removed') acknowledgeIssueJobs([event.job]);
+      if (
+        event.type === 'job-updated' && isFinalStatus(event.job.status) && !event.job.acknowledgedAt
+      ) {
         onStatus?.(event.job.summary ?? event.job.status);
       }
     });
-  }, [load, onStatus, repository, store]);
+  }, [acknowledgeIssueJobs, load, onStatus, repository, store]);
 
   const button = useMemo(() => selectJobsButtonModel(state), [state]);
 
@@ -72,6 +86,17 @@ export function useJobsController(
     });
   }, [onStatus, repository]);
 
+  const openDrawer = useCallback(() => {
+    const jobs = store.get().jobs;
+    store.update(jobsDrawerOpened);
+    acknowledgeIssueJobs(jobs);
+  }, [acknowledgeIssueJobs, store]);
+
+  const toggleDrawer = useCallback(() => {
+    if (store.get().open) store.update(jobsDrawerClosed);
+    else openDrawer();
+  }, [openDrawer, store]);
+
   return {
     button,
     cancel,
@@ -81,14 +106,18 @@ export function useJobsController(
     isLoading: state.isLoading,
     jobs: state.jobs,
     load,
-    open: () => store.update(jobsDrawerOpened),
+    open: openDrawer,
     opened: state.open,
     setExpanded: (expanded: boolean) =>
       store.update((current) => jobsExpandedChanged(current, expanded)),
     start,
     state,
-    toggle: () => store.update(jobsDrawerToggled),
+    toggle: toggleDrawer,
   };
+}
+
+function isUnacknowledgedIssueJob(job: BackgroundJob): boolean {
+  return !job.acknowledgedAt && (job.status === 'failed' || job.status === 'interrupted');
 }
 
 function isFinalStatus(status: string): boolean {

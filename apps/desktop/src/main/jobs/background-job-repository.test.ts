@@ -136,6 +136,36 @@ describe('MainBackgroundJobRepository', () => {
     expect(activity.append).toHaveBeenCalledTimes(2);
   });
 
+  it('acknowledges failed jobs durably and emits updates', async () => {
+    const dir = await makeTempDir();
+    const store = new JobsStore(dir);
+    await store.add(storedJob('failed', 'failed'));
+    const repo = new MainBackgroundJobRepository(
+      store,
+      new ControlledRunner() as unknown as FirestoreCollectionJobRunner,
+      activityLog(),
+      () => '2026-04-29T00:03:00.000Z',
+      () => 'job-new',
+    );
+    const listener = vi.fn();
+    repo.subscribe(listener);
+
+    await repo.acknowledgeIssues(['failed']);
+
+    await expect(repo.list()).resolves.toEqual(
+      expect.arrayContaining([
+        expect.objectContaining({
+          acknowledgedAt: '2026-04-29T00:03:00.000Z',
+          id: 'failed',
+        }),
+      ]),
+    );
+    expect(listener).toHaveBeenCalledWith({
+      job: expect.objectContaining({ acknowledgedAt: '2026-04-29T00:03:00.000Z', id: 'failed' }),
+      type: 'job-updated',
+    });
+  });
+
   it('uses configured file picker paths for smoke tests', async () => {
     vi.stubEnv('FIREBASE_DESK_JOB_EXPORT_PATH', '/tmp/export.jsonl');
     vi.stubEnv('FIREBASE_DESK_JOB_IMPORT_PATH', '/tmp/import.jsonl');

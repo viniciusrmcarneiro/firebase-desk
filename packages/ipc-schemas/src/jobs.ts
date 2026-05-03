@@ -65,6 +65,7 @@ export const FirestoreCollectionJobRequestSchema = z.discriminatedUnion('type', 
 ]);
 
 export const BackgroundJobSchema = z.object({
+  acknowledgedAt: z.string().optional(),
   cancelRequested: z.boolean().optional(),
   createdAt: z.string(),
   error: z.object({
@@ -101,6 +102,10 @@ export const BackgroundJobEventSchema = z.discriminatedUnion('type', [
 export const BackgroundJobListRequestSchema = z.object({
   limit: z.number().int().positive().optional(),
   status: z.union([BackgroundJobStatusSchema, z.literal('all')]).optional(),
+});
+
+export const BackgroundJobAcknowledgeIssuesRequestSchema = z.object({
+  ids: z.array(z.string().min(1)),
 });
 
 export const BackgroundJobPickExportFileRequestSchema = z.object({
