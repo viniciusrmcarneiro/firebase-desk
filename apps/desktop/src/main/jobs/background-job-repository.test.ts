@@ -51,6 +51,36 @@ describe('MainBackgroundJobRepository', () => {
     ]);
   });
 
+  it('does not start concurrent workers while queue lookup is pending', async () => {
+    const runner = new ControlledRunner();
+    const activity = activityLog();
+    const store = new SlowOldestQueuedStore(await makeTempDir());
+    const repo = new MainBackgroundJobRepository(
+      store,
+      runner as unknown as FirestoreCollectionJobRunner,
+      activity,
+      clock(),
+      ids(),
+    );
+
+    const first = await repo.start(deleteRequest('orders'));
+    const second = await repo.start(deleteRequest('orders_archive'));
+    await eventually(() => expect(store.oldestQueuedCalls).toBe(1));
+
+    store.releaseOldestQueued();
+
+    await eventually(() => expect(runner.started).toEqual([first.id]));
+    await runner.finish(first.id);
+    await eventually(() => expect(runner.started).toEqual([first.id, second.id]));
+    await runner.finish(second.id);
+    await eventually(async () => {
+      const rows = await repo.list();
+      expect(rows).toEqual(expect.arrayContaining([
+        expect.objectContaining({ id: second.id, status: 'succeeded' }),
+      ]));
+    });
+  });
+
   it('cancels queued jobs without starting them', async () => {
     const runner = new ControlledRunner();
     const activity = activityLog();
@@ -143,6 +173,28 @@ class ControlledRunner {
     this.pending.get(id)?.();
     this.pending.delete(id);
     await eventually(() => expect(this.pending.has(id)).toBe(false));
+  }
+}
+
+class SlowOldestQueuedStore extends JobsStore {
+  oldestQueuedCalls = 0;
+  private blockNext = true;
+  private release: (() => void) | null = null;
+
+  override async oldestQueued(): Promise<BackgroundJob | null> {
+    this.oldestQueuedCalls += 1;
+    if (this.blockNext) {
+      this.blockNext = false;
+      await new Promise<void>((resolve) => {
+        this.release = resolve;
+      });
+    }
+    return await super.oldestQueued();
+  }
+
+  releaseOldestQueued(): void {
+    this.release?.();
+    this.release = null;
   }
 }
 

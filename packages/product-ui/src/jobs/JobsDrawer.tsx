@@ -79,7 +79,7 @@ function JobRow(
   },
 ) {
   const active = job.status === 'queued' || job.status === 'running';
-  const total = job.progress.read + job.progress.skipped + job.progress.failed;
+  const progressPercent = jobProgressPercent(job);
   return (
     <details className='border-b border-border-subtle'>
       <summary className='grid cursor-pointer grid-cols-[112px_92px_minmax(0,1fr)_auto] items-center gap-2 px-3 py-2 text-xs hover:bg-action-ghost-hover'>
@@ -108,8 +108,13 @@ function JobRow(
       <div className='grid gap-2 bg-bg-subtle px-3 py-2 text-xs'>
         <div className='h-2 overflow-hidden rounded-full bg-bg-panel'>
           <div
+            aria-label={`${job.title} progress`}
+            aria-valuemax={100}
+            aria-valuemin={0}
+            aria-valuenow={Math.round(progressPercent)}
             className='h-full bg-action-primary'
-            style={{ width: `${Math.min(100, total ? (job.progress.read / total) * 100 : 8)}%` }}
+            role='progressbar'
+            style={{ width: `${progressPercent}%` }}
           />
         </div>
         <div className='grid grid-cols-5 gap-2 font-mono text-text-secondary'>
@@ -144,6 +149,14 @@ function Detail({ label, value }: { readonly label: string; readonly value: stri
 function progressSummary(job: BackgroundJob): string {
   if (job.status === 'queued') return 'Waiting';
   return `read ${job.progress.read}, wrote ${job.progress.written}, deleted ${job.progress.deleted}`;
+}
+
+function jobProgressPercent(job: BackgroundJob): number {
+  const processed = job.progress.written + job.progress.deleted + job.progress.skipped
+    + job.progress.failed;
+  const total = Math.max(job.progress.read, processed);
+  if (total === 0) return 8;
+  return Math.min(100, Math.max(8, (processed / total) * 100));
 }
 
 function badgeVariant(status: BackgroundJob['status']) {

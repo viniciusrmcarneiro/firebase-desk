@@ -92,6 +92,16 @@ describe('CollectionJobDialog', () => {
       })
     );
   });
+
+  it('marks plain JSONL exports as export-only', () => {
+    renderDialog({ initialKind: 'export' });
+
+    fireEvent.change(screen.getByRole('combobox', { name: 'JSONL encoding' }), {
+      target: { value: 'plain' },
+    });
+
+    expect(screen.getByText(/Plain JSONL is export-only/)).toBeTruthy();
+  });
 });
 
 function renderDialog(

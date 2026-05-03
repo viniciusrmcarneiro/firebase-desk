@@ -25,6 +25,7 @@ interface RunningJob {
 
 export class MainBackgroundJobRepository implements BackgroundJobRepository {
   private readonly listeners = new Set<(event: BackgroundJobEvent) => void>();
+  private draining = false;
   private running: RunningJob | null = null;
 
   constructor(
@@ -137,9 +138,22 @@ export class MainBackgroundJobRepository implements BackgroundJobRepository {
   }
 
   private async drainQueue(): Promise<void> {
-    if (this.running) return;
-    const next = await this.store.oldestQueued();
-    if (!next) return;
+    if (this.draining || this.running) return;
+    this.draining = true;
+    try {
+      // oxlint-disable no-await-in-loop -- jobs must run one at a time in FIFO order.
+      while (!this.running) {
+        const next = await this.store.oldestQueued();
+        if (!next) return;
+        await this.runJob(next);
+      }
+      // oxlint-enable no-await-in-loop
+    } finally {
+      this.draining = false;
+    }
+  }
+
+  private async runJob(next: BackgroundJob): Promise<void> {
     this.running = { id: next.id, cancelRequested: false };
     const started = await this.updateJob(next.id, (job) => ({
       ...job,
@@ -149,7 +163,6 @@ export class MainBackgroundJobRepository implements BackgroundJobRepository {
     }));
     if (!started) {
       this.running = null;
-      void this.drainQueue();
       return;
     }
     try {
@@ -185,7 +198,6 @@ export class MainBackgroundJobRepository implements BackgroundJobRepository {
       if (finished) await this.recordFinalActivity(finished);
     } finally {
       this.running = null;
-      void this.drainQueue();
     }
   }
 

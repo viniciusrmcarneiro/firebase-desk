@@ -105,6 +105,7 @@ export class FirestoreCollectionJobRunner {
     const targetDb = await this.firestore(request.targetConnectionId);
     const batcher = new BatchWriter(targetDb);
     const progress = progressCounter();
+    let chunk: QueryDocumentSnapshot[] = [];
 
     for await (
       const doc of streamCollectionDocuments(
@@ -115,26 +116,28 @@ export class FirestoreCollectionJobRunner {
       )
     ) {
       assertNotCancelled(signal);
-      const relativePath = relativeDocumentPath(request.sourceCollectionPath, doc.ref.path);
-      const targetPath = `${request.targetCollectionPath}/${relativePath}`;
-      assertFirestoreDocumentPath(targetPath);
-      progress.read += 1;
-      progress.currentPath = doc.ref.path;
-      const shouldWrite = await shouldWriteDocument(
+      chunk.push(doc);
+      if (chunk.length < WRITE_BATCH_LIMIT) continue;
+      await this.copyDocumentChunk(
+        chunk,
+        request,
         targetDb,
-        targetPath,
-        request.collisionPolicy,
+        batcher,
+        progress,
+        signal,
+        sink,
       );
-      if (!shouldWrite) {
-        progress.skipped += 1;
-        await sink.update(progress);
-        continue;
-      }
-      batcher.set(targetPath, decodeAdminData(targetDb, encodeAdminData(doc.data())));
-      progress.written += 1;
-      await commitIfFull(batcher, signal);
-      await sink.update(progress);
+      chunk = [];
     }
+    await this.copyDocumentChunk(
+      chunk,
+      request,
+      targetDb,
+      batcher,
+      progress,
+      signal,
+      sink,
+    );
     assertNotCancelled(signal);
     await batcher.commit();
     await sink.update({ ...progress, currentPath: undefined });
@@ -214,7 +217,8 @@ export class FirestoreCollectionJobRunner {
       await endStream(stream);
       await sink.update({ ...progress, currentPath: undefined });
     } catch (error) {
-      stream.destroy();
+      await destroyStream(stream);
+      await unlink(request.filePath).catch(() => undefined);
       throw error;
     }
   }
@@ -261,8 +265,9 @@ export class FirestoreCollectionJobRunner {
       await unlink(tempPath).catch(() => undefined);
       await sink.update({ ...progress, currentPath: undefined });
     } catch (error) {
-      temp.destroy();
+      await destroyStream(temp);
       await unlink(tempPath).catch(() => undefined);
+      await unlink(request.filePath).catch(() => undefined);
       throw error;
     }
   }
@@ -281,6 +286,7 @@ export class FirestoreCollectionJobRunner {
     const progress = progressCounter();
     const input = createReadStream(request.filePath, { encoding: 'utf8' });
     const lines = createInterface({ crlfDelay: Infinity, input });
+    let chunk: Array<{ readonly data: Record<string, unknown>; readonly targetPath: string; }> = [];
     try {
       for await (const line of lines) {
         assertNotCancelled(signal);
@@ -288,19 +294,12 @@ export class FirestoreCollectionJobRunner {
         const item = parseImportLine(line);
         const targetPath = `${request.targetCollectionPath}/${item.path}`;
         assertFirestoreDocumentPath(targetPath);
-        progress.read += 1;
-        progress.currentPath = targetPath;
-        const shouldWrite = await shouldWriteDocument(db, targetPath, request.collisionPolicy);
-        if (!shouldWrite) {
-          progress.skipped += 1;
-          await sink.update(progress);
-          continue;
-        }
-        batcher.set(targetPath, decodeAdminData(db, item.data));
-        progress.written += 1;
-        await commitIfFull(batcher, signal);
-        await sink.update(progress);
+        chunk.push({ data: item.data, targetPath });
+        if (chunk.length < WRITE_BATCH_LIMIT) continue;
+        await writeImportChunk(db, chunk, batcher, request.collisionPolicy, progress, signal, sink);
+        chunk = [];
       }
+      await writeImportChunk(db, chunk, batcher, request.collisionPolicy, progress, signal, sink);
       assertNotCancelled(signal);
       await batcher.commit();
       await sink.update({ ...progress, currentPath: undefined });
@@ -311,6 +310,45 @@ export class FirestoreCollectionJobRunner {
 
   private async firestore(connectionId: string): Promise<Firestore> {
     return (await this.provider.getFirestoreConnection(connectionId)).db;
+  }
+
+  private async copyDocumentChunk(
+    docs: ReadonlyArray<QueryDocumentSnapshot>,
+    request: Extract<FirestoreCollectionJobRequest, { readonly type: 'firestore.copyCollection'; }>,
+    targetDb: Firestore,
+    batcher: BatchWriter,
+    progress: MutableProgress,
+    signal: JobCancellationSignal,
+    sink: JobProgressSink,
+  ): Promise<void> {
+    if (docs.length === 0) return;
+    const targets = docs.map((doc) => {
+      const relativePath = relativeDocumentPath(request.sourceCollectionPath, doc.ref.path);
+      const targetPath = `${request.targetCollectionPath}/${relativePath}`;
+      assertFirestoreDocumentPath(targetPath);
+      return { doc, targetPath };
+    });
+    const writable = await writableTargetPaths(
+      targetDb,
+      targets.map((target) => target.targetPath),
+      request.collisionPolicy,
+    );
+    // oxlint-disable no-await-in-loop -- progress and batch commits must stay ordered.
+    for (const { doc, targetPath } of targets) {
+      assertNotCancelled(signal);
+      progress.read += 1;
+      progress.currentPath = doc.ref.path;
+      if (!writable.has(targetPath)) {
+        progress.skipped += 1;
+        await sink.update(progress);
+        continue;
+      }
+      batcher.set(targetPath, decodeAdminData(targetDb, encodeAdminData(doc.data())));
+      progress.written += 1;
+      await commitIfFull(batcher, signal);
+      await sink.update(progress);
+    }
+    // oxlint-enable no-await-in-loop
   }
 }
 
@@ -408,16 +446,61 @@ async function* streamDirectCollectionDocuments(
   }
 }
 
-async function shouldWriteDocument(
+async function writeImportChunk(
   db: Firestore,
-  path: string,
+  items: ReadonlyArray<{ readonly data: Record<string, unknown>; readonly targetPath: string; }>,
+  batcher: BatchWriter,
   policy: FirestoreJobCollisionPolicy,
-): Promise<boolean> {
-  if (policy === 'overwrite') return true;
-  const exists = (await db.doc(path).get()).exists;
-  if (!exists) return true;
-  if (policy === 'skip') return false;
-  throw new Error(`Target document already exists: ${path}`);
+  progress: MutableProgress,
+  signal: JobCancellationSignal,
+  sink: JobProgressSink,
+): Promise<void> {
+  if (items.length === 0) return;
+  const writable = await writableTargetPaths(
+    db,
+    items.map((item) => item.targetPath),
+    policy,
+  );
+  // oxlint-disable no-await-in-loop -- progress and batch commits must stay ordered.
+  for (const item of items) {
+    assertNotCancelled(signal);
+    progress.read += 1;
+    progress.currentPath = item.targetPath;
+    if (!writable.has(item.targetPath)) {
+      progress.skipped += 1;
+      await sink.update(progress);
+      continue;
+    }
+    batcher.set(item.targetPath, decodeAdminData(db, item.data));
+    progress.written += 1;
+    await commitIfFull(batcher, signal);
+    await sink.update(progress);
+  }
+  // oxlint-enable no-await-in-loop
+}
+
+async function writableTargetPaths(
+  db: Firestore,
+  paths: ReadonlyArray<string>,
+  policy: FirestoreJobCollisionPolicy,
+): Promise<ReadonlySet<string>> {
+  if (policy === 'overwrite') return new Set(paths);
+  const existing = await existingTargetPaths(db, paths);
+  if (policy === 'fail' && existing.size > 0) {
+    throw new Error(`Target document already exists: ${Array.from(existing)[0]}`);
+  }
+  return new Set(paths.filter((path) => !existing.has(path)));
+}
+
+async function existingTargetPaths(
+  db: Firestore,
+  paths: ReadonlyArray<string>,
+): Promise<ReadonlySet<string>> {
+  if (paths.length === 0) return new Set();
+  const snapshots = await db.getAll(...paths.map((path) => db.doc(path)));
+  return new Set(
+    snapshots.flatMap((snapshot, index) => snapshot.exists ? [paths[index] as string] : []),
+  );
 }
 
 function parseImportLine(
@@ -531,7 +614,8 @@ async function writeCsvFromTemp(
     }
     await endStream(output);
   } catch (error) {
-    output.destroy();
+    await destroyStream(output);
+    await unlink(filePath).catch(() => undefined);
     throw error;
   }
 }
@@ -547,6 +631,18 @@ async function writeLine(stream: NodeJS.WritableStream, line: string): Promise<v
 async function endStream(stream: NodeJS.WritableStream): Promise<void> {
   stream.end();
   await once(stream, 'finish');
+}
+
+async function destroyStream(stream: NodeJS.WritableStream): Promise<void> {
+  const writable = stream as NodeJS.WritableStream & {
+    readonly closed?: boolean;
+    readonly destroyed?: boolean;
+    destroy: () => void;
+  };
+  if (writable.closed) return;
+  const closed = once(stream, 'close').catch(() => undefined);
+  if (!writable.destroyed) writable.destroy();
+  await closed;
 }
 
 function isPlainObject(value: unknown): value is Record<string, unknown> {

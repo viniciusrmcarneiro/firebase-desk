@@ -48,6 +48,29 @@ describe('JobsDrawer', () => {
     expect(drawer.className).toContain('grid-rows-[auto_minmax(0,1fr)]');
     expect(drawer.className).toContain('h-[70vh]');
   });
+
+  it('does not double-count skipped or failed rows in progress', () => {
+    render(
+      <JobsDrawer
+        jobs={[{
+          ...job,
+          progress: { deleted: 0, failed: 1, read: 3, skipped: 1, written: 1 },
+          status: 'succeeded',
+        }]}
+        open
+        onCancel={vi.fn()}
+        onClearCompleted={vi.fn()}
+        onClose={vi.fn()}
+        onExpandedChange={vi.fn()}
+      />,
+    );
+
+    expect(
+      screen.getByRole('progressbar', { name: 'Copy collection progress' }).getAttribute(
+        'aria-valuenow',
+      ),
+    ).toBe('100');
+  });
 });
 
 const job: BackgroundJob = {

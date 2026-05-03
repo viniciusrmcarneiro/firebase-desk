@@ -290,10 +290,18 @@ export function CollectionJobDialog(
                         onChange={(event) =>
                           setEncoding(event.currentTarget.value as FirestoreJsonlExportEncoding)}
                       >
-                        <option value='encoded'>Firebase Desk encoded values</option>
-                        <option value='plain'>Plain JSON values</option>
+                        <option value='encoded'>Firebase Desk encoded values (importable)</option>
+                        <option value='plain'>Plain JSON values (export only)</option>
                       </select>
                     </label>
+                  )
+                  : null}
+                {format === 'jsonl' && encoding === 'plain'
+                  ? (
+                    <InlineAlert variant='warning'>
+                      Plain JSONL is export-only. Use encoded JSONL when the file will be imported
+                      back into Firebase Desk.
+                    </InlineAlert>
                   )
                   : null}
               </>
