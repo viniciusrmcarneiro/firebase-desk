@@ -70,6 +70,7 @@ export function VirtualTable<T>(
   }: VirtualTableProps<T>,
 ) {
   const parentRef = useRef<HTMLDivElement>(null);
+  const lastPrimaryClickKeyRef = useRef<Key | null>(null);
   const [isResizingColumn, setIsResizingColumn] = useState(false);
   const resolvedRowHeight = rowHeight ?? densityTokens[density].rowHeight;
   const tableWidth = tableContentWidth(columns);
@@ -168,6 +169,7 @@ export function VirtualTable<T>(
           const item = rows[row.index];
           if (item === undefined) return null;
           const rowKey = getRowKey?.(item, row.index) ?? row.key;
+          const doubleClickHandler = onRowDoubleClick ?? onRowClick;
           const rowElement = (
             <div
               aria-rowindex={row.index + 2}
@@ -189,8 +191,21 @@ export function VirtualTable<T>(
                 height: resolvedRowHeight,
               }}
               tabIndex={onRowClick ? 0 : undefined}
-              onClick={() => onRowClick?.(item)}
-              onDoubleClick={() => onRowDoubleClick?.(item)}
+              onClick={(event) => {
+                if (event.detail > 1) return;
+                lastPrimaryClickKeyRef.current = rowKey;
+                onRowClick?.(item);
+              }}
+              onDoubleClick={(event) => {
+                if (!doubleClickHandler) return;
+                if (!onRowDoubleClick && lastPrimaryClickKeyRef.current === rowKey) {
+                  lastPrimaryClickKeyRef.current = null;
+                  return;
+                }
+                event.preventDefault();
+                lastPrimaryClickKeyRef.current = null;
+                doubleClickHandler(item);
+              }}
               onKeyDown={(event) => {
                 handleRowKeyDown({
                   event,

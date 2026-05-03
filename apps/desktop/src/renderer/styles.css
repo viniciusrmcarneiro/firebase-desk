@@ -18,6 +18,11 @@
     color: var(--color-text-primary);
     font-family: var(--font-family-sans);
     font-size: var(--font-size-base);
+    user-select: none;
+  }
+
+  :where(input, textarea, [contenteditable='true'], .select-text, .select-text *, .monaco-editor, .monaco-editor *) {
+    user-select: text;
   }
 
   :where(button, a, [role='button'], [role='treeitem'], [role='tab'], [role='menuitem'], input, select, textarea):focus-visible {

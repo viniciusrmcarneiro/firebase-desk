@@ -135,7 +135,8 @@ export function VirtualTree(
                 width: '100%',
                 transform: `translateY(${row.start}px)`,
               }}
-              onClick={() => {
+              onClick={(event) => {
+                if (event.detail > 1) return;
                 setFocusedIndex(row.index);
                 onSelect?.(node.id);
                 if (node.hasChildren) onToggle(node.id);

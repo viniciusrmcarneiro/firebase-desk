@@ -192,7 +192,7 @@ function ActivityDetail({ label, value }: { readonly label: string; readonly val
   return (
     <div className='grid grid-cols-[80px_minmax(0,1fr)] gap-2'>
       <span className='text-text-muted'>{label}</span>
-      <span className='min-w-0 break-all font-mono text-text-secondary'>{value}</span>
+      <span className='min-w-0 select-text break-all font-mono text-text-secondary'>{value}</span>
     </div>
   );
 }
@@ -211,7 +211,7 @@ function JsonBlock({ label, value }: { readonly label: string; readonly value: u
           )
           : null}
       </span>
-      <pre className='max-h-32 overflow-auto rounded-md border border-border-subtle bg-bg-panel p-2 font-mono text-xs text-text-secondary'>
+      <pre className='max-h-32 select-text overflow-auto rounded-md border border-border-subtle bg-bg-panel p-2 font-mono text-xs text-text-secondary'>
         {text}
         {truncated ? '\n… (truncated)' : null}
       </pre>

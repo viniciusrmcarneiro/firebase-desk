@@ -32,7 +32,7 @@ export function NestedValueTree(
 ) {
   const actionProps = { document, onDeleteField, onEditField, onSetFieldNull, onSetFieldValue };
   return (
-    <div className='max-h-[48vh] overflow-auto rounded-md border border-border-subtle font-mono text-xs'>
+    <div className='max-h-[48vh] select-text overflow-auto rounded-md border border-border-subtle font-mono text-xs'>
       {Object.entries(value).map(([key, entry]) => (
         <NestedValueNode
           key={key}

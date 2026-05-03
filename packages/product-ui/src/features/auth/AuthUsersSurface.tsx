@@ -335,7 +335,7 @@ function DetailItem({ label, value }: { readonly label: string; readonly value: 
 
 function JsonPreview({ value }: { readonly value: unknown; }) {
   return (
-    <pre className='overflow-auto rounded-md border border-border-subtle bg-bg-subtle p-3 font-mono text-xs leading-relaxed text-text-secondary'>
+    <pre className='select-text overflow-auto rounded-md border border-border-subtle bg-bg-subtle p-3 font-mono text-xs leading-relaxed text-text-secondary'>
       {JSON.stringify(value, null, 2)}
     </pre>
   );

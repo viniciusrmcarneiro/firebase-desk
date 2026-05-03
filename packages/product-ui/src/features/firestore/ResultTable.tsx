@@ -85,6 +85,7 @@ export function ResultTable(
         cell: ({ row }) => (
           <code
             aria-label={`Document ID ${row.original.document.id}`}
+            className='select-text'
             title={row.original.document.id}
           >
             {row.original.document.id}
@@ -93,7 +94,7 @@ export function ResultTable(
       },
       ...fieldColumns.map((field) => ({
         id: field,
-        header: () => <code>{field}</code>,
+        header: () => <code className='select-text'>{field}</code>,
         width: 160,
         minWidth: 96,
         cell: ({ row }) => {

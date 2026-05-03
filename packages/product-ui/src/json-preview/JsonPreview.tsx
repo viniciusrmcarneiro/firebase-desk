@@ -61,7 +61,7 @@ export function JsonPreview(
   return (
     <pre
       className={cn(
-        'h-full min-h-0 overflow-auto rounded-md border border-border-subtle bg-bg-subtle p-3 font-mono text-xs leading-relaxed text-text-secondary',
+        'h-full min-h-0 select-text overflow-auto rounded-md border border-border-subtle bg-bg-subtle p-3 font-mono text-xs leading-relaxed text-text-secondary',
         className,
       )}
     >

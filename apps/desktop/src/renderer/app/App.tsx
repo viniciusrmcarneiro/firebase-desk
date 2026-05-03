@@ -170,5 +170,8 @@ async function loadAppConfig(): Promise<AppConfig> {
   if (typeof window !== 'undefined' && window.firebaseDesk?.app?.getConfig) {
     return await window.firebaseDesk.app.getConfig();
   }
+  if (import.meta.env.DEV) {
+    return { appVersion: 'dev-browser', dataMode: 'mock' };
+  }
   throw new Error('Firebase Desk preload app API is unavailable.');
 }

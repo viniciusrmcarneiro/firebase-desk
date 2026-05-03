@@ -154,7 +154,7 @@ function FieldCatalogTable(
 ) {
   if (!fields.length) return <EmptyState title='No fields' />;
   return (
-    <div className='overflow-auto'>
+    <div className='select-text overflow-auto'>
       <table className='w-full min-w-[360px] border-collapse text-xs'>
         <thead>
           <tr className='border-b border-border-subtle bg-bg-subtle text-left text-text-muted'>
@@ -212,7 +212,9 @@ function SelectionPreview(
   return (
     <div className='grid gap-2 p-3'>
       <div className='grid gap-2'>
-        <div className='min-w-0 font-mono text-xs text-text-secondary'>{document.path}</div>
+        <div className='min-w-0 select-text font-mono text-xs text-text-secondary'>
+          {document.path}
+        </div>
         <div className='flex flex-wrap items-center gap-1'>
           <Badge>{Object.keys(document.data).length} fields</Badge>
           {document.hasSubcollections === true ? <Badge>subcollections</Badge> : null}

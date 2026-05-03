@@ -171,12 +171,17 @@ function ExplorerTreeRow<TNode extends ExplorerTreeRowModel>(
       aria-expanded={node.hasChildren ? Boolean(node.expanded) : undefined}
       aria-level={node.level + 1}
       ref={rowRef}
-      onClick={() => {
+      onClick={(event) => {
+        if (event.detail > 1) return;
         setFocusedIndex(index);
         onSelect?.(node.id);
         if (node.hasChildren) onToggle(node.id);
       }}
-      onDoubleClick={() => onOpen?.(node.id)}
+      onDoubleClick={(event) => {
+        if (!onOpen) return;
+        event.preventDefault();
+        onOpen(node.id);
+      }}
       onKeyDown={(event) => onKeyDown(event, index, node)}
     >
       <span>
