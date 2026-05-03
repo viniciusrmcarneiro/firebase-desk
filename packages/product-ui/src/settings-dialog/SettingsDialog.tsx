@@ -14,6 +14,7 @@ import { useAppearance } from '../appearance/AppearanceProvider.tsx';
 import { messageFromError } from '../shared/errors.ts';
 
 export interface SettingsDialogProps {
+  readonly appVersion: string;
   readonly dataDirectoryPath?: string | null | undefined;
   readonly density?: DensityName | undefined;
   readonly onOpenChange: (open: boolean) => void;
@@ -36,6 +37,7 @@ const BYTES_PER_MB = 1024 * 1024;
 
 export function SettingsDialog(
   {
+    appVersion,
     dataDirectoryPath,
     density,
     onDensityChange,
@@ -362,7 +364,8 @@ export function SettingsDialog(
         </div>
         <div className='grid gap-1 rounded-md border border-border-subtle bg-bg-subtle p-3 text-sm'>
           <div className='font-medium text-text-primary'>About</div>
-          <div className='text-text-secondary'>Firebase Desk, MIT license.</div>
+          <SettingRow label='Version' value={appVersion} />
+          <SettingRow label='License' value='MIT' />
         </div>
       </DialogContent>
     </Dialog>

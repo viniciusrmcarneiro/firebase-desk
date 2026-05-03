@@ -92,6 +92,7 @@ function SettingsDialogStory() {
   const [density, setDensity] = useState<DensityName>('compact');
   return (
     <SettingsDialog
+      appVersion='0.1.0'
       density={density}
       open
       onDensityChange={setDensity}

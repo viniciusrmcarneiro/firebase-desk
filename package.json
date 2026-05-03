@@ -1,6 +1,6 @@
 {
   "name": "firebase-desk",
-  "version": "0.0.0",
+  "version": "0.0.1",
   "private": true,
   "description": "Firebase Desk monorepo root.",
   "license": "MIT",
@@ -18,7 +18,8 @@
     "test": "turbo run test test:repo-invariants",
     "test:boundaries": "tsx scripts/check-package-boundaries.ts",
     "test:desktop-packaging": "tsx scripts/check-desktop-packaging-contract.ts",
-    "test:repo-invariants": "pnpm test:boundaries && pnpm test:desktop-packaging",
+    "test:release-version": "tsx scripts/check-release-version.ts",
+    "test:repo-invariants": "pnpm test:boundaries && pnpm test:desktop-packaging && pnpm test:release-version",
     "test:coverage": "turbo run test:coverage test:repo-invariants",
     "test:packaged": "pnpm --dir e2e test:packaged",
     "coverage:summary": "node scripts/coverage-summary.mjs",
@@ -32,7 +33,9 @@
     "storybook": "pnpm --filter @firebase-desk/storybook dev",
     "test:e2e": "pnpm --dir e2e test:e2e",
     "test:smoke": "pnpm --dir e2e test:withEmulators",
-    "package": "pnpm --filter @firebase-desk/desktop package"
+    "package": "pnpm --filter @firebase-desk/desktop package",
+    "release:manifest": "tsx scripts/write-release-manifest.ts",
+    "package-managers:manifests": "tsx scripts/write-package-manager-manifests.ts"
   },
   "devDependencies": {
     "@types/node": "24.12.2",

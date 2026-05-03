@@ -66,7 +66,11 @@ export const IPC_CHANNELS = {
   },
   'app.config': {
     request: z.object({}),
-    response: z.object({ dataDirectory: z.string(), dataMode: DataModeSchema }),
+    response: z.object({
+      appVersion: z.string(),
+      dataDirectory: z.string(),
+      dataMode: DataModeSchema,
+    }),
   },
   'app.openDataDirectory': {
     request: z.object({}),

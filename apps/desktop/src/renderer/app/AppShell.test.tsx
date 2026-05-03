@@ -127,7 +127,7 @@ function renderShell(
     <RepositoryProvider repositories={repositories}>
       <HotkeysProvider settings={repositories.settings}>
         <AppearanceProvider settings={repositories.settings}>
-          <AppShell dataMode={dataMode} />
+          <AppShell appVersion='0.1.0' dataMode={dataMode} />
         </AppearanceProvider>
       </HotkeysProvider>
     </RepositoryProvider>,

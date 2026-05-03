@@ -379,6 +379,7 @@ function createInput(
     activeTab: tab,
     addProjectOpen: false,
     appearance: { mode: 'system', resolvedTheme: 'dark' },
+    appVersion: '0.1.0',
     authTab: authTabFacade,
     canOpenDataDirectory: true,
     closeWorkspaceTabs: closeWorkspaceTabsCommand,

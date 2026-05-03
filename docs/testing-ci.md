@@ -17,7 +17,8 @@ This doc explains how testing runs in CI, release, and package validation. Test 
 
 - `ci.yml`: install (pnpm), run `pnpm format:check`, `pnpm lint`, `pnpm typecheck`, `pnpm test:coverage`, publish the coverage summary, then `pnpm build`.
 - `e2e.yml`: install, build affected workspaces, start Firebase emulators, seed data, run `pnpm test:e2e`, upload traces/screenshots on failure.
-- `release.yml`: on PR, merge to `main`, tag, or ad-hoc dispatch, run CI checks and `pnpm package` for the desktop app. PRs always package Linux, and package macOS/Windows when the PR has the `package-all` label or touches package-sensitive paths (`apps/desktop/**`, `e2e/**`, release workflows, package scripts, or lockfile). Linux, macOS, and Windows all run the packaged smoke check against the built app. PR and ad-hoc runs upload temporary workflow artifacts with retention. Merges to `main` create or update the rolling published prerelease `latest` with release assets and SHA-256 checksums. Version tags create published prereleases with release assets and SHA-256 checksums.
+- `release-gate.yml`: on PRs to `main`, require `apps/desktop/package.json` to change unless the PR title includes `[skip release]`.
+- `release.yml`: on PR, merge to `main`, tag, or ad-hoc dispatch, run CI checks and `pnpm package` for the desktop app. PRs always package Linux, and package macOS/Windows when the PR has the `package-all` label or touches package-sensitive paths (`apps/desktop/**`, `e2e/**`, release workflows, package scripts, or lockfile). Linux, macOS, and Windows all run the packaged smoke check against the built app. PR and ad-hoc runs upload temporary workflow artifacts with retention. Merges to `main` create or update the rolling published prerelease `latest` only when the desktop package version changed. Version tags create stable releases with release assets, SHA-256 checksums, `release-manifest.json`, and package manager manifest artifacts.
 
 ### Required Scripts (root `package.json`, delegated via turbo/pnpm filters)
 
@@ -29,6 +30,7 @@ This doc explains how testing runs in CI, release, and package validation. Test 
 - `pnpm test`
 - `pnpm test:boundaries`
 - `pnpm test:desktop-packaging`
+- `pnpm test:release-version`
 - `pnpm test:coverage`
 - `pnpm test:e2e`
 - `pnpm build`
@@ -57,8 +59,10 @@ This doc explains how testing runs in CI, release, and package validation. Test 
 - Release workflow must exist before the first packaged build is considered done.
 - PR package outputs are workflow artifacts only, not GitHub Release assets.
 - PR and manual package artifacts use short retention; main and tag artifacts use longer retention.
-- Every merge to `main` updates the rolling published prerelease `latest`; keep its tag stable and update assets instead of deleting/recreating the release.
-- Version tags create separate published prereleases.
+- Merges to `main` with a desktop version change update the rolling published prerelease `latest`; keep its tag stable and update assets instead of deleting/recreating the release.
+- Merges to `main` without a desktop version change do not publish a rolling release.
+- Version tags create separate published stable releases.
+- Version tags must match `apps/desktop/package.json`.
 - Unsigned builds are published intentionally with SHA-256 checksums; binary signing is not planned.
-- Package-manager distribution is deferred until the direct release path is stable.
+- Package-manager distribution starts with self-owned Homebrew and Scoop manifests generated from versioned releases.
 - First release phase validates unsigned app warnings and install/open smoke on each OS before Firebase feature work continues.

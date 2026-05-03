@@ -37,6 +37,7 @@ Safety note: binaries are published as unsigned development builds with SHA-256 
 - [docs/design-system.md](docs/design-system.md)
 - [docs/project-structure.md](docs/project-structure.md)
 - [docs/release-checklist.md](docs/release-checklist.md)
+- [docs/package-managers.md](docs/package-managers.md)
 - [docs/testing-ci.md](docs/testing-ci.md)
 
 ## Local Scripts ↔ GitHub Actions
@@ -59,23 +60,27 @@ The Docker wrapper runs the Ubuntu image as `linux/amd64` and grants the Chromiu
 
 ## Release Workflow
 
-Firebase Desk publishes unsigned development binaries with SHA-256 checksums. We do not plan to sign binaries; package-manager distribution can come later.
+Firebase Desk publishes unsigned binaries with SHA-256 checksums. We do not plan to sign binaries; package-manager distribution starts with self-owned Homebrew and Scoop manifests.
 
 | Event           | Output                                                                                                                   |
 | --------------- | ------------------------------------------------------------------------------------------------------------------------ |
 | PR to `main`    | CI, package Linux; package macOS/Windows when `package-all` or package paths change; upload temporary workflow artifacts |
-| Merge to `main` | CI, package macOS/Windows/Linux, publish/update prerelease `latest`                                                      |
-| Tag `v*.*.*`    | CI, package macOS/Windows/Linux, publish versioned prerelease                                                            |
+| Merge to `main` | CI, package macOS/Windows/Linux, publish/update prerelease `latest` when the desktop version changed                     |
+| Tag `v*.*.*`    | CI, package macOS/Windows/Linux, publish a stable versioned release                                                      |
 | Manual dispatch | Ad-hoc package smoke run with temporary workflow artifacts                                                               |
 
-Use PR artifacts to block broken packaging before merge. Use GitHub Release assets from `latest` and version tags as the long-lived download links. The rolling `latest` tag is created once and kept stable; the release assets and notes are updated on each merge.
+Use PR artifacts to block broken packaging before merge. Use GitHub Release assets from `latest` and version tags as the long-lived download links. The rolling `latest` tag is created once and kept stable; the release assets and notes are updated only when the desktop package version changes.
+
+Pull requests to `main` must change `apps/desktop/package.json` version unless the title includes `[skip release]`. Version tags must match the desktop package version, for example `v0.1.0` requires `apps/desktop/package.json` version `0.1.0`.
 
 ## Downloads
 
 - Rolling dev build: <https://github.com/viniciusrmcarneiro/firebase-desk/releases/tag/latest>
-- Versioned prereleases: <https://github.com/viniciusrmcarneiro/firebase-desk/releases>
+- Versioned releases: <https://github.com/viniciusrmcarneiro/firebase-desk/releases>
 
 Artifact names include channel/version, OS, architecture, and target extension. PR and manual-dispatch artifacts are temporary workflow artifacts, not release assets. Each package artifact set includes a matching `SHA256SUMS*.txt` file.
+
+Versioned releases also include `release-manifest.json`. Tag workflows generate Homebrew cask and Scoop manifests as workflow artifacts for self-owned package manager distribution.
 
 ## Checksums
 
@@ -93,4 +98,4 @@ Run that command in the directory containing the downloaded binary and matching 
 - Windows: SmartScreen may warn on the installer or zip app. For local smoke testing, use `More info > Run anyway`.
 - Linux: AppImage builds may need `chmod +x Firebase\ Desk-*.AppImage`; `.deb` builds can be installed with `sudo apt install ./Firebase\ Desk-*.deb`.
 
-Signing, notarization, and Windows code-signing are intentionally out of scope. Package-manager distribution is a later improvement. See [docs/release-checklist.md](docs/release-checklist.md).
+Signing, notarization, and Windows code-signing are intentionally out of scope. Package managers provide checksums and update paths, not signing. See [docs/release-checklist.md](docs/release-checklist.md).
