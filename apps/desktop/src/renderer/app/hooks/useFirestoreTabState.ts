@@ -248,10 +248,7 @@ export function useFirestoreTabState(
   }
 
   function clearTab(tabId: string) {
-    updateQueryState((current) => {
-      const cleared = firestoreTabCleared(current, tabId);
-      return activeTab?.id === tabId ? { ...cleared, errorMessage: null } : cleared;
-    });
+    updateQueryState((current) => firestoreTabCleared(current, tabId));
     selectDocument(tabId, null);
   }
 
