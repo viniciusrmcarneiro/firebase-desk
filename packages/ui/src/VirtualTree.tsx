@@ -8,6 +8,7 @@ import {
   useRef,
   useState,
 } from 'react';
+import { preventRepeatedMouseSelection } from './preventRepeatedMouseSelection.ts';
 import { visibleVirtualRows } from './virtualRows.ts';
 
 export interface VirtualTreeNode {
@@ -135,13 +136,19 @@ export function VirtualTree(
                 width: '100%',
                 transform: `translateY(${row.start}px)`,
               }}
-              onClick={() => {
+              className='select-none'
+              onClick={(event) => {
+                if (event.detail > 1) return;
                 setFocusedIndex(row.index);
                 onSelect?.(node.id);
                 if (node.hasChildren) onToggle(node.id);
               }}
-              onDoubleClick={() => onOpen?.(node.id)}
+              onDoubleClick={(event) => {
+                event.preventDefault();
+                onOpen?.(node.id);
+              }}
               onKeyDown={(e) => handleKeyDown(e, row.index, node)}
+              onMouseDown={preventRepeatedMouseSelection}
             >
               {renderNode
                 ? renderNode(node)

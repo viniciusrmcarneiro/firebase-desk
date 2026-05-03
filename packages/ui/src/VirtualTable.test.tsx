@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { createEvent, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@tanstack/react-virtual', () => ({
@@ -111,5 +111,31 @@ describe('VirtualTable', () => {
 
     expect(onRowClick).toHaveBeenCalledWith(rows[0]);
     expect(document.activeElement).toBe(dataRows[1]);
+  });
+
+  it('uses row click as the double-click action when no double-click action is provided', () => {
+    const onRowClick = vi.fn();
+    render(
+      <VirtualTable
+        rows={rows}
+        columns={columns}
+        onRowClick={onRowClick}
+        rowHeight={24}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getAllByRole('row')[1]!);
+
+    expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+  });
+
+  it('prevents repeated mouse down from selecting row text', () => {
+    render(<VirtualTable rows={rows} columns={columns} rowHeight={24} />);
+
+    const row = screen.getAllByRole('row')[1]!;
+    const event = createEvent.mouseDown(row, { detail: 2 });
+    fireEvent(row, event);
+
+    expect(event.defaultPrevented).toBe(true);
   });
 });

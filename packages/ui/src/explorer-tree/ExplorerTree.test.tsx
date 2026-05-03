@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { createEvent, fireEvent, render, screen } from '@testing-library/react';
 import { FileText } from 'lucide-react';
 import { describe, expect, it, vi } from 'vitest';
 import { ExplorerTree, type ExplorerTreeRowModel } from './ExplorerTree.tsx';
@@ -185,5 +185,16 @@ describe('ExplorerTree', () => {
     );
 
     expect(document.activeElement).toBe(button);
+  });
+
+  it('marks rows non-selectable and prevents repeated mouse selection', () => {
+    render(<ExplorerTree rows={rows} onToggle={vi.fn()} />);
+
+    const row = screen.getByRole('treeitem', { name: /one/ });
+    const event = createEvent.mouseDown(row, { detail: 2 });
+    fireEvent(row, event);
+
+    expect(row.className).toContain('select-none');
+    expect(event.defaultPrevented).toBe(true);
   });
 });

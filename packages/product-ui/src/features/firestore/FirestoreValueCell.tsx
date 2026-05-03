@@ -22,14 +22,14 @@ export function FirestoreValueCell({ value }: { readonly value: unknown; }): Rea
     const plain = plainValueSummary(value);
     if (!plain) return formatFirestoreValue(value);
     return (
-      <span className='font-mono text-xs text-text-primary' title={plain.title}>
+      <span className='select-text font-mono text-xs text-text-primary' title={plain.title}>
         {plain.value}
       </span>
     );
   }
   return (
     <span
-      className='inline-flex max-w-full items-center gap-1.5 overflow-hidden align-middle'
+      className='inline-flex max-w-full select-text items-center gap-1.5 overflow-hidden align-middle'
       title={typed.title ?? typed.value}
     >
       <span className='shrink-0 rounded border border-border-subtle bg-bg-subtle px-1 py-0.5 font-mono text-[10px] leading-none text-text-muted'>

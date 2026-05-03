@@ -1,4 +1,4 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { createEvent, fireEvent, render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 
 vi.mock('@tanstack/react-virtual', () => ({
@@ -121,6 +121,17 @@ describe('VirtualTree', () => {
     fireEvent.keyDown(screen.getAllByRole('treeitem')[0]!, { key: 'ArrowUp' });
     expect(screen.getAllByRole('treeitem').map((i) => i.getAttribute('tabindex')))
       .toEqual(['0', '-1', '-1']);
+  });
+
+  it('marks tree rows non-selectable and prevents repeated mouse selection', () => {
+    render(<VirtualTree flattenedNodes={nodes} rowHeight={20} onToggle={() => {}} />);
+
+    const row = screen.getAllByRole('treeitem')[0]!;
+    const event = createEvent.mouseDown(row, { detail: 2 });
+    fireEvent(row, event);
+
+    expect(row.className).toContain('select-none');
+    expect(event.defaultPrevented).toBe(true);
   });
 
   it('moves focus with Home / End', () => {

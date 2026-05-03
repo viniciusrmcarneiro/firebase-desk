@@ -10,6 +10,7 @@ import {
 } from 'react';
 import { cn } from '../cn.ts';
 import { ContextMenu, ContextMenuTrigger } from '../context-menu/index.ts';
+import { preventRepeatedMouseSelection } from '../preventRepeatedMouseSelection.ts';
 import { VirtualList } from '../VirtualList.tsx';
 
 export interface ExplorerTreeRowModel {
@@ -164,20 +165,25 @@ function ExplorerTreeRow<TNode extends ExplorerTreeRowModel>(
 
   const row = (
     <div
-      className='grid grid-cols-[16px_16px_minmax(140px,0.8fr)_minmax(160px,1fr)_112px_auto] items-center gap-2 border-b border-border-subtle pr-3 text-text-primary transition-colors hover:bg-action-ghost-hover'
+      className='grid select-none grid-cols-[16px_16px_minmax(140px,0.8fr)_minmax(160px,1fr)_112px_auto] items-center gap-2 border-b border-border-subtle pr-3 text-text-primary transition-colors hover:bg-action-ghost-hover'
       role='treeitem'
       tabIndex={focused ? 0 : -1}
       style={{ minHeight: rowHeight, paddingLeft: 12 + node.level * 22 }}
       aria-expanded={node.hasChildren ? Boolean(node.expanded) : undefined}
       aria-level={node.level + 1}
       ref={rowRef}
-      onClick={() => {
+      onClick={(event) => {
+        if (event.detail > 1) return;
         setFocusedIndex(index);
         onSelect?.(node.id);
         if (node.hasChildren) onToggle(node.id);
       }}
-      onDoubleClick={() => onOpen?.(node.id)}
+      onDoubleClick={(event) => {
+        event.preventDefault();
+        onOpen?.(node.id);
+      }}
       onKeyDown={(event) => onKeyDown(event, index, node)}
+      onMouseDown={preventRepeatedMouseSelection}
     >
       <span>
         {node.hasChildren

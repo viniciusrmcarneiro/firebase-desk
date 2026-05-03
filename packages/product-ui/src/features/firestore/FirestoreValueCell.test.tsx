@@ -54,7 +54,7 @@ describe('FirestoreValueCell', () => {
   it('renders plain objects with compact content previews', () => {
     render(<FirestoreValueCell value={{ nested: true }} />);
 
-    expect(screen.getByText('{"nested":true}')).toBeTruthy();
+    expect(screen.getByText('{"nested":true}').className).toContain('select-text');
     expect(screen.getByTitle('{"nested":true}')).toBeTruthy();
   });
 
