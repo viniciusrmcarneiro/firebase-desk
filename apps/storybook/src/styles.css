@@ -18,6 +18,10 @@
     font-size: var(--font-size-base);
   }
 
+  :where(input, textarea, code, pre, [contenteditable='true'], .select-text) {
+    user-select: text;
+  }
+
   :where(button, a, [role='button'], [role='treeitem'], [role='tab'], [role='menuitem'], input, select, textarea):focus-visible {
     outline: none;
     box-shadow: var(--focus-ring-shadow);

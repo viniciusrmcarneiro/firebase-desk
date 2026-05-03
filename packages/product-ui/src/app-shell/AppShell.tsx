@@ -13,7 +13,7 @@ export function AppShell({ className, sidebar, statusBar, titlebar, workspace }:
   return (
     <div
       className={cn(
-        'flex h-full flex-col bg-bg-app text-text-primary',
+        'flex h-full select-none flex-col bg-bg-app text-text-primary',
         className,
       )}
     >

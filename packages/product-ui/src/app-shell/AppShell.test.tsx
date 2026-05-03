@@ -10,5 +10,6 @@ describe('AppShell', () => {
     expect(container.textContent).toContain('Sidebar');
     expect(container.textContent).toContain('Workspace');
     expect(container.textContent).toContain('Status');
+    expect(container.firstElementChild?.className).toContain('select-none');
   });
 });
