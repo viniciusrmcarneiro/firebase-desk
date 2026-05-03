@@ -113,4 +113,13 @@ const api = {
 
 export type DesktopApi = typeof api;
 
+function setPlatformDataset(): void {
+  document.documentElement.dataset.platform = process.platform;
+}
+
+setPlatformDataset();
+if (document.readyState === 'loading') {
+  window.addEventListener('DOMContentLoaded', setPlatformDataset, { once: true });
+}
+
 contextBridge.exposeInMainWorld('firebaseDesk', api);

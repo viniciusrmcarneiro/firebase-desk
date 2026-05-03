@@ -31,8 +31,9 @@ export function AppHeader(
   }: AppHeaderProps,
 ) {
   return (
-    <header className='flex min-w-0 items-center gap-2 border-b border-border-subtle bg-bg-panel px-2'>
-      <div className='flex h-full shrink-0 items-center gap-1 border-r border-border-subtle pr-2'>
+    <header className='app-region-drag native-titlebar flex min-w-0 items-center gap-2 border-b border-border-subtle bg-bg-panel px-2'>
+      <span className='native-titlebar-traffic-spacer shrink-0' aria-hidden='true' />
+      <div className='app-region-no-drag flex h-full shrink-0 items-center gap-1 border-r border-border-subtle pr-2'>
         <IconButton
           disabled={!canGoBack}
           icon={<ArrowLeft size={14} aria-hidden='true' />}
@@ -57,7 +58,7 @@ export function AppHeader(
         <strong className='truncate text-sm font-semibold text-text-primary'>Firebase Desk</strong>
         <Badge variant={dataMode === 'live' ? 'warning' : 'neutral'}>{dataMode}</Badge>
       </div>
-      <div className='ml-auto flex shrink-0 items-center gap-2'>
+      <div className='app-region-no-drag ml-auto flex shrink-0 items-center gap-2'>
         <Button variant='secondary' onClick={onOpenSettings}>
           <Settings size={14} aria-hidden='true' /> Settings
         </Button>
