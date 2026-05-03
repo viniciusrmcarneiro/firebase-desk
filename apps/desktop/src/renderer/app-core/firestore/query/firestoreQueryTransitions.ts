@@ -37,7 +37,6 @@ export function firestoreQueryStarted(
         ...state.queryRequests,
         [input.tabId]: { limit: input.limit, query: input.query, runId },
       },
-      resultsStale: false,
       selectedDocumentPaths: input.clearSelection
         ? omitKey(state.selectedDocumentPaths, input.tabId)
         : state.selectedDocumentPaths,
@@ -145,7 +144,6 @@ export function firestoreRefreshSucceeded(
   return {
     ...firestoreQuerySucceeded(state, tabId, pages, hasMore),
     pendingPageReloads: omitKey(state.pendingPageReloads, tabId),
-    resultsStale: false,
   };
 }
 
@@ -177,7 +175,6 @@ export function firestoreSubcollectionsLoaded(
 ): FirestoreQueryRuntimeState {
   return {
     ...state,
-    pages: mergeSubcollectionsIntoPages(state.pages, documentPath, subcollections),
     resultsByTab: Object.fromEntries(
       Object.entries(state.resultsByTab).map(([tabId, result]) => [
         tabId,
@@ -210,7 +207,7 @@ export function firestoreResultsMarkedStale(
   if (tabId) {
     return updateTabResult(state, tabId, (current) => ({ ...current, resultsStale: true }));
   }
-  return { ...state, resultsStale: true };
+  return updateAllTabResults(state, (current) => ({ ...current, resultsStale: true }));
 }
 
 export function firestoreResultsRefreshed(
@@ -220,7 +217,7 @@ export function firestoreResultsRefreshed(
   if (tabId) {
     return updateTabResult(state, tabId, (current) => ({ ...current, resultsStale: false }));
   }
-  return { ...state, resultsStale: false };
+  return updateAllTabResults(state, (current) => ({ ...current, resultsStale: false }));
 }
 
 export function firestorePendingPageReloadCleared(
@@ -310,13 +307,18 @@ function updateTabResult(
   const nextResult = update(state.resultsByTab[tabId] ?? emptyFirestoreQueryResultState());
   return {
     ...state,
-    errorMessage: nextResult.errorMessage,
-    hasMore: nextResult.hasMore,
-    isFetchingMore: nextResult.isFetchingMore,
-    isLoading: nextResult.isLoading,
-    pages: nextResult.pages,
     resultsByTab: { ...state.resultsByTab, [tabId]: nextResult },
-    resultView: nextResult.resultView,
-    resultsStale: nextResult.resultsStale,
+  };
+}
+
+function updateAllTabResults(
+  state: FirestoreQueryRuntimeState,
+  update: (current: FirestoreQueryResultState) => FirestoreQueryResultState,
+): FirestoreQueryRuntimeState {
+  return {
+    ...state,
+    resultsByTab: Object.fromEntries(
+      Object.entries(state.resultsByTab).map(([tabId, result]) => [tabId, update(result)]),
+    ),
   };
 }

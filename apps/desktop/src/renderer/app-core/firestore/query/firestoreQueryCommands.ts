@@ -369,7 +369,7 @@ async function loadDocumentPage(
   env: FirestoreQueryExecutionEnvironment,
   connectionId: string,
   path: string,
-): Promise<FirestoreQueryRuntimeState['pages']> {
+): Promise<ReadonlyArray<FirestoreQueryPage>> {
   const document = await env.getDocument(connectionId, path);
   return document ? [{ items: [document] }] : [];
 }
@@ -379,7 +379,7 @@ async function loadQueryPages(
   query: FirestoreQuery,
   limit: number,
   pagesToLoad: number,
-): Promise<FirestoreQueryRuntimeState['pages']> {
+): Promise<ReadonlyArray<FirestoreQueryPage>> {
   const pages: FirestoreQueryPage[] = [];
   let cursor: PageRequest['cursor'] | undefined;
   do {

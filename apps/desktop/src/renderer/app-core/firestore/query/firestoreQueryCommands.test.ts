@@ -17,6 +17,7 @@ import {
   refreshFirestoreQueryCommand,
   runFirestoreQueryCommand,
 } from './firestoreQueryCommands.ts';
+import { selectFirestoreTabResultState } from './firestoreQuerySelectors.ts';
 import { createInitialFirestoreQueryRuntimeState } from './firestoreQueryState.ts';
 
 describe('firestore query commands', () => {
@@ -104,7 +105,7 @@ describe('firestore query commands', () => {
       },
     );
     expect(collectionResult.shouldFetchNextPage).toBe(true);
-    expect(collectionResult.state.isFetchingMore).toBe(true);
+    expect(resultFor(collectionResult.state, tab.id).isFetchingMore).toBe(true);
 
     const documentState = createInitialFirestoreQueryRuntimeState();
     expect(loadMoreFirestoreQueryCommand(documentState, {
@@ -359,21 +360,31 @@ describe('firestore query commands', () => {
         subcollections: [{ id: 'events', path: 'orders/ord_1/events' }],
       },
     );
-    expect(state.pages).toEqual([]);
+    expect(resultFor(state, tab.id).pages).toEqual([]);
 
     const withPage = loadFirestoreSubcollectionsCommand(
       {
         ...createInitialFirestoreQueryRuntimeState(),
-        pages: [{
-          items: [{ data: {}, hasSubcollections: true, id: 'ord_1', path: 'orders/ord_1' }],
-        }],
+        resultsByTab: {
+          [tab.id]: {
+            errorMessage: null,
+            hasMore: false,
+            isFetchingMore: false,
+            isLoading: false,
+            pages: [{
+              items: [{ data: {}, hasSubcollections: true, id: 'ord_1', path: 'orders/ord_1' }],
+            }],
+            resultView: 'table',
+            resultsStale: false,
+          },
+        },
       },
       {
         documentPath: 'orders/ord_1',
         subcollections: [{ id: 'events', path: 'orders/ord_1/events' }],
       },
     );
-    expect(withPage.pages[0]?.items[0]?.subcollections).toEqual([{
+    expect(resultFor(withPage, tab.id).pages[0]?.items[0]?.subcollections).toEqual([{
       id: 'events',
       path: 'orders/ord_1/events',
     }]);
@@ -433,6 +444,13 @@ describe('firestore query commands', () => {
     });
   });
 });
+
+function resultFor(
+  state: ReturnType<typeof createInitialFirestoreQueryRuntimeState>,
+  tabId: string,
+) {
+  return selectFirestoreTabResultState(state, { id: tabId, kind: 'firestore-query' });
+}
 
 const tab = {
   connectionId: 'emu',
