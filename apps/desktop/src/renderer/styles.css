@@ -29,8 +29,17 @@
     -webkit-app-region: no-drag;
   }
 
+  :where(.native-titlebar-traffic-spacer) {
+    display: none;
+  }
+
   :root[data-platform='darwin'] :where(.native-titlebar) {
-    padding-left: 5rem;
+    padding-left: 0.5rem;
+  }
+
+  :root[data-platform='darwin'] :where(.native-titlebar-traffic-spacer) {
+    display: block;
+    width: 6.25rem;
   }
 
   :where(input, textarea, [contenteditable='true'], .select-text, .select-text *, .monaco-editor, .monaco-editor *) {
