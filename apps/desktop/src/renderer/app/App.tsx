@@ -70,7 +70,6 @@ export function App() {
 
   const handleDataModeChange = useCallback((nextDataMode: DataMode) => {
     setBootError(null);
-    setAppVersion(null);
     setSnapshot(null);
     setDataMode(nextDataMode);
   }, []);
