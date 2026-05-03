@@ -31,6 +31,15 @@ describe('useJobsController', () => {
       badge: { label: '1', variant: 'danger' },
       variant: 'warning',
     });
+
+    act(() => {
+      result.current.open();
+    });
+
+    expect(result.current.button).toMatchObject({
+      badge: { label: '1', variant: 'warning' },
+      variant: 'secondary',
+    });
   });
 
   it('starts, cancels, and clears through the repository with status updates', async () => {
