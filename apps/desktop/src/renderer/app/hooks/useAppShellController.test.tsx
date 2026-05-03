@@ -1,5 +1,5 @@
 import { createProjectFixture } from '@firebase-desk/repo-mocks';
-import { renderHook } from '@testing-library/react';
+import { renderHook, waitFor } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { AppShellController, AppShellOrchestratorInput } from '../appShellOrchestrator.ts';
 import type { RepositorySet } from '../RepositoryProvider.tsx';
@@ -235,6 +235,28 @@ describe('useAppShellController', () => {
       }),
     );
   });
+
+  it('handles settings load failure when restoring density', async () => {
+    const scenario = createScenario({
+      repositories: createRepositories({
+        load: vi.fn(async () => {
+          throw new Error('settings unreadable');
+        }),
+      }),
+    });
+    setupMocks(scenario);
+
+    renderHook(() => useAppShellController());
+
+    await waitFor(() => {
+      expect(mocks.createAppShellController).toHaveBeenLastCalledWith(
+        expect.objectContaining({
+          density: 'compact',
+          lastAction: 'Settings load failed: settings unreadable',
+        }),
+      );
+    });
+  });
 });
 
 interface Scenario {
@@ -353,7 +375,13 @@ function createScenario(
 }
 
 function createRepositories(
-  { save = vi.fn() }: { readonly save?: (patch: unknown) => unknown; } = {},
+  {
+    load = vi.fn(async () => ({ density: 'compact' as const })),
+    save = vi.fn(),
+  }: {
+    readonly load?: () => Promise<{ readonly density: 'compact'; }>;
+    readonly save?: (patch: unknown) => unknown;
+  } = {},
 ) {
   return {
     activity: {},
@@ -370,7 +398,7 @@ function createRepositories(
     },
     projects: {},
     scriptRunner: {},
-    settings: { save },
+    settings: { load, save },
   } as unknown as RepositorySet;
 }
 
@@ -497,6 +525,7 @@ function createJsTab({ scripts = {} }: { readonly scripts?: Record<string, strin
   return {
     cancelScript: vi.fn(() => false),
     clearTab: vi.fn(),
+    clearTabRuntime: vi.fn(),
     isRunning: false,
     isTabRunning: vi.fn(() => false),
     runScript: vi.fn(() => false),
@@ -551,6 +580,7 @@ function createProjectsQuery(project: ReturnType<typeof createProjectFixture>) {
 
 function createSettings() {
   return {
+    changeDensity: vi.fn(),
     changeTheme: vi.fn(),
     dataDirectoryPath: null,
     open: false,

@@ -177,6 +177,33 @@ exports[`generateThemesCss > generates the CSS variable contract 1`] = `
   --scrollbar-thumb-hover: var(--color-border-strong);
   --scrollbar-track: transparent;
   --scrollbar-size: 10px;
+  --density-control-height: var(--density-compact-control-height);
+  --density-row-height: var(--density-compact-row-height);
+  --density-tree-row-height: var(--density-compact-tree-row-height);
+  --density-tab-height: var(--density-compact-tab-height);
+  --density-toolbar-height: var(--density-compact-toolbar-height);
+  --density-panel-padding: var(--density-compact-panel-padding);
+  --density-icon-size: var(--density-compact-icon-size);
+}
+
+:root[data-density="compact"] {
+  --density-control-height: var(--density-compact-control-height);
+  --density-row-height: var(--density-compact-row-height);
+  --density-tree-row-height: var(--density-compact-tree-row-height);
+  --density-tab-height: var(--density-compact-tab-height);
+  --density-toolbar-height: var(--density-compact-toolbar-height);
+  --density-panel-padding: var(--density-compact-panel-padding);
+  --density-icon-size: var(--density-compact-icon-size);
+}
+
+:root[data-density="comfortable"] {
+  --density-control-height: var(--density-comfortable-control-height);
+  --density-row-height: var(--density-comfortable-row-height);
+  --density-tree-row-height: var(--density-comfortable-tree-row-height);
+  --density-tab-height: var(--density-comfortable-tab-height);
+  --density-toolbar-height: var(--density-comfortable-toolbar-height);
+  --density-panel-padding: var(--density-comfortable-panel-padding);
+  --density-icon-size: var(--density-comfortable-icon-size);
 }
 
 @media (prefers-reduced-motion: reduce) {

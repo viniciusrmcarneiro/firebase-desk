@@ -151,7 +151,6 @@ export function AppWorkspacePanel(
                     projects={projects}
                     onConnectionChange={onConnectionChange}
                   />
-                  <Badge variant={activeProject.target}>{activeProject.target}</Badge>
                   <IconButton
                     disabled={activeTabIsRefreshing}
                     icon={

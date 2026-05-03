@@ -16,7 +16,7 @@ export function SidebarShell({ children, className, footer, title }: SidebarShel
         className,
       )}
     >
-      <div className='flex h-[var(--density-compact-toolbar-height)] items-center border-b border-border-subtle px-2 text-sm font-semibold'>
+      <div className='flex h-[var(--density-toolbar-height)] items-center border-b border-border-subtle px-2 text-sm font-semibold'>
         {title}
       </div>
       <div className='min-h-0 overflow-auto p-2'>{children}</div>

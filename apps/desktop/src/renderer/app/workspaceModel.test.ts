@@ -59,11 +59,13 @@ describe('workspaceModel', () => {
       filters: [
         { id: 'filter-1', field: 'count', op: '>=', value: '2' },
         { id: 'filter-2', field: 'name', op: '==', value: 'Ada' },
-        { id: 'filter-3', field: '', op: '==', value: 'ignored' },
+        { id: 'filter-3', field: 'archivedAt', op: '==', value: 'null' },
+        { id: 'filter-4', field: '', op: '==', value: 'ignored' },
       ],
     })).toEqual([
       { field: 'count', op: '>=', value: 2 },
       { field: 'name', op: '==', value: 'Ada' },
+      { field: 'archivedAt', op: '==', value: null },
     ]);
   });
 

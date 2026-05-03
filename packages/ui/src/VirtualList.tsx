@@ -7,7 +7,7 @@ import { visibleVirtualRows } from './virtualRows.ts';
 export interface VirtualListProps<T> {
   readonly items: ReadonlyArray<T>;
   readonly className?: string;
-  readonly density?: DensityName;
+  readonly density?: DensityName | undefined;
   readonly estimateSize?: (index: number) => number;
   readonly getItemKey?: (item: T, index: number) => Key;
   readonly itemClassName?: string | ((item: T, index: number) => string | undefined);

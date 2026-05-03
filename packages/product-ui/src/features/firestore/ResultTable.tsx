@@ -1,3 +1,4 @@
+import type { DensityName } from '@firebase-desk/design-tokens';
 import type { FirestoreDocumentResult, SettingsRepository } from '@firebase-desk/repo-contracts';
 import { Button, DataTable, type DataTableColumn, EmptyState } from '@firebase-desk/ui';
 import { RotateCcw } from 'lucide-react';
@@ -10,6 +11,7 @@ import { useResultTableLayout } from './resultTableLayout.ts';
 import { renderSubcollectionButtons } from './SubcollectionControls.tsx';
 
 export interface ResultTableProps {
+  readonly density?: DensityName | undefined;
   readonly hasMore: boolean;
   readonly isFetchingMore: boolean;
   readonly onDeleteDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
@@ -36,6 +38,7 @@ const FIELD_OVERFLOW_COLUMN_ID = '__field_overflow__';
 
 export function ResultTable(
   {
+    density,
     hasMore,
     isFetchingMore,
     onDeleteDocument,
@@ -161,6 +164,7 @@ export function ResultTable(
         columnLayout={layout}
         columns={columns}
         data={tableRows}
+        density={density}
         emptyState={<EmptyState title='No documents' />}
         enableColumnReorder
         enableColumnResize

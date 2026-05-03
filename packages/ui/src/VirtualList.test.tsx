@@ -40,6 +40,19 @@ describe('VirtualList', () => {
     expect(screen.getAllByTestId('row').map((r) => r.textContent)).toEqual(['0:x', '1:y']);
   });
 
+  it('uses density row height when no estimate size is provided', () => {
+    render(
+      <VirtualList
+        density='comfortable'
+        items={['x', 'y']}
+        renderItem={(item) => <span data-testid='row'>{item}</span>}
+      />,
+    );
+
+    const rowWrappers = screen.getAllByTestId('row').map((row) => row.parentElement);
+    expect(rowWrappers[1]?.style.transform).toBe('translateY(36px)');
+  });
+
   it('applies container and item classes', () => {
     const { container } = render(
       <VirtualList

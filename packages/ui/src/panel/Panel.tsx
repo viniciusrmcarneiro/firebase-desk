@@ -20,7 +20,7 @@ export function PanelHeader({ actions, children, className, ...props }: PanelHea
   return (
     <header
       className={cn(
-        'flex h-[var(--density-compact-toolbar-height)] items-center justify-between gap-2 border-b border-border-subtle px-2',
+        'flex h-[var(--density-toolbar-height)] items-center justify-between gap-2 border-b border-border-subtle px-2',
         className,
       )}
       {...props}
@@ -34,7 +34,7 @@ export function PanelHeader({ actions, children, className, ...props }: PanelHea
 export function PanelBody({ className, ...props }: HTMLAttributes<HTMLDivElement>) {
   return (
     <div
-      className={cn('min-h-0 overflow-auto p-[var(--density-compact-panel-padding)]', className)}
+      className={cn('min-h-0 overflow-auto p-[var(--density-panel-padding)]', className)}
       {...props}
     />
   );

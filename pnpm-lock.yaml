@@ -384,6 +384,9 @@ importers:
 
   packages/ipc-schemas:
     dependencies:
+      '@firebase-desk/design-tokens':
+        specifier: workspace:*
+        version: link:../design-tokens
       '@firebase-desk/repo-contracts':
         specifier: workspace:*
         version: link:../repo-contracts
@@ -493,6 +496,10 @@ importers:
         version: 4.1.5(@opentelemetry/api@1.9.1)(@types/node@24.12.2)(@vitest/coverage-v8@4.1.5)(jsdom@29.0.2)(vite@8.0.10(@types/node@24.12.2)(esbuild@0.27.7)(jiti@2.6.1)(tsx@4.21.0)(yaml@2.8.3))
 
   packages/repo-contracts:
+    dependencies:
+      '@firebase-desk/design-tokens':
+        specifier: workspace:*
+        version: link:../design-tokens
     devDependencies:
       '@firebase-desk/config-oxlint':
         specifier: workspace:*

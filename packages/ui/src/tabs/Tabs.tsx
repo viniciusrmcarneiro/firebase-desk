@@ -24,7 +24,7 @@ export const TabsTrigger = forwardRef<
   <TabsPrimitive.Trigger
     ref={ref}
     className={cn(
-      'flex h-[var(--density-compact-tab-height)] items-center border-b-2 border-transparent px-3 text-sm text-text-secondary data-[state=active]:border-action-primary data-[state=active]:bg-action-selected data-[state=active]:text-text-primary',
+      'flex h-[var(--density-tab-height)] items-center border-b-2 border-transparent px-3 text-sm text-text-secondary data-[state=active]:border-action-primary data-[state=active]:bg-action-selected data-[state=active]:text-text-primary',
       className,
     )}
     {...props}

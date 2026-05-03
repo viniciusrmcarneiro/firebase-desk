@@ -20,7 +20,7 @@ export const buttonVariants = cva(
       },
       size: {
         xs: 'h-[var(--density-compact-control-height)] px-2 text-xs',
-        sm: 'h-[var(--density-compact-control-height)] px-2.5 text-sm',
+        sm: 'h-[var(--density-control-height)] px-2.5 text-sm',
         md: 'h-[var(--density-comfortable-control-height)] px-3 text-sm',
       },
       density: {

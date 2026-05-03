@@ -1,3 +1,4 @@
+import type { DensityName } from '@firebase-desk/design-tokens';
 import type { AuthUser } from '@firebase-desk/repo-contracts';
 import {
   Badge,
@@ -23,6 +24,7 @@ import { useMediaQuery } from '../../hooks/useMediaQuery.ts';
 import { messageFromError } from '../../shared/errors.ts';
 
 export interface AuthUsersSurfaceProps {
+  readonly density?: DensityName | undefined;
   readonly errorMessage?: string | null;
   readonly filterValue: string;
   readonly hasMore: boolean;
@@ -41,6 +43,7 @@ export interface AuthUsersSurfaceProps {
 
 export function AuthUsersSurface(
   {
+    density: tableDensity,
     filterValue,
     errorMessage = null,
     hasMore,
@@ -100,6 +103,7 @@ export function AuthUsersSurface(
                 )
                 : null}
               <AuthUsersTable
+                density={tableDensity}
                 hasMore={hasMore}
                 isFetchingMore={isFetchingMore}
                 isLoading={isLoading}
@@ -128,6 +132,7 @@ export function AuthUsersSurface(
 }
 
 interface AuthUsersTableProps {
+  readonly density?: DensityName | undefined;
   readonly hasMore: boolean;
   readonly isFetchingMore: boolean;
   readonly isLoading: boolean;
@@ -141,6 +146,7 @@ type AuthUsersTableRow = { readonly kind: 'user'; readonly user: AuthUser; };
 
 function AuthUsersTable(
   {
+    density,
     hasMore,
     isFetchingMore,
     isLoading,
@@ -207,6 +213,7 @@ function AuthUsersTable(
       <DataTable
         columns={columns}
         data={rows}
+        density={density}
         getRowId={(row) => row.user.uid}
         rowClassName={(row) =>
           row.user.uid === selectedUserId

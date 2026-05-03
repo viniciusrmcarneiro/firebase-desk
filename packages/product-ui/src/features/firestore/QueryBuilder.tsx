@@ -40,7 +40,7 @@ const filterOps: ReadonlyArray<FirestoreFilterOp> = [
 ];
 
 const selectClassName =
-  'h-[var(--density-compact-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary disabled:cursor-not-allowed disabled:opacity-60';
+  'h-[var(--density-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary disabled:cursor-not-allowed disabled:opacity-60';
 
 export function QueryBuilder(
   {
@@ -152,7 +152,7 @@ export function QueryBuilder(
                   {filters.map((filter, index) => (
                     <div
                       key={filter.id}
-                      className='grid grid-cols-[minmax(140px,1fr)_130px_minmax(140px,1fr)_auto] items-center gap-2'
+                      className='grid grid-cols-[minmax(140px,1fr)_130px_minmax(140px,1fr)_auto_auto] items-center gap-2'
                     >
                       <FieldAutocompleteInput
                         ariaLabel={`Filter ${index + 1} field`}
@@ -179,11 +179,20 @@ export function QueryBuilder(
                         aria-label={`Filter ${index + 1} value`}
                         className='font-mono'
                         disabled={isLoading}
-                        placeholder='value'
+                        placeholder='value, JSON, or null'
                         value={filter.value}
                         onChange={(event) =>
                           updateFilter(index, { value: event.currentTarget.value })}
                       />
+                      <Button
+                        disabled={isLoading}
+                        size='xs'
+                        title='Set filter value to JSON null'
+                        variant={filter.value.trim() === 'null' ? 'primary' : 'secondary'}
+                        onClick={() => updateFilter(index, { value: 'null' })}
+                      >
+                        Null
+                      </Button>
                       <IconButton
                         disabled={isLoading}
                         icon={<X size={14} aria-hidden='true' />}

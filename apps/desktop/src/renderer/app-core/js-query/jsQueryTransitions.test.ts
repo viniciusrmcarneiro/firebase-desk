@@ -7,6 +7,7 @@ import {
   jsQueryRunStarted,
   jsQuerySourceChanged,
   jsQueryTabCleared,
+  jsQueryTabRuntimeCleared,
 } from './jsQueryTransitions.ts';
 
 const result: ScriptRunResult = {
@@ -132,5 +133,21 @@ describe('jsQueryTransitions', () => {
     expect(state.activeRuns['tab-1']).toBeUndefined();
     expect(state.runIds['tab-1']).toBeUndefined();
     expect(state.scripts['tab-1']).toBeUndefined();
+  });
+
+  it('clears tab runtime without removing its script source', () => {
+    const running = jsQueryRunStarted(createInitialJsQueryState({ scripts: { 'tab-1': 'x' } }), {
+      connectionId: 'emu',
+      runId: 'run-1',
+      source: 'x',
+      startedAt: 100,
+      tabId: 'tab-1',
+    });
+
+    const state = jsQueryTabRuntimeCleared(running, 'tab-1');
+
+    expect(state.activeRuns['tab-1']).toBeUndefined();
+    expect(state.runIds['tab-1']).toBeUndefined();
+    expect(state.scripts['tab-1']).toBe('x');
   });
 });

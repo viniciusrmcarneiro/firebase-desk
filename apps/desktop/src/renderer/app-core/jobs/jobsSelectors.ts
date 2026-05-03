@@ -12,8 +12,12 @@ export interface JobsButtonModel {
 export function selectJobsButtonModel(state: JobsState): JobsButtonModel {
   const activeCount =
     state.jobs.filter((job) => job.status === 'queued' || job.status === 'running').length;
+  const acknowledgedIssueIds = new Set(state.acknowledgedIssueJobIds);
   const failedCount =
-    state.jobs.filter((job) => job.status === 'failed' || job.status === 'interrupted').length;
+    state.jobs.filter((job) =>
+      (job.status === 'failed' || job.status === 'interrupted')
+      && !acknowledgedIssueIds.has(job.id)
+    ).length;
   if (failedCount > 0) {
     return { badge: { label: String(failedCount), variant: 'danger' }, variant: 'warning' };
   }

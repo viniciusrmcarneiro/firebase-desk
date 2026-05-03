@@ -26,7 +26,7 @@ export interface FieldEditModalProps {
 }
 
 const selectClassName =
-  'h-[var(--density-compact-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary disabled:cursor-not-allowed disabled:opacity-60';
+  'h-[var(--density-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary disabled:cursor-not-allowed disabled:opacity-60';
 
 export function FieldEditModal(
   { onOpenChange, onSaveField, open, target }: FieldEditModalProps,

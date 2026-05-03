@@ -17,7 +17,7 @@ export function TabStrip({ activeTabId, className, onSelectTab, tabs }: TabStrip
   return (
     <div
       className={cn(
-        'flex h-[var(--density-compact-tab-height)] items-end border-b border-border-subtle bg-bg-panel',
+        'flex h-[var(--density-tab-height)] items-end border-b border-border-subtle bg-bg-panel',
         className,
       )}
       role='tablist'

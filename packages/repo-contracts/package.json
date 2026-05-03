@@ -17,6 +17,9 @@
     "test": "vitest run --passWithNoTests",
     "build": "tsc -b tsconfig.build.json --force"
   },
+  "dependencies": {
+    "@firebase-desk/design-tokens": "workspace:*"
+  },
   "devDependencies": {
     "@firebase-desk/config-oxlint": "workspace:*",
     "@firebase-desk/config-tsconfig": "workspace:*",

@@ -1,3 +1,17 @@
+export const densityNames = ['compact', 'comfortable'] as const;
+
+export type DensityName = (typeof densityNames)[number];
+
+interface DensityTokens {
+  readonly controlHeight: number;
+  readonly rowHeight: number;
+  readonly treeRowHeight: number;
+  readonly tabHeight: number;
+  readonly toolbarHeight: number;
+  readonly panelPadding: number;
+  readonly iconSize: number;
+}
+
 export const density = {
   compact: {
     controlHeight: 28,
@@ -17,8 +31,6 @@ export const density = {
     panelPadding: 12,
     iconSize: 18,
   },
-} as const;
-
-export type DensityName = keyof typeof density;
+} as const satisfies Record<DensityName, DensityTokens>;
 
 export const defaultDensity: DensityName = 'compact';

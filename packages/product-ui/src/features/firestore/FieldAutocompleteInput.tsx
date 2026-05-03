@@ -36,7 +36,7 @@ export interface FieldAutocompleteInputProps {
 }
 
 const inputClassName =
-  'h-[var(--density-compact-control-height)] w-full rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-action-primary focus:ring-2 focus:ring-action-primary/20 disabled:cursor-not-allowed disabled:opacity-60';
+  'h-[var(--density-control-height)] w-full rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary outline-none transition-colors placeholder:text-text-muted focus:border-action-primary focus:ring-2 focus:ring-action-primary/20 disabled:cursor-not-allowed disabled:opacity-60';
 
 export function FieldAutocompleteInput(
   {

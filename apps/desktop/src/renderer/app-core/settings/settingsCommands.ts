@@ -1,5 +1,5 @@
-import type { AppearanceMode } from '@firebase-desk/design-tokens';
-import type { ActivityLogAppendInput } from '@firebase-desk/repo-contracts';
+import type { AppearanceMode, DensityName } from '@firebase-desk/design-tokens';
+import type { ActivityLogAppendInput, SettingsRepository } from '@firebase-desk/repo-contracts';
 import { messageFromError } from '../shared/errors.ts';
 import { elapsedMs } from '../shared/time.ts';
 import { settingsPatchMetadata, settingsPatchSummary } from './settingsSelectors.ts';
@@ -40,6 +40,49 @@ export async function changeAppearanceModeCommand(
       durationMs: elapsedMs(startedAt, env.now()),
       error: { message },
       metadata: { mode: input.mode },
+      status: 'failure',
+      summary: message,
+      target: { type: 'settings' },
+    });
+  }
+}
+
+export interface ChangeDensityInput {
+  readonly density: DensityName;
+  readonly settings: SettingsRepository;
+  readonly setDensity: (density: DensityName) => void;
+}
+
+export async function changeDensityCommand(
+  env: SettingsCommandEnvironment,
+  input: ChangeDensityInput,
+): Promise<void> {
+  const startedAt = env.now();
+  let previousDensity: DensityName | null = null;
+  try {
+    previousDensity = (await input.settings.load()).density;
+    input.setDensity(input.density);
+    const snapshot = await input.settings.save({ density: input.density });
+    input.setDensity(snapshot.density);
+    void env.recordActivity({
+      action: 'Change density',
+      area: 'settings',
+      durationMs: elapsedMs(startedAt, env.now()),
+      metadata: { density: snapshot.density },
+      status: 'success',
+      summary: `Density changed to ${snapshot.density}`,
+      target: { type: 'settings' },
+    });
+  } catch (error) {
+    if (previousDensity) input.setDensity(previousDensity);
+    const message = messageFromError(error, 'Could not change density.');
+    env.onStatus?.(`Density failed: ${message}`);
+    void env.recordActivity({
+      action: 'Change density',
+      area: 'settings',
+      durationMs: elapsedMs(startedAt, env.now()),
+      error: { message },
+      metadata: { density: input.density },
       status: 'failure',
       summary: message,
       target: { type: 'settings' },

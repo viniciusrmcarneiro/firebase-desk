@@ -3,8 +3,13 @@ import { describe, expect, it } from 'vitest';
 import { TargetModeBadge } from './TargetModeBadge.tsx';
 
 describe('TargetModeBadge', () => {
-  it('renders production target text', () => {
-    render(<TargetModeBadge mode='production' />);
-    expect(screen.getByText('Target: Production')).toBeDefined();
+  it('does not render a production label', () => {
+    const { container } = render(<TargetModeBadge mode='production' />);
+    expect(container.textContent).toBe('');
+  });
+
+  it('only flags emulator targets', () => {
+    render(<TargetModeBadge mode='emulator' />);
+    expect(screen.getByText('Emulator')).toBeDefined();
   });
 });

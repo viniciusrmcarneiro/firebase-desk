@@ -1,4 +1,4 @@
-import { StatusBar, TargetModeBadge } from '@firebase-desk/product-ui';
+import { StatusBar } from '@firebase-desk/product-ui';
 import type { ProjectSummary } from '@firebase-desk/repo-contracts';
 import { Badge, Button } from '@firebase-desk/ui';
 import { BriefcaseBusiness, ListChecks } from 'lucide-react';
@@ -45,17 +45,29 @@ export function AppStatusBar(
     <StatusBar
       left={
         <>
-          {activeProject ? <TargetModeBadge mode={activeProject.target} /> : null}
-          <span>{activeProject?.name ?? 'No project'}</span>
-          <span>{activeProject?.projectId ?? 'No project id'}</span>
-          <span>{activeTabTitle}</span>
-          <span>{selectedTreeItemId ?? 'No tree selection'}</span>
+          <span className='min-w-0 shrink truncate' title={activeProject?.name ?? 'No project'}>
+            {activeProject?.name ?? 'No project'}
+          </span>
+          <span
+            className='min-w-0 shrink truncate'
+            title={activeProject?.projectId ?? 'No project id'}
+          >
+            {activeProject?.projectId ?? 'No project id'}
+          </span>
+          <span className='min-w-0 shrink truncate' title={activeTabTitle}>{activeTabTitle}</span>
+          <span
+            className='min-w-0 shrink truncate'
+            title={selectedTreeItemId ?? 'No tree selection'}
+          >
+            {selectedTreeItemId ?? 'No tree selection'}
+          </span>
         </>
       }
       right={
         <>
           <Button
             aria-pressed={jobsOpen}
+            className='shrink-0 whitespace-nowrap'
             size='xs'
             variant={jobsButtonVariant}
             onClick={onJobsToggle}
@@ -66,6 +78,7 @@ export function AppStatusBar(
           </Button>
           <Button
             aria-pressed={activityOpen}
+            className='shrink-0 whitespace-nowrap'
             size='xs'
             variant={activityButtonVariant}
             onClick={onActivityToggle}
@@ -76,7 +89,7 @@ export function AppStatusBar(
               ? <Badge variant={activityBadge.variant}>{activityBadge.label}</Badge>
               : null}
           </Button>
-          <span>{lastAction}</span>
+          <span className='min-w-0 truncate' title={lastAction}>{lastAction}</span>
         </>
       }
     />

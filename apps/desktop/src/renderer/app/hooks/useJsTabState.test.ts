@@ -243,6 +243,43 @@ describe('useJsTabState', () => {
     expect(result.current.scripts[tabId]).toBeUndefined();
   });
 
+  it('clears running output without dropping the tab script source', async () => {
+    vi.mocked(scriptRunner.run).mockReturnValue(new Promise(() => {}));
+    const tabId = tabActions.openTab({ kind: 'js-query', connectionId: 'emu' });
+    const tab = tabsStore.state.tabs.find((item) => item.id === tabId)!;
+    const { result } = renderHook(() =>
+      useJsTabState({
+        activeTab: tab,
+        recordActivity,
+        selectedTreeItemId: 'script:emu',
+      })
+    );
+
+    act(() => result.current.setScriptSource('yield project.projectId;'));
+    act(() => {
+      expect(result.current.runScript()).toBe(true);
+    });
+    const runId = scriptRunRequest(scriptRunner.run).runId;
+    act(() =>
+      listener?.({
+        type: 'output',
+        runId,
+        item: { id: 'yield-1', label: 'before switch', badge: 'string', view: 'json', value: 'x' },
+      })
+    );
+
+    await act(async () => {
+      result.current.clearTabRuntime(tabId);
+      await Promise.resolve();
+    });
+
+    expect(scriptRunner.cancel).toHaveBeenCalledWith(runId);
+    expect(result.current.isRunning).toBe(false);
+    expect(result.current.scriptResult).toBeUndefined();
+    expect(result.current.scriptSource).toBe('yield project.projectId;');
+    expect(result.current.scripts[tabId]).toBe('yield project.projectId;');
+  });
+
   it('keeps running state and start time scoped by tab', () => {
     vi.mocked(scriptRunner.run).mockReturnValue(new Promise(() => {}));
     const firstTabId = tabActions.openTab({ kind: 'js-query', connectionId: 'emu' });

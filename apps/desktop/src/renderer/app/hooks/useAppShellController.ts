@@ -1,4 +1,4 @@
-import type { DensityName } from '@firebase-desk/design-tokens';
+import { defaultDensity, type DensityName } from '@firebase-desk/design-tokens';
 import { useAppearance } from '@firebase-desk/product-ui';
 import { useSelector } from '@tanstack/react-store';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -52,7 +52,7 @@ export function useAppShellController(
     ?? tabsState.tabs[0];
   const activeProject = activeTab ? resolveProject(projects, activeTab.connectionId) : null;
 
-  const [density, setDensity] = useState<DensityName>('compact');
+  const [density, setDensity] = useState<DensityName>(defaultDensity);
   const [addProjectOpen, setAddProjectOpen] = useState(false);
   const [editingProjectId, setEditingProjectId] = useState<string | null>(null);
   const [credentialWarning, setCredentialWarning] = useState<string | null>(null);
@@ -91,7 +91,9 @@ export function useAppShellController(
     dataDirectoryApi: desktopAppApi,
     onStatus: setLastAction,
     recordActivity,
+    repository: repositories.settings,
     setAppearanceMode: appearance.setMode,
+    setDensity,
   });
   const firestoreTab = useFirestoreTabState({
     activeProject,
@@ -110,6 +112,23 @@ export function useAppShellController(
     selectedTreeItemId: selection.treeItemId,
     setLastAction,
   });
+  useEffect(() => {
+    let cancelled = false;
+    void repositories.settings.load()
+      .then((snapshot) => {
+        if (!cancelled) setDensity(snapshot.density);
+      })
+      .catch((error: unknown) => {
+        if (cancelled) return;
+        setDensity(defaultDensity);
+        setLastAction(
+          `Settings load failed: ${messageFromError(error, 'Could not load settings.')}`,
+        );
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [repositories.settings]);
   const firestoreWrite = useFirestoreWriteController({
     activeProject,
     activeTab,
@@ -265,7 +284,6 @@ export function useAppShellController(
       setAddProjectOpen,
       setCredentialWarning,
       setCollectionJobRequest,
-      setDensity,
       setEditingProjectId,
       setLastAction,
       setSidebarCollapsed,
@@ -311,4 +329,8 @@ function persistSidebarWidth(repositories: RepositorySet, size: number) {
   const width = clampSidebarWidth(size);
   document.documentElement.style.setProperty('--sidebar-width', `${width}px`);
   void repositories.settings.save({ sidebarWidth: width });
+}
+
+function messageFromError(error: unknown, fallback: string): string {
+  return error instanceof Error ? error.message : fallback;
 }

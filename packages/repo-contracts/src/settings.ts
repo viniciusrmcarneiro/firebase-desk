@@ -1,3 +1,4 @@
+import { defaultDensity, type DensityName } from '@firebase-desk/design-tokens';
 import type { ActivityLogSettings } from './activity.ts';
 
 /**
@@ -91,6 +92,7 @@ export interface SettingsSnapshot {
   readonly sidebarWidth: number;
   readonly inspectorWidth: number;
   readonly theme: 'system' | 'light' | 'dark';
+  readonly density: DensityName;
   readonly dataMode: DataMode;
   readonly hotkeyOverrides: HotkeyOverrides;
   readonly resultTableLayouts: ResultTableLayouts;
@@ -104,6 +106,7 @@ export interface SettingsPatch {
   readonly sidebarWidth?: number | undefined;
   readonly inspectorWidth?: number | undefined;
   readonly theme?: SettingsSnapshot['theme'] | undefined;
+  readonly density?: DensityName | undefined;
   readonly dataMode?: DataMode | undefined;
   readonly hotkeyOverrides?: HotkeyOverrides | undefined;
   readonly resultTableLayouts?: ResultTableLayouts | undefined;
@@ -111,6 +114,8 @@ export interface SettingsPatch {
   readonly firestoreWrites?: FirestoreWriteSettings | undefined;
   readonly workspaceState?: unknown | null | undefined;
 }
+
+export const DEFAULT_DENSITY: DensityName = defaultDensity;
 
 export interface SettingsRepository {
   load(): Promise<SettingsSnapshot>;

@@ -7,9 +7,6 @@ export interface TargetModeBadgeProps {
 }
 
 export function TargetModeBadge({ mode }: TargetModeBadgeProps) {
-  return (
-    <StatusBadge status={mode}>
-      Target: {mode === 'production' ? 'Production' : 'Emulator'}
-    </StatusBadge>
-  );
+  if (mode === 'production') return null;
+  return <StatusBadge status='emulator' />;
 }

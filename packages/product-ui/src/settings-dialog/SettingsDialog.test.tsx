@@ -1,6 +1,6 @@
 import type { SettingsRepository, SettingsSnapshot } from '@firebase-desk/repo-contracts';
 import { MockSettingsRepository } from '@firebase-desk/repo-mocks';
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import { AppearanceProvider } from '../appearance/AppearanceProvider.tsx';
 import { SettingsDialog } from './SettingsDialog.tsx';
@@ -48,6 +48,24 @@ describe('SettingsDialog', () => {
 
     fireEvent.click(screen.getByRole('button', { name: 'Close dialog' }));
     expect(onOpenChange).toHaveBeenCalledWith(false);
+  });
+
+  it('keeps the settings header sticky while settings content scrolls', () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    render(
+      <AppearanceProvider settings={new MockSettingsRepository()}>
+        <SettingsDialog open onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    expect(screen.getByText('Settings').closest('.sticky')).toBeTruthy();
   });
 
   it('updates density when density controls are provided', () => {
@@ -153,6 +171,158 @@ describe('SettingsDialog', () => {
       expect((await settings.load()).firestoreWrites.fieldStaleBehavior).toBe('block')
     );
     expect(onSettingsSaved).toHaveBeenCalled();
+  });
+
+  it('lists saved Firestore metadata alphabetically', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    await settings.save({
+      firestoreFieldCatalogs: {
+        zeta: [{ count: 1, field: 'last', types: ['string'] }],
+        alpha: [{ count: 1, field: 'first', types: ['string'] }],
+      },
+      resultTableLayouts: {
+        gamma: { columnOrder: ['middle'], columnSizing: { middle: 140 } },
+      },
+    });
+
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} onSettingsSaved={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    const metadata = await screen.findByLabelText('Saved Firestore metadata');
+    expect(
+      within(metadata).getAllByText(/^(alpha|gamma|zeta)$/).map((item) => item.textContent),
+    ).toEqual(['alpha', 'gamma', 'zeta']);
+  });
+
+  it('deletes saved Firestore metadata for one collection key', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    await settings.save({
+      firestoreFieldCatalogs: {
+        orders: [{ count: 2, field: 'status', types: ['string'] }],
+        users: [{ count: 1, field: 'displayName', types: ['string'] }],
+      },
+      resultTableLayouts: {
+        orders: { columnOrder: ['status'], columnSizing: { status: 140 } },
+        users: { columnOrder: ['displayName'], columnSizing: { displayName: 180 } },
+      },
+    });
+    const onSettingsSaved = vi.fn();
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} onSettingsSaved={onSettingsSaved} />
+      </AppearanceProvider>,
+    );
+
+    await screen.findByText('orders');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Firestore metadata for orders' }));
+
+    await waitFor(async () => {
+      const snapshot = await settings.load();
+      expect(snapshot.firestoreFieldCatalogs.orders).toBeUndefined();
+      expect(snapshot.resultTableLayouts.orders).toBeUndefined();
+      expect(snapshot.firestoreFieldCatalogs.users).toBeDefined();
+      expect(snapshot.resultTableLayouts.users).toBeDefined();
+    });
+    expect(screen.queryByText('orders')).toBeNull();
+    expect(screen.getByText('users')).toBeTruthy();
+    expect(onSettingsSaved).toHaveBeenCalledWith(
+      expect.objectContaining({
+        firestoreFieldCatalogs: expect.not.objectContaining({ orders: expect.anything() }),
+        resultTableLayouts: expect.not.objectContaining({ orders: expect.anything() }),
+      }),
+      expect.objectContaining({
+        firestoreFieldCatalogs: expect.objectContaining({ users: expect.anything() }),
+        resultTableLayouts: expect.objectContaining({ users: expect.anything() }),
+      }),
+    );
+  });
+
+  it('clears saved Firestore metadata', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    await settings.save({
+      firestoreFieldCatalogs: {
+        orders: [{ count: 2, field: 'status', types: ['string'] }],
+      },
+      resultTableLayouts: {
+        orders: { columnOrder: ['status'], columnSizing: { status: 140 } },
+      },
+    });
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    await screen.findByText('orders');
+    fireEvent.click(screen.getByRole('button', { name: 'Clear Firestore metadata' }));
+
+    await waitFor(async () =>
+      expect(await settings.load()).toMatchObject({
+        firestoreFieldCatalogs: {},
+        resultTableLayouts: {},
+      })
+    );
+    expect(await screen.findByText('No saved Firestore metadata.')).toBeTruthy();
+  });
+
+  it('restores Firestore metadata when delete save fails', async () => {
+    vi.stubGlobal(
+      'matchMedia',
+      vi.fn(() => ({
+        matches: false,
+        addEventListener: vi.fn(),
+        removeEventListener: vi.fn(),
+      })),
+    );
+    const settings = new MockSettingsRepository();
+    await settings.save({
+      firestoreFieldCatalogs: {
+        orders: [{ count: 2, field: 'status', types: ['string'] }],
+      },
+      resultTableLayouts: {
+        orders: { columnOrder: ['status'], columnSizing: { status: 140 } },
+      },
+    });
+    vi.spyOn(settings, 'save').mockRejectedValueOnce(new Error('metadata locked'));
+    render(
+      <AppearanceProvider settings={settings}>
+        <SettingsDialog open onOpenChange={vi.fn()} />
+      </AppearanceProvider>,
+    );
+
+    await screen.findByText('orders');
+    fireEvent.click(screen.getByRole('button', { name: 'Delete Firestore metadata for orders' }));
+
+    expect((await screen.findByRole('alert')).textContent).toContain('metadata locked');
+    expect(screen.getByText('orders')).toBeTruthy();
+    expect((await settings.load()).firestoreFieldCatalogs.orders).toBeDefined();
   });
 
   it('defaults Firestore write settings for older saved settings', async () => {

@@ -111,6 +111,7 @@ export interface AppShellController {
   };
   readonly sidebar: {
     readonly collapsed: boolean;
+    readonly density: DensityName;
     readonly filterValue: string;
     readonly items: AccountTreeProps['items'];
     readonly onAddProject: () => void;
@@ -282,7 +283,6 @@ export interface AppShellUiActions {
       readonly requestId: number;
     } | null,
   ) => void;
-  readonly setDensity: (density: DensityName) => void;
   readonly setEditingProjectId: (id: string | null) => void;
   readonly setLastAction: (message: string) => void;
   readonly setSidebarCollapsed: (collapsed: boolean) => void;
@@ -382,6 +382,7 @@ export interface AppShellActivityFacade {
 }
 
 export interface AppShellSettingsFacade {
+  readonly changeDensity: (density: DensityName) => void;
   readonly changeTheme: (mode: 'dark' | 'light' | 'system') => void;
   readonly dataDirectoryPath: string | null | undefined;
   readonly open: boolean;
@@ -410,6 +411,7 @@ export interface AppShellAuthFacade {
 export interface AppShellJsFacade {
   readonly cancelScript: () => boolean;
   readonly clearTab: (tabId: string) => void;
+  readonly clearTabRuntime: (tabId: string) => void;
   readonly isRunning: boolean;
   readonly isTabRunning: (tabId: string) => boolean;
   readonly runScript: () => boolean;
@@ -755,6 +757,8 @@ export function createAppShellController(
 
   function clearConnectionScopedTabState(tab: WorkspaceTab) {
     clearTabRuntimeState(tab);
+    if (tab.kind === 'js-query') input.jsTab.clearTabRuntime(tab.id);
+    else input.jsTab.clearTab(tab.id);
     input.ui.clearAuthSelection();
     input.authTab.clear();
   }
@@ -768,13 +772,17 @@ export function createAppShellController(
       successLabel,
       tabsToClose,
     });
-    for (const tab of result.tabsToCleanup) clearTabRuntimeState(tab);
+    for (const tab of result.tabsToCleanup) clearClosedTabRuntimeState(tab);
     input.ui.setTabsState(result.state);
     input.ui.setLastAction(result.lastAction);
   }
 
   function clearTabRuntimeState(tab: WorkspaceTab) {
     input.firestoreTab.clearTab(tab.id);
+  }
+
+  function clearClosedTabRuntimeState(tab: WorkspaceTab) {
+    clearTabRuntimeState(tab);
     input.jsTab.clearTab(tab.id);
   }
 
@@ -838,6 +846,7 @@ export function createAppShellController(
   const tabView: WorkspaceTabViewProps | null = input.activeTab
     ? {
       activeTab: input.activeTab,
+      density: input.density,
       auth: {
         errorMessage: input.authTab.errorMessage,
         filter: input.authTab.authFilter,
@@ -950,7 +959,7 @@ export function createAppShellController(
       settingsOpen: input.settings.open,
       onAddProjectOpenChange: input.ui.setAddProjectOpen,
       onCredentialWarningDismiss: () => input.ui.setCredentialWarning(null),
-      onDensityChange: input.ui.setDensity,
+      onDensityChange: input.settings.changeDensity,
       onDestructiveActionOpenChange: input.destructiveAction.setOpen,
       onEditProjectOpenChange: (open) => {
         if (!open) input.ui.setEditingProjectId(null);
@@ -1003,6 +1012,7 @@ export function createAppShellController(
     },
     sidebar: {
       collapsed: input.sidebarCollapsed,
+      density: input.density,
       filterValue: input.tree.filter,
       items: input.tree.items,
       onAddProject: () => input.ui.setAddProjectOpen(true),

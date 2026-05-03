@@ -1,3 +1,4 @@
+import type { DensityName } from '@firebase-desk/design-tokens';
 import type { FirestoreDocumentResult } from '@firebase-desk/repo-contracts';
 import { Button, ExplorerTree, IconButton } from '@firebase-desk/ui';
 import { Folder, Loader2, Trash2 } from 'lucide-react';
@@ -16,6 +17,7 @@ const EMPTY_VALUE_CHILD_LIMITS = new Map<string, number>();
 
 export function ResultTreeView(
   {
+    density,
     expandedIds,
     hasMore,
     isFetchingMore,
@@ -34,6 +36,7 @@ export function ResultTreeView(
     subcollectionStates,
     valueChildLimits,
   }: {
+    readonly density?: DensityName | undefined;
     readonly expandedIds: ReadonlySet<string>;
     readonly hasMore: boolean;
     readonly isFetchingMore: boolean;
@@ -93,6 +96,7 @@ export function ResultTreeView(
 
   return (
     <ExplorerTree
+      density={density}
       rows={treeRows}
       onOpen={openNode}
       onSelect={selectNode}

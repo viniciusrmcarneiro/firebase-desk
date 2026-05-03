@@ -137,6 +137,29 @@ describe('ExplorerTree', () => {
     expect(screen.getByRole('treeitem', { name: /one/ }).tabIndex).toBe(0);
   });
 
+  it('uses density tree row height for layout and virtualization', () => {
+    render(
+      <ExplorerTree
+        density='comfortable'
+        rows={[
+          ...rows,
+          {
+            id: 'doc:two',
+            label: 'two',
+            level: 0,
+            hasChildren: false,
+          },
+        ]}
+        onToggle={vi.fn()}
+      />,
+    );
+
+    expect(screen.getByRole('treeitem', { name: /one/ }).style.minHeight).toBe('34px');
+    expect(screen.getByRole('treeitem', { name: /two/ }).parentElement?.style.transform).toBe(
+      'translateY(34px)',
+    );
+  });
+
   it('does not steal focus from row actions on rerender', () => {
     const action = vi.fn();
     const { rerender } = render(

@@ -99,7 +99,32 @@ describe('QueryBuilder', () => {
     );
 
     expect(screen.getAllByPlaceholderText('field name')).toHaveLength(2);
-    expect(screen.getByPlaceholderText('value')).toBeTruthy();
+    expect(screen.getByPlaceholderText('value, JSON, or null')).toBeTruthy();
+  });
+
+  it('sets a filter value to null from the filter row', () => {
+    const onDraftChange = vi.fn();
+    render(
+      <QueryBuilder
+        draft={{
+          ...draft,
+          filters: [{ id: 'filter-1', field: 'archivedAt', op: '==', value: '' }],
+          filterField: 'archivedAt',
+          filterValue: '',
+        }}
+        isLoading={false}
+        onDraftChange={onDraftChange}
+        onReset={() => {}}
+        onRun={() => {}}
+      />,
+    );
+
+    fireEvent.click(screen.getByRole('button', { name: 'Null' }));
+
+    expect(onDraftChange).toHaveBeenCalledWith(expect.objectContaining({
+      filterValue: 'null',
+      filters: [expect.objectContaining({ field: 'archivedAt', value: 'null' })],
+    }));
   });
 
   it('adds and removes the only filter row', () => {

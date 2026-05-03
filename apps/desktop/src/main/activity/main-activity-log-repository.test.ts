@@ -141,6 +141,7 @@ class MemorySettingsRepository implements SettingsRepository {
       ...this.snapshot,
       ...(patch.activityLog ? { activityLog: patch.activityLog } : {}),
       ...(patch.dataMode ? { dataMode: patch.dataMode } : {}),
+      ...(patch.density ? { density: patch.density } : {}),
       ...(patch.firestoreFieldCatalogs
         ? { firestoreFieldCatalogs: patch.firestoreFieldCatalogs }
         : {}),

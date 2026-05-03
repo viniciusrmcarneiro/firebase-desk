@@ -8,7 +8,7 @@ export function Toolbar({ className, ...props }: ToolbarProps) {
     <div
       role='toolbar'
       className={cn(
-        'flex h-[var(--density-compact-toolbar-height)] items-center gap-1 border-b border-border-subtle bg-bg-panel px-2',
+        'flex h-[var(--density-toolbar-height)] items-center gap-1 border-b border-border-subtle bg-bg-panel px-2',
         className,
       )}
       {...props}

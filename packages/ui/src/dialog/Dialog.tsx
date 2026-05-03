@@ -12,6 +12,7 @@ export interface DialogContentProps
   extends Omit<ComponentPropsWithoutRef<typeof DialogPrimitive.Content>, 'title'>
 {
   readonly description?: ReactNode;
+  readonly stickyHeader?: boolean;
   readonly title: ReactNode;
 }
 
@@ -19,7 +20,7 @@ export const DialogContent = forwardRef<
   ElementRef<typeof DialogPrimitive.Content>,
   DialogContentProps
 >(
-  ({ children, className, description, title, ...props }, ref) => (
+  ({ children, className, description, stickyHeader = false, title, ...props }, ref) => (
     <DialogPrimitive.Portal>
       <DialogPrimitive.Overlay className='fixed inset-0 z-overlay bg-bg-overlay' />
       <DialogPrimitive.Content
@@ -30,7 +31,13 @@ export const DialogContent = forwardRef<
         )}
         {...props}
       >
-        <div className='flex items-start justify-between gap-3'>
+        <div
+          className={cn(
+            'flex items-start justify-between gap-3',
+            stickyHeader
+              && 'sticky -top-4 z-10 -mx-4 -mt-4 border-b border-border bg-bg-elevated px-4 py-4',
+          )}
+        >
           <div className='grid gap-1'>
             <DialogPrimitive.Title className='text-base font-semibold text-text-primary'>
               {title}

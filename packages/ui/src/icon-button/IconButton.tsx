@@ -7,7 +7,7 @@ const iconButtonVariants = cva('p-0', {
   variants: {
     size: {
       xs: 'h-[var(--density-compact-control-height)] w-[var(--density-compact-control-height)]',
-      sm: 'h-[var(--density-compact-control-height)] w-[var(--density-compact-control-height)]',
+      sm: 'h-[var(--density-control-height)] w-[var(--density-control-height)]',
       md:
         'h-[var(--density-comfortable-control-height)] w-[var(--density-comfortable-control-height)]',
     },
