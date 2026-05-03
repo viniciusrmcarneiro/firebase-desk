@@ -1,12 +1,17 @@
 import {
   IPC_CHANNELS,
   type IpcChannel,
+  JOB_EVENT_CHANNEL,
   SCRIPT_RUN_EVENT_CHANNEL,
 } from '@firebase-desk/ipc-schemas';
 import { describe, expect, it, vi } from 'vitest';
 import type { CreateIpcHandlersDeps } from './handlers.ts';
 import { createIpcHandlers } from './handlers.ts';
-import { broadcastScriptRunEvent, registerIpcHandlers } from './registry.ts';
+import {
+  broadcastBackgroundJobEvent,
+  broadcastScriptRunEvent,
+  registerIpcHandlers,
+} from './registry.ts';
 
 const electronMocks = vi.hoisted(() => ({
   getAllWindows: vi.fn(),
@@ -80,6 +85,37 @@ describe('script runner IPC event broadcast', () => {
   });
 });
 
+describe('background job IPC event broadcast', () => {
+  it('sends live job events to renderer windows', () => {
+    const send = vi.fn();
+    electronMocks.getAllWindows.mockReturnValue([{ webContents: { send } }]);
+
+    broadcastBackgroundJobEvent({
+      job: {
+        createdAt: '2026-04-29T00:00:00.000Z',
+        id: 'job-1',
+        progress: { deleted: 0, failed: 0, read: 0, skipped: 0, written: 0 },
+        request: {
+          collectionPath: 'orders',
+          connectionId: 'emu',
+          includeSubcollections: false,
+          type: 'firestore.deleteCollection',
+        },
+        status: 'running',
+        title: 'Delete collection',
+        type: 'firestore.deleteCollection',
+        updatedAt: '2026-04-29T00:00:00.000Z',
+      },
+      type: 'job-updated',
+    });
+
+    expect(send).toHaveBeenCalledWith(
+      JOB_EVENT_CHANNEL,
+      expect.objectContaining({ type: 'job-updated' }),
+    );
+  });
+});
+
 function sortedKeys(keys: Iterable<string>): string[] {
   const sorted = [...keys];
   for (let index = 1; index < sorted.length; index += 1) {
@@ -125,6 +161,15 @@ function fakeDeps(): CreateIpcHandlersDeps {
       runQuery: vi.fn(),
       saveDocument: vi.fn(),
       updateDocumentFields: vi.fn(),
+    },
+    jobsRepository: {
+      cancel: vi.fn(),
+      clearCompleted: vi.fn(),
+      list: vi.fn(),
+      pickExportFile: vi.fn(),
+      pickImportFile: vi.fn(),
+      start: vi.fn(),
+      subscribe: vi.fn(),
     },
     openDataDirectory: vi.fn(),
     pickServiceAccountFile: vi.fn(),

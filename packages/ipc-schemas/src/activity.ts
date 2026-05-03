@@ -22,6 +22,7 @@ export const ActivityLogTargetSchema = z.object({
   projectId: z.string().min(1).optional(),
   type: z.enum([
     'auth-user',
+    'firestore-collection',
     'firestore-document',
     'firestore-query',
     'project',

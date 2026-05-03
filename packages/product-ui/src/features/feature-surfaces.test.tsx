@@ -430,6 +430,36 @@ describe('feature surfaces', () => {
     expect(onCreateDocument).toHaveBeenCalledWith('collection:emu:orders');
   });
 
+  it('AccountTree exposes collection job actions on collection context menu', async () => {
+    const onCollectionJob = vi.fn();
+    render(
+      <AccountTree
+        filterValue=''
+        items={[{
+          id: 'collection:emu:orders',
+          kind: 'collection',
+          label: 'orders',
+          depth: 0,
+          hasChildren: false,
+          expanded: false,
+        }]}
+        onAddProject={() => {}}
+        onCollectionJob={onCollectionJob}
+        onFilterChange={() => {}}
+        onOpenItem={() => {}}
+        onRefreshItem={() => {}}
+        onRemoveItem={() => {}}
+        onSelectItem={() => {}}
+        onToggleItem={() => {}}
+      />,
+    );
+
+    fireEvent.contextMenu(screen.getByText('orders'));
+    fireEvent.click(await screen.findByRole('menuitem', { name: 'Delete collection' }));
+
+    expect(onCollectionJob).toHaveBeenCalledWith('collection:emu:orders', 'delete');
+  });
+
   it('AccountTree exposes new collection action on Firestore rows', async () => {
     const onCreateCollection = vi.fn();
     render(

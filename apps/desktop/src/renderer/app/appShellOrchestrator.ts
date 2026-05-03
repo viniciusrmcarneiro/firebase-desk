@@ -24,6 +24,11 @@ import type {
   SettingsPatch,
   SettingsRepository,
 } from '@firebase-desk/repo-contracts';
+import type {
+  BackgroundJob,
+  FirestoreCollectionJobRequest,
+  FirestoreExportFormat,
+} from '@firebase-desk/repo-contracts/jobs';
 import type { Badge, IconButton } from '@firebase-desk/ui';
 import type { ComponentProps } from 'react';
 import { createCommandPaletteModel } from './commandPaletteModel.ts';
@@ -112,6 +117,10 @@ export interface AppShellController {
     readonly onCollapse: () => void;
     readonly onCreateCollection: (id: string) => void;
     readonly onCreateDocument: (id: string) => void;
+    readonly onCollectionJob: (
+      id: string,
+      kind: 'copy' | 'delete' | 'duplicate' | 'export' | 'import',
+    ) => void;
     readonly onEditItem: (id: string) => void;
     readonly onExpand: () => void;
     readonly onFilterChange: (value: string) => void;
@@ -140,6 +149,17 @@ export interface AppShellController {
       readonly search: string;
       readonly status: 'all' | ActivityLogEntry['status'];
     };
+    readonly jobs: {
+      readonly buttonBadge: {
+        readonly label: string;
+        readonly variant: ComponentProps<typeof Badge>['variant'];
+      } | null;
+      readonly buttonVariant: 'ghost' | 'secondary' | 'warning';
+      readonly expanded: boolean;
+      readonly isLoading: boolean;
+      readonly open: boolean;
+      readonly rows: ReadonlyArray<BackgroundJob>;
+    };
     readonly lastAction: string;
     readonly projects: ReadonlyArray<ProjectSummary>;
     readonly selectedTreeItemId: string | null;
@@ -154,6 +174,11 @@ export interface AppShellController {
     readonly onActivitySearchChange: (search: string) => void;
     readonly onActivityStatusChange: (status: 'all' | ActivityLogEntry['status']) => void;
     readonly onActivityToggle: () => void;
+    readonly onJobsCancel: (id: string) => void;
+    readonly onJobsClearCompleted: () => void;
+    readonly onJobsClose: () => void;
+    readonly onJobsExpandedChange: (expanded: boolean) => void;
+    readonly onJobsToggle: () => void;
     readonly onCloseAllTabs: () => void;
     readonly onCloseOtherTabs: (tabId: string) => void;
     readonly onCloseTab: (tabId: string) => void;
@@ -184,6 +209,11 @@ export interface AppShellOrchestratorInput {
     input: CloseWorkspaceTabsInput,
   ) => CloseWorkspaceTabsResult;
   readonly credentialWarning: string | null;
+  readonly collectionJobRequest: {
+    readonly collectionPath: string;
+    readonly kind: 'copy' | 'delete' | 'duplicate' | 'export' | 'import';
+    readonly requestId: number;
+  } | null;
   readonly dataMode: 'live' | 'mock';
   readonly density: DensityName;
   readonly destructiveAction: AppShellDestructiveActionFacade;
@@ -193,6 +223,7 @@ export interface AppShellOrchestratorInput {
   readonly focusAuthFilter: () => void;
   readonly focusTreeFilter: () => void;
   readonly jsTab: AppShellJsFacade;
+  readonly jobs: AppShellJobsFacade;
   readonly lastAction: string;
   readonly layout: {
     readonly sidebarCollapsed: boolean;
@@ -200,9 +231,19 @@ export interface AppShellOrchestratorInput {
     readonly onSidebarResize: (size: number) => void;
   };
   readonly nextCreateDocumentRequestId: () => number;
+  readonly nextCollectionJobRequestId: () => number;
   readonly projects: ReadonlyArray<ProjectSummary>;
   readonly projectsRepository: ProjectsRepository;
   readonly projectCommands: AppShellProjectCommandFacade;
+  readonly jobsRepository: {
+    readonly pickExportFile: (
+      format: FirestoreExportFormat,
+    ) => Promise<{ readonly canceled: boolean; readonly filePath?: string | undefined; }>;
+    readonly pickImportFile: () => Promise<{
+      readonly canceled: boolean;
+      readonly filePath?: string | undefined;
+    }>;
+  };
   readonly repositories: {
     readonly firestore: {
       readonly listSubcollections: (
@@ -234,6 +275,13 @@ export interface AppShellUiActions {
   readonly selectTreeItem: (treeItemId: string | null) => void;
   readonly setAddProjectOpen: (open: boolean) => void;
   readonly setCredentialWarning: (message: string | null) => void;
+  readonly setCollectionJobRequest: (
+    request: {
+      readonly collectionPath: string;
+      readonly kind: 'copy' | 'delete' | 'duplicate' | 'export' | 'import';
+      readonly requestId: number;
+    } | null,
+  ) => void;
   readonly setDensity: (density: DensityName) => void;
   readonly setEditingProjectId: (id: string | null) => void;
   readonly setLastAction: (message: string) => void;
@@ -245,6 +293,26 @@ export interface AppShellUiActions {
 export interface AppShellDestructiveActionFacade {
   readonly pendingAction: DestructiveAction | null;
   readonly setOpen: (open: boolean) => void;
+}
+
+export interface AppShellJobsFacade {
+  readonly button: {
+    readonly badge: {
+      readonly label: string;
+      readonly variant: 'danger' | 'neutral' | 'warning';
+    } | null;
+    readonly variant: 'ghost' | 'secondary' | 'warning';
+  };
+  readonly cancel: (id: string) => void;
+  readonly clearCompleted: () => void;
+  readonly close: () => void;
+  readonly expanded: boolean;
+  readonly isLoading: boolean;
+  readonly jobs: ReadonlyArray<BackgroundJob>;
+  readonly opened: boolean;
+  readonly setExpanded: (expanded: boolean) => void;
+  readonly start: (request: FirestoreCollectionJobRequest) => Promise<unknown>;
+  readonly toggle: () => void;
 }
 
 export interface AppShellProjectCommandFacade {
@@ -563,6 +631,26 @@ export function createAppShellController(
     input.ui.setLastAction(`Creating document in ${parsed.path}`);
   }
 
+  function handleCollectionJobFromTree(
+    id: string,
+    kind: 'copy' | 'delete' | 'duplicate' | 'export' | 'import',
+  ) {
+    const parsed = parseTreeId(id);
+    if (parsed.kind !== 'collection' || !parsed.connectionId || !parsed.path) return;
+    const tabId = input.firestoreTab.openTab(parsed.connectionId, parsed.path);
+    input.ui.recordInteraction({
+      activeTabId: tabId,
+      path: parsed.path,
+      selectedTreeItemId: id,
+    });
+    input.ui.setCollectionJobRequest({
+      collectionPath: parsed.path,
+      kind,
+      requestId: input.nextCollectionJobRequestId(),
+    });
+    input.ui.setLastAction(`Opened ${kind} collection job`);
+  }
+
   function handleCreateCollectionFromTree(id: string) {
     const parsed = parseTreeId(id);
     if (parsed.kind !== 'firestore' || !parsed.connectionId) return;
@@ -765,6 +853,8 @@ export function createAppShellController(
         users: input.authTab.users,
       },
       firestore: {
+        activeProject: input.activeProject,
+        collectionJobRequest: input.collectionJobRequest,
         createDocumentRequest: input.firestoreWrite.createDocumentRequest,
         draft: input.firestoreTab.activeDraft,
         errorMessage: input.firestoreTab.errorMessage,
@@ -772,10 +862,23 @@ export function createAppShellController(
         isFetchingMore: input.firestoreTab.isFetchingMore,
         isLoading: input.firestoreTab.isLoading,
         onCreateDocument: input.firestoreWrite.createDocument,
+        onCollectionJobRequestHandled: (requestId) => {
+          if (input.collectionJobRequest?.requestId === requestId) {
+            input.ui.setCollectionJobRequest(null);
+          }
+        },
         onCreateDocumentRequestHandled: input.firestoreWrite.handleCreateDocumentRequestHandled,
         onDeleteDocument: input.firestoreWrite.deleteDocument,
         onDraftChange: input.firestoreTab.setDraft,
         onGenerateDocumentId: input.firestoreWrite.generateDocumentId,
+        onPickCollectionJobExportFile: async (format: FirestoreExportFormat) => {
+          const result = await input.jobsRepository.pickExportFile(format);
+          return result.canceled ? null : result.filePath ?? null;
+        },
+        onPickCollectionJobImportFile: async () => {
+          const result = await input.jobsRepository.pickImportFile();
+          return result.canceled ? null : result.filePath ?? null;
+        },
         onLoadMore: handleLoadMoreFirestore,
         onLoadSubcollections: handleLoadSubcollections,
         onOpenDocumentInNewTab: (path) => {
@@ -794,7 +897,12 @@ export function createAppShellController(
         onRunQuery: handleRunQuery,
         onSaveDocument: input.firestoreWrite.saveDocument,
         onSelectDocument: (path) => input.firestoreTab.selectDocument(input.activeTab!.id, path),
+        onStartCollectionJob: async (request) => {
+          await input.jobs.start(request);
+          if (!input.jobs.opened) input.jobs.toggle();
+        },
         onUpdateDocumentFields: input.firestoreWrite.updateDocumentFields,
+        projects: input.projects,
         rows: input.firestoreTab.queryRows,
         resultView: input.firestoreTab.resultView,
         resultsStale: input.firestoreTab.resultsStale,
@@ -901,6 +1009,7 @@ export function createAppShellController(
       onCollapse: () => input.ui.setSidebarCollapsed(true),
       onCreateCollection: handleCreateCollectionFromTree,
       onCreateDocument: handleCreateDocumentFromTree,
+      onCollectionJob: handleCollectionJobFromTree,
       onEditItem: handleEditTreeItem,
       onExpand: () => input.ui.setSidebarCollapsed(false),
       onFilterChange: input.tree.setFilter,
@@ -926,6 +1035,14 @@ export function createAppShellController(
         search: input.activity.drawer.search,
         status: input.activity.drawer.status,
       },
+      jobs: {
+        buttonBadge: input.jobs.button.badge,
+        buttonVariant: input.jobs.button.variant,
+        expanded: input.jobs.expanded,
+        isLoading: input.jobs.isLoading,
+        open: input.jobs.opened,
+        rows: input.jobs.jobs,
+      },
       lastAction: input.lastAction,
       projects: input.projects,
       selectedTreeItemId: input.selection.treeItemId,
@@ -947,6 +1064,11 @@ export function createAppShellController(
       onActivitySearchChange: input.activity.setSearch,
       onActivityStatusChange: input.activity.setStatus,
       onActivityToggle: input.activity.toggle,
+      onJobsCancel: input.jobs.cancel,
+      onJobsClearCompleted: input.jobs.clearCompleted,
+      onJobsClose: input.jobs.close,
+      onJobsExpandedChange: input.jobs.setExpanded,
+      onJobsToggle: input.jobs.toggle,
       onCloseAllTabs: requestCloseAllTabs,
       onCloseOtherTabs: requestCloseOtherTabs,
       onCloseTab: requestCloseTab,

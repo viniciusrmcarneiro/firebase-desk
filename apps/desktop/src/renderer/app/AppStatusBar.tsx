@@ -1,7 +1,7 @@
 import { StatusBar, TargetModeBadge } from '@firebase-desk/product-ui';
 import type { ProjectSummary } from '@firebase-desk/repo-contracts';
 import { Badge, Button } from '@firebase-desk/ui';
-import { ListChecks } from 'lucide-react';
+import { BriefcaseBusiness, ListChecks } from 'lucide-react';
 import type { ComponentProps } from 'react';
 
 interface AppStatusBarProps {
@@ -14,8 +14,15 @@ interface AppStatusBarProps {
   readonly activityButtonVariant: ComponentProps<typeof Button>['variant'];
   readonly activityOpen: boolean;
   readonly lastAction: string;
+  readonly jobsBadge: {
+    readonly label: string;
+    readonly variant: ComponentProps<typeof Badge>['variant'];
+  } | null;
+  readonly jobsButtonVariant: ComponentProps<typeof Button>['variant'];
+  readonly jobsOpen: boolean;
   readonly selectedTreeItemId: string | null;
   readonly onActivityToggle: () => void;
+  readonly onJobsToggle: () => void;
 }
 
 export function AppStatusBar(
@@ -26,8 +33,12 @@ export function AppStatusBar(
     activityButtonVariant,
     activityOpen,
     lastAction,
+    jobsBadge,
+    jobsButtonVariant,
+    jobsOpen,
     selectedTreeItemId,
     onActivityToggle,
+    onJobsToggle,
   }: AppStatusBarProps,
 ) {
   return (
@@ -43,6 +54,16 @@ export function AppStatusBar(
       }
       right={
         <>
+          <Button
+            aria-pressed={jobsOpen}
+            size='xs'
+            variant={jobsButtonVariant}
+            onClick={onJobsToggle}
+          >
+            <BriefcaseBusiness size={13} aria-hidden='true' />
+            Jobs
+            {jobsBadge ? <Badge variant={jobsBadge.variant}>{jobsBadge.label}</Badge> : null}
+          </Button>
           <Button
             aria-pressed={activityOpen}
             size='xs'

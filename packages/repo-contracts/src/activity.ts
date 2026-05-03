@@ -39,6 +39,7 @@ export interface ActivityLogTarget {
   readonly projectId?: string | undefined;
   readonly type:
     | 'auth-user'
+    | 'firestore-collection'
     | 'firestore-document'
     | 'firestore-query'
     | 'project'

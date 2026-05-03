@@ -51,6 +51,10 @@ export interface AccountTreeProps {
   readonly onAddProject: () => void;
   readonly onCreateCollection?: (id: string) => void;
   readonly onCreateDocument?: (id: string) => void;
+  readonly onCollectionJob?: (
+    id: string,
+    kind: 'copy' | 'delete' | 'duplicate' | 'export' | 'import',
+  ) => void;
   readonly onFilterChange: (value: string) => void;
   readonly onEditItem?: (id: string) => void;
   readonly onOpenItem: (id: string) => void;
@@ -67,6 +71,7 @@ export function AccountTree(
     onAddProject,
     onCreateCollection,
     onCreateDocument,
+    onCollectionJob,
     onEditItem,
     onFilterChange,
     onOpenItem,
@@ -104,6 +109,7 @@ export function AccountTree(
               item={node as AccountTreeItem}
               {...(onCreateCollection ? { onCreateCollection } : {})}
               {...(onCreateDocument ? { onCreateDocument } : {})}
+              {...(onCollectionJob ? { onCollectionJob } : {})}
               {...(onEditItem ? { onEditItem } : {})}
               onRefreshItem={onRefreshItem}
               onRemoveItem={onRemoveItem}
@@ -122,6 +128,10 @@ interface AccountTreeRowProps {
   readonly item: AccountTreeItem;
   readonly onCreateCollection?: (id: string) => void;
   readonly onCreateDocument?: (id: string) => void;
+  readonly onCollectionJob?: (
+    id: string,
+    kind: 'copy' | 'delete' | 'duplicate' | 'export' | 'import',
+  ) => void;
   readonly onEditItem?: (id: string) => void;
   readonly onRefreshItem: (id: string) => void;
   readonly onRemoveItem: (id: string) => void;
@@ -132,6 +142,7 @@ function AccountTreeRow(
     item,
     onCreateCollection,
     onCreateDocument,
+    onCollectionJob,
     onEditItem,
     onRefreshItem,
     onRemoveItem,
@@ -240,7 +251,7 @@ function AccountTreeRow(
   const hasProjectMenu = item.kind === 'project' && onEditItem;
   const hasFirestoreMenu = item.kind === 'firestore' && item.canCreateCollection
     && onCreateCollection;
-  const hasCollectionMenu = item.kind === 'collection' && onCreateDocument;
+  const hasCollectionMenu = item.kind === 'collection' && (onCreateDocument || onCollectionJob);
 
   if (!hasProjectMenu && !hasFirestoreMenu && !hasCollectionMenu) return row;
 
@@ -260,9 +271,36 @@ function AccountTreeRow(
           : null}
         {hasCollectionMenu
           ? (
-            <ContextMenuItem onSelect={() => onCreateDocument(item.id)}>
-              New document
-            </ContextMenuItem>
+            <>
+              {onCreateDocument
+                ? (
+                  <ContextMenuItem onSelect={() => onCreateDocument(item.id)}>
+                    New document
+                  </ContextMenuItem>
+                )
+                : null}
+              {onCollectionJob
+                ? (
+                  <>
+                    <ContextMenuItem onSelect={() => onCollectionJob(item.id, 'copy')}>
+                      Copy collection
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => onCollectionJob(item.id, 'duplicate')}>
+                      Duplicate collection
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => onCollectionJob(item.id, 'export')}>
+                      Export collection
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => onCollectionJob(item.id, 'import')}>
+                      Import collection
+                    </ContextMenuItem>
+                    <ContextMenuItem onSelect={() => onCollectionJob(item.id, 'delete')}>
+                      Delete collection
+                    </ContextMenuItem>
+                  </>
+                )
+                : null}
+            </>
           )
           : null}
         {item.canRefresh

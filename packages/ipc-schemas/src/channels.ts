@@ -32,6 +32,13 @@ import {
 } from './firestore.ts';
 import { HealthCheckRequestSchema, HealthCheckResponseSchema } from './health.ts';
 import {
+  BackgroundJobListRequestSchema,
+  BackgroundJobPickExportFileRequestSchema,
+  BackgroundJobPickFileResultSchema,
+  BackgroundJobSchema,
+  FirestoreCollectionJobRequestSchema,
+} from './jobs.ts';
+import {
   PickServiceAccountFileResultSchema,
   ProjectAddInputSchema,
   ProjectSummarySchema,
@@ -79,6 +86,30 @@ export const IPC_CHANNELS = {
   'activity.list': {
     request: ActivityLogListRequestSchema,
     response: z.array(ActivityLogEntrySchema),
+  },
+  'jobs.cancel': {
+    request: z.object({ id: z.string() }),
+    response: z.void(),
+  },
+  'jobs.clearCompleted': {
+    request: z.object({}),
+    response: z.void(),
+  },
+  'jobs.list': {
+    request: BackgroundJobListRequestSchema,
+    response: z.array(BackgroundJobSchema),
+  },
+  'jobs.pickExportFile': {
+    request: BackgroundJobPickExportFileRequestSchema,
+    response: BackgroundJobPickFileResultSchema,
+  },
+  'jobs.pickImportFile': {
+    request: z.object({}),
+    response: BackgroundJobPickFileResultSchema,
+  },
+  'jobs.start': {
+    request: FirestoreCollectionJobRequestSchema,
+    response: BackgroundJobSchema,
   },
   'projects.list': {
     request: z.object({}),
@@ -194,3 +225,5 @@ export type IpcChannel = keyof typeof IPC_CHANNELS;
 
 export type IpcRequest<C extends IpcChannel> = z.infer<(typeof IPC_CHANNELS)[C]['request']>;
 export type IpcResponse<C extends IpcChannel> = z.infer<(typeof IPC_CHANNELS)[C]['response']>;
+
+export const JOB_EVENT_CHANNEL = 'jobs.event';

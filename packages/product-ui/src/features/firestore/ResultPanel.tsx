@@ -2,6 +2,10 @@ import type { FirestoreDocumentResult, SettingsRepository } from '@firebase-desk
 import {
   Badge,
   Button,
+  DropdownMenu,
+  DropdownMenuContent,
+  DropdownMenuItem,
+  DropdownMenuTrigger,
   EmptyState,
   InlineAlert,
   Panel,
@@ -12,7 +16,7 @@ import {
   TabsList,
   TabsTrigger,
 } from '@firebase-desk/ui';
-import { Braces, GitBranch, Plus, Table2 } from 'lucide-react';
+import { Braces, BriefcaseBusiness, GitBranch, Plus, Table2 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { JsonPreview } from '../../json-preview/index.ts';
 import { type FieldEditTarget } from './fieldEditModel.ts';
@@ -27,6 +31,8 @@ import { ResultTable } from './ResultTable.tsx';
 import { ResultTreeView } from './ResultTreeView.tsx';
 import type { FirestoreResultView } from './types.ts';
 
+type CollectionJobKind = 'copy' | 'delete' | 'duplicate' | 'export' | 'import';
+
 export interface ResultPanelProps {
   readonly errorMessage: string | null;
   readonly hasMore: boolean;
@@ -36,6 +42,9 @@ export interface ResultPanelProps {
   readonly actionNoticeMessage?: string | null;
   readonly resultsStale?: boolean;
   readonly onCreateDocument?: ((collectionPath: string) => void) | undefined;
+  readonly onCollectionJob?:
+    | ((kind: CollectionJobKind, collectionPath: string) => void)
+    | undefined;
   readonly onDeleteDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
   readonly onDeleteField?: ((target: FieldEditTarget) => void) | undefined;
   readonly onEditDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
@@ -66,6 +75,7 @@ export function ResultPanel(
     isLoading,
     resultsStale = false,
     onCreateDocument,
+    onCollectionJob,
     onDeleteDocument,
     onDeleteField,
     onEditDocument,
@@ -150,6 +160,35 @@ export function ResultPanel(
                     <Plus size={13} aria-hidden='true' />
                     New document
                   </Button>
+                )
+                : null}
+              {isCollectionPath(queryPath) && onCollectionJob
+                ? (
+                  <DropdownMenu>
+                    <DropdownMenuTrigger asChild>
+                      <Button size='xs' variant='secondary'>
+                        <BriefcaseBusiness size={13} aria-hidden='true' />
+                        Jobs
+                      </Button>
+                    </DropdownMenuTrigger>
+                    <DropdownMenuContent>
+                      <DropdownMenuItem onSelect={() => onCollectionJob('copy', queryPath)}>
+                        Copy collection
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => onCollectionJob('duplicate', queryPath)}>
+                        Duplicate collection
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => onCollectionJob('export', queryPath)}>
+                        Export collection
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => onCollectionJob('import', queryPath)}>
+                        Import collection
+                      </DropdownMenuItem>
+                      <DropdownMenuItem onSelect={() => onCollectionJob('delete', queryPath)}>
+                        Delete collection
+                      </DropdownMenuItem>
+                    </DropdownMenuContent>
+                  </DropdownMenu>
                 )
                 : null}
               <TabsList className='rounded-md border border-border-subtle bg-bg-subtle p-0.5'>

@@ -238,6 +238,19 @@ function createInput(
     toggle: vi.fn(),
     ...overrides.activity,
   };
+  const jobs = {
+    button: { badge: null, variant: 'ghost' as const },
+    cancel: vi.fn(),
+    clearCompleted: vi.fn(),
+    close: vi.fn(),
+    expanded: false,
+    isLoading: false,
+    jobs: [],
+    opened: false,
+    setExpanded: vi.fn(),
+    start: vi.fn(),
+    toggle: vi.fn(),
+  };
   const authTabFacade = {
     authFilter: '',
     clear: vi.fn(),
@@ -327,6 +340,7 @@ function createInput(
     selectAuthUser: vi.fn(),
     selectTreeItem: vi.fn(),
     setAddProjectOpen: vi.fn(),
+    setCollectionJobRequest: vi.fn(),
     setCredentialWarning: vi.fn(),
     setDensity: vi.fn(),
     setEditingProjectId: vi.fn(),
@@ -343,6 +357,7 @@ function createInput(
     authTab: authTabFacade,
     canOpenDataDirectory: true,
     closeWorkspaceTabs: closeWorkspaceTabsCommand,
+    collectionJobRequest: null,
     credentialWarning: null,
     dataMode: 'mock',
     density: 'compact',
@@ -356,6 +371,7 @@ function createInput(
     focusAuthFilter: vi.fn(),
     focusTreeFilter: vi.fn(),
     jsTab: jsTabFacade,
+    jobs,
     lastAction: 'Ready',
     layout: {
       sidebarCollapsed: false,
@@ -363,7 +379,9 @@ function createInput(
       onSidebarResize: vi.fn(),
     },
     nextCreateDocumentRequestId: vi.fn(() => 1),
+    nextCollectionJobRequestId: vi.fn(() => 1),
     projects: [project, prod],
+    jobsRepository: repositories.jobs,
     projectsRepository: repositories.projects,
     projectCommands: {
       addProject: vi.fn(),

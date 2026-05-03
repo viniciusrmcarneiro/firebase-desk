@@ -114,6 +114,46 @@ describe('ResultPanel', () => {
     expect(screen.queryByRole('button', { name: 'New document' })).toBeNull();
   });
 
+  it('shows collection jobs CTA only for collection paths', () => {
+    const { rerender } = render(
+      <ResultPanel
+        errorMessage={null}
+        hasMore={false}
+        isFetchingMore={false}
+        isLoading={false}
+        queryPath='orders'
+        resultView='table'
+        rows={[]}
+        selectedDocumentPath={null}
+        subcollectionStates={{}}
+        onCollectionJob={() => {}}
+        onLoadMore={() => {}}
+        onResultViewChange={() => {}}
+      />,
+    );
+
+    expect(screen.getByRole('button', { name: 'Jobs' })).toBeTruthy();
+
+    rerender(
+      <ResultPanel
+        errorMessage={null}
+        hasMore={false}
+        isFetchingMore={false}
+        isLoading={false}
+        queryPath='orders/ord_1'
+        resultView='table'
+        rows={[]}
+        selectedDocumentPath={null}
+        subcollectionStates={{}}
+        onCollectionJob={() => {}}
+        onLoadMore={() => {}}
+        onResultViewChange={() => {}}
+      />,
+    );
+
+    expect(screen.queryByRole('button', { name: 'Jobs' })).toBeNull();
+  });
+
   it('loads subcollections when expanding tree document', () => {
     const onLoadSubcollections = vi.fn();
     const onSelectDocument = vi.fn();

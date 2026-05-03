@@ -5,6 +5,7 @@ import { replaceMonacoEditorValue } from '../fixtures/editor.ts';
 import {
   deleteFirestoreEmulatorDocument,
   getFirestoreEmulatorDocument,
+  listFirestoreEmulatorCollection,
   setFirestoreEmulatorDocument,
 } from '../fixtures/firestore-rest.ts';
 import {
@@ -16,10 +17,15 @@ import {
 } from '../fixtures/live-app.ts';
 
 test('Firestore query, create, edit, conflict, and delete flows use emulator UI', async () => {
-  const live = await openLiveApp({ activityExportFileName: 'activity-export.jsonl' });
+  const live = await openLiveApp({
+    activityExportFileName: 'activity-export.jsonl',
+    jobExportFileName: 'jobs-export.jsonl',
+    jobImportFileName: 'jobs-export.jsonl',
+  });
   try {
     const page = live.page;
     const activityExportPath = join(live.userDataDir, 'activity-export.jsonl');
+    const jobsExportPath = join(live.userDataDir, 'jobs-export.jsonl');
     const suffix = uniqueSmokeId('ui');
     await addLocalEmulatorAccount(page);
     await openFirestore(page);
@@ -51,6 +57,10 @@ test('Firestore query, create, edit, conflict, and delete flows use emulator UI'
 
     await test.step('delete document with selected subcollection through UI', async () => {
       await deleteWithSelectedSubcollection(page, suffix);
+    });
+
+    await test.step('collection jobs export, import, duplicate, and delete through emulator UI', async () => {
+      await collectionJobs(page, suffix, jobsExportPath);
     });
 
     await test.step('activity trail records UI actions and exports detail mode', async () => {
@@ -479,6 +489,122 @@ async function deleteWithSelectedSubcollection(page: Page, suffix: string): Prom
   await deleteFirestoreEmulatorDocument(keptChildPath);
 }
 
+async function collectionJobs(page: Page, suffix: string, exportPath: string): Promise<void> {
+  const sourceCollection = `smokeJobsSource_${suffix}`;
+  const sourceDocumentId = `source-${suffix}`;
+  const sourcePath = `${sourceCollection}/${sourceDocumentId}`;
+  const importedCollection = `smokeJobsImported_${suffix}`;
+  const copyCollection = `smokeJobsCopy_${suffix}`;
+  const duplicateCollection = `smokeJobsDuplicate_${suffix}`;
+  await setFirestoreEmulatorDocument(sourcePath, {
+    amount: 42,
+    shippedAt: { __type__: 'timestamp', value: '2026-04-29T02:03:04.000Z' },
+    source: 'jobs-source',
+  });
+
+  await runCollectionQuery(page, sourceCollection);
+  await openCollectionJob(page, 'Export collection');
+  const exportDialog = page.getByRole('dialog', { name: 'Collection job' });
+  await exportDialog.getByRole('button', { name: 'Choose' }).click();
+  await expect(exportDialog.getByLabel('Export file path')).toHaveValue(exportPath);
+  await exportDialog.getByRole('button', { name: 'Start job' }).click();
+  await expectDialogHidden(exportDialog, 'Export job dialog stayed open');
+  await expect.poll(async () => readFile(exportPath, 'utf8').catch(() => '')).toContain(
+    sourceDocumentId,
+  );
+
+  await openCollectionJob(page, 'Import collection');
+  const importDialog = page.getByRole('dialog', { name: 'Collection job' });
+  await importDialog.getByLabel('Target collection path').fill(importedCollection);
+  await importDialog.getByRole('button', { name: 'Choose' }).click();
+  await expect(importDialog.getByLabel('Import file path')).toHaveValue(exportPath);
+  await importDialog.getByRole('button', { name: 'Start job' }).click();
+  await expectDialogHidden(importDialog, 'Import job dialog stayed open');
+  await expect.poll(async () =>
+    await getFirestoreEmulatorDocument(
+      `${importedCollection}/${sourceDocumentId}`,
+    )
+  ).toMatchObject({
+    fields: {
+      amount: { integerValue: '42' },
+      shippedAt: { timestampValue: '2026-04-29T02:03:04Z' },
+      source: { stringValue: 'jobs-source' },
+    },
+  });
+
+  await openCollectionJob(page, 'Copy collection');
+  const copyDialog = page.getByRole('dialog', { name: 'Collection job' });
+  await copyDialog.getByLabel('Target collection path').fill(copyCollection);
+  await copyDialog.getByRole('button', { name: 'Start job' }).click();
+  await expectDialogHidden(copyDialog, 'Copy job dialog stayed open');
+  await expect.poll(async () =>
+    await getFirestoreEmulatorDocument(
+      `${copyCollection}/${sourceDocumentId}`,
+    )
+  ).toMatchObject({
+    fields: { source: { stringValue: 'jobs-source' } },
+  });
+
+  await openCollectionJob(page, 'Duplicate collection');
+  const duplicateDialog = page.getByRole('dialog', { name: 'Collection job' });
+  await duplicateDialog.getByLabel('Target collection path').fill(duplicateCollection);
+  await duplicateDialog.getByRole('button', { name: 'Start job' }).click();
+  await expectDialogHidden(duplicateDialog, 'Duplicate job dialog stayed open');
+  await expect.poll(async () =>
+    await getFirestoreEmulatorDocument(
+      `${duplicateCollection}/${sourceDocumentId}`,
+    )
+  ).toMatchObject({
+    fields: { source: { stringValue: 'jobs-source' } },
+  });
+
+  const docsOnlyCollection = `smokeJobsDeleteDocsOnly_${suffix}`;
+  const docsOnlyParent = `${docsOnlyCollection}/parent`;
+  const docsOnlyChild = `${docsOnlyParent}/events/child`;
+  await setFirestoreEmulatorDocument(docsOnlyParent, { mode: 'docs-only' });
+  await setFirestoreEmulatorDocument(docsOnlyChild, { kept: true });
+  await runCollectionQuery(page, docsOnlyCollection);
+  page.once('dialog', (dialog) => dialog.accept());
+  await openCollectionJob(page, 'Delete collection');
+  const docsOnlyDialog = page.getByRole('dialog', { name: 'Collection job' });
+  await expect(docsOnlyDialog.getByText(/Subcollections may remain/)).toBeVisible();
+  await docsOnlyDialog.getByRole('button', { name: 'Start job' }).click();
+  await expectDialogHidden(docsOnlyDialog, 'Docs-only delete job dialog stayed open');
+  await expect.poll(async () => await listFirestoreEmulatorCollection(docsOnlyCollection))
+    .toHaveLength(0);
+  expect(await getFirestoreEmulatorDocument(docsOnlyChild)).toMatchObject({
+    fields: { kept: { booleanValue: true } },
+  });
+
+  const recursiveCollection = `smokeJobsDeleteRecursive_${suffix}`;
+  const recursiveParent = `${recursiveCollection}/parent`;
+  const recursiveChild = `${recursiveParent}/events/child`;
+  await setFirestoreEmulatorDocument(recursiveParent, { mode: 'recursive' });
+  await setFirestoreEmulatorDocument(recursiveChild, { deleted: true });
+  await runCollectionQuery(page, recursiveCollection);
+  page.once('dialog', (dialog) => dialog.accept());
+  await openCollectionJob(page, 'Delete collection');
+  const recursiveDialog = page.getByRole('dialog', { name: 'Collection job' });
+  await recursiveDialog.getByRole('checkbox', { name: 'Include subcollections' }).check();
+  await recursiveDialog.getByRole('button', { name: 'Start job' }).click();
+  await expectDialogHidden(recursiveDialog, 'Recursive delete job dialog stayed open');
+  await expect.poll(async () => await getFirestoreEmulatorDocument(recursiveParent)).toBeNull();
+  await expect.poll(async () => await getFirestoreEmulatorDocument(recursiveChild)).toBeNull();
+
+  await openJobs(page);
+  await expect(page.getByRole('region', { name: 'Jobs' }).getByText('Export collection').first())
+    .toBeVisible();
+  await expect(page.getByRole('region', { name: 'Jobs' }).getByText('Import collection').first())
+    .toBeVisible();
+  await expect(page.getByRole('region', { name: 'Jobs' }).getByText('Copy collection').first())
+    .toBeVisible();
+  await expect(page.getByRole('region', { name: 'Jobs' }).getByText('Duplicate collection').first())
+    .toBeVisible();
+  await expect(page.getByRole('region', { name: 'Jobs' }).getByText('Delete collection').first())
+    .toBeVisible();
+  await closeJobs(page);
+}
+
 async function verifyActivityTrail(
   page: Page,
   suffix: string,
@@ -499,6 +625,7 @@ async function verifyActivityTrail(
   await expect(settings.getByText(/fullPayload, 5 MB/)).toBeVisible();
   await settings.getByRole('button', { name: 'Close dialog' }).click();
   await expect(settings).toBeHidden();
+  await closeActivity(page);
 
   const documentId = `activity-${suffix}`;
   await runCollectionQuery(page, 'smokeUiActivity');
@@ -604,6 +731,26 @@ async function refreshChangedResults(page: Page): Promise<void> {
   await bannerText.locator('xpath=..').getByRole('button', { name: 'Refresh' }).click();
 }
 
+async function openCollectionJob(page: Page, menuItem: string): Promise<void> {
+  await resultsPanel(page).getByRole('button', { name: 'Jobs' }).click();
+  await page.getByRole('menuitem', { name: menuItem }).click();
+  await expect(page.getByRole('dialog', { name: 'Collection job' })).toBeVisible();
+}
+
+async function openJobs(page: Page): Promise<void> {
+  const drawer = page.getByRole('region', { name: 'Jobs' });
+  if (await drawer.count()) return;
+  await page.locator('footer').getByRole('button', { name: /Jobs/ }).click();
+  await expect(drawer).toBeVisible();
+}
+
+async function closeJobs(page: Page): Promise<void> {
+  const drawer = page.getByRole('region', { name: 'Jobs' });
+  if (!(await drawer.count())) return;
+  await drawer.getByRole('button', { name: 'Close' }).click();
+  await expect(drawer).toBeHidden();
+}
+
 function resultsChangedBanner(page: Page) {
   return resultsPanel(page).getByText('Results changed.');
 }
@@ -611,8 +758,15 @@ function resultsChangedBanner(page: Page) {
 async function openActivity(page: Page): Promise<void> {
   const activity = page.getByRole('region', { name: 'Activity' });
   if (await activity.count()) return;
-  await page.getByRole('button', { name: /Activity/ }).click();
+  await page.locator('footer').getByRole('button', { name: /Activity/ }).click();
   await expect(activity).toBeVisible();
+}
+
+async function closeActivity(page: Page): Promise<void> {
+  const activity = page.getByRole('region', { name: 'Activity' });
+  if (!(await activity.count())) return;
+  await activity.getByRole('button', { name: 'Close' }).click();
+  await expect(activity).toBeHidden();
 }
 
 async function expectDialogHidden(dialog: ReturnType<Page['getByRole']>, message: string) {
