@@ -60,7 +60,7 @@ async function main(): Promise<void> {
   }
 
   const assets = await Promise.all(
-    sortStrings(candidates).map(async (filePath) => assetFromFile(artifactsDirectory, filePath)),
+    sortStrings(candidates).map(assetFromFile),
   );
   const manifest: ReleaseManifest = {
     appId: 'dev.firebase-desk.app',
@@ -95,7 +95,7 @@ async function recursiveFiles(directory: string): Promise<ReadonlyArray<string>>
   return files.concat(...nestedFiles);
 }
 
-async function assetFromFile(root: string, filePath: string): Promise<ReleaseManifestAsset> {
+async function assetFromFile(filePath: string): Promise<ReleaseManifestAsset> {
   const fileStat = await stat(filePath);
   return {
     arch: archFromName(basename(filePath)),

@@ -39,7 +39,9 @@ describe('desktop App', () => {
     settingsLoad.mockReset();
     createRepositories.mockReset();
     appShellProps.mockReset();
-    vi.stubGlobal('firebaseDesk', undefined);
+    vi.stubGlobal('firebaseDesk', {
+      app: { getConfig: vi.fn().mockResolvedValue({ appVersion: '0.1.0', dataMode: 'mock' }) },
+    });
   });
 
   it('shows the splash while settings load', () => {
@@ -57,7 +59,7 @@ describe('desktop App', () => {
     render(<App />);
 
     await waitFor(() => expect(screen.getByTestId('app-shell')).toBeTruthy());
-    expect(appShellProps).toHaveBeenCalledWith(expect.objectContaining({ appVersion: '0.0.1' }));
+    expect(appShellProps).toHaveBeenCalledWith(expect.objectContaining({ appVersion: '0.1.0' }));
     expect(screen.queryByLabelText('Loading Firebase Desk')).toBeNull();
   });
 
@@ -101,6 +103,18 @@ describe('desktop App', () => {
 
     await waitFor(() => expect(screen.getByTestId('app-shell')).toBeTruthy());
     expect(getConfig).toHaveBeenCalledTimes(2);
+  });
+
+  it('shows a retryable boot failure when preload app API is unavailable', async () => {
+    settingsLoad.mockResolvedValue(settingsSnapshot());
+    vi.stubGlobal('firebaseDesk', undefined);
+
+    render(<App />);
+
+    await waitFor(() =>
+      expect(screen.getByLabelText('Firebase Desk failed to start')).toBeTruthy()
+    );
+    expect(screen.getByText('Firebase Desk preload app API is unavailable.')).toBeTruthy();
   });
 
   it('shows a retryable boot failure when settings load fails', async () => {
