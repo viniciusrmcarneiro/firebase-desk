@@ -35,6 +35,23 @@ describe('workspace transitions', () => {
     expect(result.state.tabs.at(-1)?.title).toBe('customers');
   });
 
+  it('keeps opened tab ids unique when the adapter supplies a stale id', () => {
+    const result = tabOpened(
+      createInitialTabsState('emu'),
+      { kind: 'firestore-query', connectionId: 'emu', path: 'customers' },
+      'tab-firestore',
+    );
+
+    expect(result.tabId).toBe('tab-firestore-2');
+    expect(result.state.activeTabId).toBe('tab-firestore-2');
+    expect(result.state.tabs.map((tab) => tab.id)).toEqual([
+      'tab-firestore',
+      'tab-auth',
+      'tab-js',
+      'tab-firestore-2',
+    ]);
+  });
+
   it('selects existing tabs instead of duplicating them', () => {
     const state = createInitialTabsState('emu');
 
@@ -152,6 +169,40 @@ describe('workspace transitions', () => {
       inspectorWidth: 360,
       title: 'orders',
     });
+  });
+
+  it('renames duplicate restored tab ids so only one tab can match active state', () => {
+    const restored = tabsRestored({
+      activeTabId: 'tab-firestore',
+      interactionHistory: [
+        { activeTabId: 'tab-firestore', path: 'orders', selectedTreeItemId: null },
+      ],
+      interactionHistoryIndex: 0,
+      tabs: [
+        {
+          connectionId: 'emu',
+          history: ['orders'],
+          historyIndex: 0,
+          id: 'tab-firestore',
+          inspectorWidth: 360,
+          kind: 'firestore-query',
+          title: 'orders',
+        },
+        {
+          connectionId: 'emu',
+          history: ['admin-leagues'],
+          historyIndex: 0,
+          id: 'tab-firestore',
+          inspectorWidth: 360,
+          kind: 'firestore-query',
+          title: 'admin-leagues',
+        },
+      ],
+    });
+
+    expect(restored.activeTabId).toBe('tab-firestore');
+    expect(restored.tabs.map((tab) => tab.id)).toEqual(['tab-firestore', 'tab-firestore-2']);
+    expect(restored.tabs.filter((tab) => tab.id === restored.activeTabId)).toHaveLength(1);
   });
 
   it('tracks selection slices independently', () => {

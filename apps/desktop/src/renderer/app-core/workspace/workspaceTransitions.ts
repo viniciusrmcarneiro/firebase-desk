@@ -23,7 +23,7 @@ export function tabsReset(connectionId?: string): TabsState {
 }
 
 export function tabsRestored(state: TabsState): TabsState {
-  const tabs = state.tabs.map(normalizeWorkspaceTab);
+  const tabs = normalizeUniqueTabs(state.tabs);
   const interactionHistory = state.interactionHistory.filter((entry) =>
     tabs.some((tab) => tab.id === entry.activeTabId)
   );
@@ -40,7 +40,7 @@ export function tabOpened(
   input: OpenTabInput,
   tabId: string,
 ): { readonly state: TabsState; readonly tabId: string; } {
-  const tab = createWorkspaceTab(input, tabId);
+  const tab = createWorkspaceTab(input, uniqueTabId(tabId, tabIdsFor(state.tabs)));
   return {
     state: {
       ...state,
@@ -260,4 +260,26 @@ function compareTabsByProject(left: WorkspaceTab, right: WorkspaceTab): number {
   const project = left.connectionId.localeCompare(right.connectionId);
   if (project !== 0) return project;
   return left.title.localeCompare(right.title);
+}
+
+function normalizeUniqueTabs(tabs: ReadonlyArray<WorkspaceTab>): ReadonlyArray<WorkspaceTab> {
+  const seen = new Set<string>();
+  return tabs.map((tab) => {
+    const normalized = normalizeWorkspaceTab(tab);
+    const id = uniqueTabId(normalized.id, seen);
+    seen.add(id);
+    return id === normalized.id ? normalized : { ...normalized, id };
+  });
+}
+
+function tabIdsFor(tabs: ReadonlyArray<WorkspaceTab>): Set<string> {
+  return new Set(tabs.map((tab) => tab.id));
+}
+
+function uniqueTabId(id: string, seen: ReadonlySet<string>): string {
+  if (!seen.has(id)) return id;
+  for (let index = 2;; index += 1) {
+    const candidate = `${id}-${index}`;
+    if (!seen.has(candidate)) return candidate;
+  }
 }

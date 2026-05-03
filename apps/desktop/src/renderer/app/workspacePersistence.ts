@@ -5,6 +5,7 @@ import type {
   SettingsRepository,
 } from '@firebase-desk/repo-contracts';
 import { z } from 'zod';
+import { tabsRestored } from '../app-core/workspace/workspaceTransitions.ts';
 import {
   type InteractionHistoryEntry,
   type TabsState,
@@ -57,9 +58,6 @@ const TabsStateSchema = z.object({
   tabs: z.array(WorkspaceTabSchema).min(1),
 }).superRefine((state, context) => {
   const tabIds = new Set(state.tabs.map((tab) => tab.id));
-  if (tabIds.size !== state.tabs.length) {
-    context.addIssue({ code: 'custom', message: 'Duplicate tab ids' });
-  }
   if (!tabIds.has(state.activeTabId)) {
     context.addIssue({ code: 'custom', message: 'Active tab is not open' });
   }
@@ -220,18 +218,13 @@ export function parsePersistedWorkspaceState(
 }
 
 function sanitizeTabsState(state: TabsState): TabsState {
-  const tabIds = new Set(state.tabs.map((tab) => tab.id));
-  const interactionHistory = state.interactionHistory.filter((entry) =>
-    tabIds.has(entry.activeTabId)
-  );
-  return {
+  return tabsRestored({
     ...state,
-    interactionHistory,
     interactionHistoryIndex: clampInteractionHistoryIndex(
       state.interactionHistoryIndex,
-      interactionHistory,
+      state.interactionHistory,
     ),
-  };
+  });
 }
 
 function clampInteractionHistoryIndex(
