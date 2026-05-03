@@ -127,10 +127,12 @@ describe('VirtualTable', () => {
     const row = screen.getAllByRole('row')[1]!;
     fireEvent.click(row, { detail: 1 });
     fireEvent.click(row, { detail: 2 });
-    fireEvent.doubleClick(row, { detail: 2 });
+    const event = new MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2 });
+    fireEvent(row, event);
 
     expect(onRowClick).toHaveBeenCalledWith(rows[0]);
     expect(onRowClick).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(false);
   });
 
   it('uses row click for double-click when no double-click action is provided', () => {

@@ -198,11 +198,11 @@ export function VirtualTable<T>(
               }}
               onDoubleClick={(event) => {
                 if (!doubleClickHandler) return;
-                event.preventDefault();
                 if (!onRowDoubleClick && lastPrimaryClickKeyRef.current === rowKey) {
                   lastPrimaryClickKeyRef.current = null;
                   return;
                 }
+                event.preventDefault();
                 lastPrimaryClickKeyRef.current = null;
                 doubleClickHandler(item);
               }}

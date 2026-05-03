@@ -178,8 +178,9 @@ function ExplorerTreeRow<TNode extends ExplorerTreeRowModel>(
         if (node.hasChildren) onToggle(node.id);
       }}
       onDoubleClick={(event) => {
+        if (!onOpen) return;
         event.preventDefault();
-        onOpen?.(node.id);
+        onOpen(node.id);
       }}
       onKeyDown={(event) => onKeyDown(event, index, node)}
     >
