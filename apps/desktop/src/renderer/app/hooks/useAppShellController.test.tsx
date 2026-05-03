@@ -122,7 +122,9 @@ describe('useAppShellController', () => {
     });
     setupMocks(scenario);
 
-    const { result } = renderHook(() => useAppShellController({ initialSidebarWidth: 999 }));
+    const { result } = renderHook(() =>
+      useAppShellController({ appVersion: '0.1.0', initialSidebarWidth: 999 })
+    );
 
     const input = expectControllerInput();
     expect(result.current).toBe(scenario.controller);
@@ -155,7 +157,7 @@ describe('useAppShellController', () => {
     });
     setupMocks(scenario);
 
-    renderHook(() => useAppShellController());
+    renderHook(() => useAppShellController({ appVersion: '0.1.0' }));
 
     expect(mocks.useFirestoreTabState).toHaveBeenCalledWith(
       expect.objectContaining({
@@ -204,7 +206,7 @@ describe('useAppShellController', () => {
     });
     setupMocks(scenario);
 
-    renderHook(() => useAppShellController());
+    renderHook(() => useAppShellController({ appVersion: '0.1.0' }));
     const input = expectControllerInput();
 
     input.layout.onSidebarResize(10);
@@ -223,7 +225,7 @@ describe('useAppShellController', () => {
     const scenario = createScenario();
     setupMocks(scenario);
 
-    renderHook(() => useAppShellController({ dataMode: 'live' }));
+    renderHook(() => useAppShellController({ appVersion: '0.1.0', dataMode: 'live' }));
 
     expect(mocks.useSettingsController).toHaveBeenCalledWith(
       expect.objectContaining({ dataDirectoryApi: desktopAppApi }),
@@ -246,7 +248,7 @@ describe('useAppShellController', () => {
     });
     setupMocks(scenario);
 
-    renderHook(() => useAppShellController());
+    renderHook(() => useAppShellController({ appVersion: '0.1.0' }));
 
     await waitFor(() => {
       expect(mocks.createAppShellController).toHaveBeenLastCalledWith(

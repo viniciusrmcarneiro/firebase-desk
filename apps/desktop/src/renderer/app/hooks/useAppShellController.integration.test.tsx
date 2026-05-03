@@ -284,7 +284,7 @@ function renderController(
     })),
   );
   const activityStore = activityState ? createActivityStore(activityState) : undefined;
-  return renderHook(() => useAppShellController({ activityStore, dataMode }), {
+  return renderHook(() => useAppShellController({ activityStore, appVersion: '0.1.0', dataMode }), {
     wrapper: ({ children }: { readonly children: ReactNode; }) => (
       <MaybeStrictMode strictMode={strictMode}>
         <RepositoryProvider repositories={repositories}>

@@ -10,7 +10,7 @@ import { DEFAULT_SIDEBAR_WIDTH, MIN_WORKSPACE_WIDTH } from './workspaceModel.ts'
 import { WorkspaceTabView } from './WorkspaceTabView.tsx';
 
 export interface AppShellProps {
-  readonly appVersion?: string | undefined;
+  readonly appVersion: string;
   readonly activityStore?: ActivityStore | undefined;
   readonly dataMode?: 'live' | 'mock';
   readonly initialSidebarWidth?: number;

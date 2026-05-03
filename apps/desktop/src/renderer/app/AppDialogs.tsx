@@ -15,7 +15,7 @@ import type { RepositorySet } from './RepositoryProvider.tsx';
 
 interface AppDialogsProps {
   readonly addProjectOpen: boolean;
-  readonly appVersion?: string | undefined;
+  readonly appVersion: string;
   readonly canOpenDataDirectory: boolean;
   readonly credentialWarning: string | null;
   readonly dataDirectoryPath: string | null | undefined;

@@ -19,7 +19,12 @@ describe('SettingsDialog', () => {
     const onSettingsSaved = vi.fn();
     render(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} onSettingsSaved={onSettingsSaved} />
+        <SettingsDialog
+          appVersion='0.1.0'
+          open
+          onOpenChange={vi.fn()}
+          onSettingsSaved={onSettingsSaved}
+        />
       </AppearanceProvider>,
     );
     fireEvent.click(screen.getByRole('button', { name: 'dark' }));
@@ -42,7 +47,7 @@ describe('SettingsDialog', () => {
     const onOpenChange = vi.fn();
     render(
       <AppearanceProvider settings={new MockSettingsRepository()}>
-        <SettingsDialog open onOpenChange={onOpenChange} />
+        <SettingsDialog appVersion='0.1.0' open onOpenChange={onOpenChange} />
       </AppearanceProvider>,
     );
 
@@ -61,7 +66,7 @@ describe('SettingsDialog', () => {
     );
     render(
       <AppearanceProvider settings={new MockSettingsRepository()}>
-        <SettingsDialog open onOpenChange={vi.fn()} />
+        <SettingsDialog appVersion='0.1.0' open onOpenChange={vi.fn()} />
       </AppearanceProvider>,
     );
 
@@ -81,6 +86,7 @@ describe('SettingsDialog', () => {
     render(
       <AppearanceProvider settings={new MockSettingsRepository()}>
         <SettingsDialog
+          appVersion='0.1.0'
           density='compact'
           open
           onDensityChange={onDensityChange}
@@ -105,7 +111,7 @@ describe('SettingsDialog', () => {
     const settings = new MockSettingsRepository();
     render(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} />
+        <SettingsDialog appVersion='0.1.0' open onOpenChange={vi.fn()} />
       </AppearanceProvider>,
     );
 
@@ -127,7 +133,12 @@ describe('SettingsDialog', () => {
     const onSettingsSaved = vi.fn();
     render(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} onSettingsSaved={onSettingsSaved} />
+        <SettingsDialog
+          appVersion='0.1.0'
+          open
+          onOpenChange={vi.fn()}
+          onSettingsSaved={onSettingsSaved}
+        />
       </AppearanceProvider>,
     );
 
@@ -159,7 +170,12 @@ describe('SettingsDialog', () => {
     const onSettingsSaved = vi.fn();
     render(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} onSettingsSaved={onSettingsSaved} />
+        <SettingsDialog
+          appVersion='0.1.0'
+          open
+          onOpenChange={vi.fn()}
+          onSettingsSaved={onSettingsSaved}
+        />
       </AppearanceProvider>,
     );
 
@@ -195,7 +211,7 @@ describe('SettingsDialog', () => {
 
     render(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} onSettingsSaved={vi.fn()} />
+        <SettingsDialog appVersion='0.1.0' open onOpenChange={vi.fn()} onSettingsSaved={vi.fn()} />
       </AppearanceProvider>,
     );
 
@@ -228,7 +244,12 @@ describe('SettingsDialog', () => {
     const onSettingsSaved = vi.fn();
     render(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} onSettingsSaved={onSettingsSaved} />
+        <SettingsDialog
+          appVersion='0.1.0'
+          open
+          onOpenChange={vi.fn()}
+          onSettingsSaved={onSettingsSaved}
+        />
       </AppearanceProvider>,
     );
 
@@ -276,7 +297,7 @@ describe('SettingsDialog', () => {
     });
     render(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} />
+        <SettingsDialog appVersion='0.1.0' open onOpenChange={vi.fn()} />
       </AppearanceProvider>,
     );
 
@@ -337,7 +358,7 @@ describe('SettingsDialog', () => {
     const settings = createLegacySettingsRepository();
     render(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} />
+        <SettingsDialog appVersion='0.1.0' open onOpenChange={vi.fn()} />
       </AppearanceProvider>,
     );
 
@@ -357,7 +378,7 @@ describe('SettingsDialog', () => {
     const settings = new MockSettingsRepository();
     const { rerender } = render(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} />
+        <SettingsDialog appVersion='0.1.0' open onOpenChange={vi.fn()} />
       </AppearanceProvider>,
     );
 
@@ -378,12 +399,12 @@ describe('SettingsDialog', () => {
 
     rerender(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open={false} onOpenChange={vi.fn()} />
+        <SettingsDialog appVersion='0.1.0' open={false} onOpenChange={vi.fn()} />
       </AppearanceProvider>,
     );
     rerender(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} />
+        <SettingsDialog appVersion='0.1.0' open onOpenChange={vi.fn()} />
       </AppearanceProvider>,
     );
 
@@ -407,7 +428,7 @@ describe('SettingsDialog', () => {
     vi.spyOn(settings, 'save').mockRejectedValueOnce(new Error('Could not rename settings file'));
     render(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} />
+        <SettingsDialog appVersion='0.1.0' open onOpenChange={vi.fn()} />
       </AppearanceProvider>,
     );
 
@@ -431,6 +452,7 @@ describe('SettingsDialog', () => {
     render(
       <AppearanceProvider settings={new MockSettingsRepository()}>
         <SettingsDialog
+          appVersion='0.1.0'
           dataDirectoryPath='/Users/vini/Library/Application Support/@firebase-desk/desktop'
           open
           onOpenChange={vi.fn()}
@@ -460,6 +482,7 @@ describe('SettingsDialog', () => {
     render(
       <AppearanceProvider settings={new MockSettingsRepository()}>
         <SettingsDialog
+          appVersion='0.1.0'
           dataDirectoryPath={null}
           open
           onOpenChange={vi.fn()}
@@ -485,6 +508,7 @@ describe('SettingsDialog', () => {
     render(
       <AppearanceProvider settings={new MockSettingsRepository()}>
         <SettingsDialog
+          appVersion='0.1.0'
           dataDirectoryPath='/tmp/firebase-desk'
           open
           onOpenChange={vi.fn()}
@@ -537,7 +561,7 @@ describe('SettingsDialog', () => {
     await settings.save({ dataMode: 'mock' });
     render(
       <AppearanceProvider settings={settings}>
-        <SettingsDialog open onOpenChange={vi.fn()} />
+        <SettingsDialog appVersion='0.1.0' open onOpenChange={vi.fn()} />
       </AppearanceProvider>,
     );
 

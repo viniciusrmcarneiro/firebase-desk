@@ -135,7 +135,7 @@ export function App() {
   }, [repositories]);
 
   if (bootError) return <BootFailureScreen message={bootError} onRetry={retryBoot} />;
-  if (!repositories || !snapshot) return <SplashScreen />;
+  if (!repositories || !snapshot || appVersion === null) return <SplashScreen />;
 
   return (
     <RepositoryProvider repositories={repositories}>
@@ -150,7 +150,7 @@ export function App() {
           >
             <RenderErrorBoundary label='Firebase Desk' resetKey={dataMode ?? 'mock'}>
               <AppShell
-                appVersion={appVersion ?? undefined}
+                appVersion={appVersion}
                 dataMode={dataMode ?? 'mock'}
                 initialSidebarWidth={snapshot.sidebarWidth}
               />
@@ -170,5 +170,5 @@ async function loadAppConfig(): Promise<AppConfig> {
   if (typeof window !== 'undefined' && window.firebaseDesk?.app?.getConfig) {
     return await window.firebaseDesk.app.getConfig();
   }
-  return { appVersion: '0.0.0', dataMode: 'mock' };
+  return { appVersion: '0.0.1', dataMode: 'mock' };
 }

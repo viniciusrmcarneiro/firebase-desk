@@ -14,7 +14,7 @@ import { useAppearance } from '../appearance/AppearanceProvider.tsx';
 import { messageFromError } from '../shared/errors.ts';
 
 export interface SettingsDialogProps {
-  readonly appVersion?: string | undefined;
+  readonly appVersion: string;
   readonly dataDirectoryPath?: string | null | undefined;
   readonly density?: DensityName | undefined;
   readonly onOpenChange: (open: boolean) => void;
@@ -364,7 +364,7 @@ export function SettingsDialog(
         </div>
         <div className='grid gap-1 rounded-md border border-border-subtle bg-bg-subtle p-3 text-sm'>
           <div className='font-medium text-text-primary'>About</div>
-          <SettingRow label='Version' value={appVersion ?? 'Unavailable'} />
+          <SettingRow label='Version' value={appVersion} />
           <SettingRow label='License' value='MIT' />
         </div>
       </DialogContent>

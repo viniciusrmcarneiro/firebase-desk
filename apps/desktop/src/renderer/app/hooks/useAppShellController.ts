@@ -29,7 +29,7 @@ import { useProjects } from './useProjects.ts';
 import { useWorkspaceTree } from './useWorkspaceTree.ts';
 
 export interface UseAppShellControllerInput {
-  readonly appVersion?: string | undefined;
+  readonly appVersion: string;
   readonly activityStore?: ActivityStore | undefined;
   readonly dataMode?: 'live' | 'mock';
   readonly initialSidebarWidth?: number;
@@ -41,7 +41,7 @@ export function useAppShellController(
     appVersion,
     dataMode = 'mock',
     initialSidebarWidth = DEFAULT_SIDEBAR_WIDTH,
-  }: UseAppShellControllerInput = {},
+  }: UseAppShellControllerInput,
 ): AppShellController {
   const appearance = useAppearance();
   const repositories = useRepositories();

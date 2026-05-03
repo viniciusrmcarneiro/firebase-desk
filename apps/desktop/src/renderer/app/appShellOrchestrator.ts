@@ -56,7 +56,7 @@ export interface AppShellController {
   readonly commands: ReadonlyArray<CommandPaletteItem>;
   readonly dialogs: {
     readonly addProjectOpen: boolean;
-    readonly appVersion?: string | undefined;
+    readonly appVersion: string;
     readonly canOpenDataDirectory: boolean;
     readonly credentialWarning: string | null;
     readonly dataDirectoryPath: string | null | undefined;
@@ -204,7 +204,7 @@ export interface AppShellOrchestratorInput {
     readonly mode: 'dark' | 'light' | 'system';
     readonly resolvedTheme: 'dark' | 'light';
   };
-  readonly appVersion?: string | undefined;
+  readonly appVersion: string;
   readonly authTab: AppShellAuthFacade;
   readonly canOpenDataDirectory: boolean;
   readonly closeWorkspaceTabs: (

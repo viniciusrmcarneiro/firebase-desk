@@ -18,7 +18,7 @@ vi.mock('@firebase-desk/product-ui', () => ({
 const appShellProps = vi.hoisted(() => vi.fn());
 
 vi.mock('./AppShell.tsx', () => ({
-  AppShell: (props: { readonly appVersion?: string | undefined; }) => {
+  AppShell: (props: { readonly appVersion: string; }) => {
     appShellProps(props);
     return <div data-testid='app-shell' />;
   },
@@ -57,7 +57,7 @@ describe('desktop App', () => {
     render(<App />);
 
     await waitFor(() => expect(screen.getByTestId('app-shell')).toBeTruthy());
-    expect(appShellProps).toHaveBeenCalledWith(expect.objectContaining({ appVersion: '0.0.0' }));
+    expect(appShellProps).toHaveBeenCalledWith(expect.objectContaining({ appVersion: '0.0.1' }));
     expect(screen.queryByLabelText('Loading Firebase Desk')).toBeNull();
   });
 
