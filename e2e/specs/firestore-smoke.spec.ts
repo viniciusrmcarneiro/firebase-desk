@@ -150,6 +150,16 @@ async function querySameCollectionInTwoTabs(page: Page): Promise<void> {
   await workspaceTabs.getByRole('tab', { name: /orders/ }).nth(1).click();
   await expectResultDocumentId(page, 'ord_1024');
 
+  await resultsPanel(page).getByRole('tab', { name: 'Tree' }).click();
+  await expectResultView(page, 'Tree');
+
+  await workspaceTabs.getByRole('tab', { name: /orders/ }).first().click();
+  await expectResultView(page, 'Table');
+
+  await workspaceTabs.getByRole('tab', { name: /orders/ }).nth(1).click();
+  await expectResultView(page, 'Tree');
+  await resultsPanel(page).getByRole('tab', { name: 'Table' }).click();
+
   await selectDocument(page, 'ord_1024');
   await openFieldEdit(page, 'customer', 'Edit string');
   const editDialog = page.getByRole('dialog', { name: 'Edit customer' });
@@ -536,6 +546,13 @@ async function runCollectionQuery(page: Page, path: string): Promise<void> {
 
 async function expectResultDocumentId(page: Page, documentId: string): Promise<void> {
   await expect(resultDocumentIdCell(page, documentId)).toBeVisible();
+}
+
+async function expectResultView(page: Page, view: 'JSON' | 'Table' | 'Tree'): Promise<void> {
+  await expect(resultsPanel(page).getByRole('tab', { name: view })).toHaveAttribute(
+    'aria-selected',
+    'true',
+  );
 }
 
 function resultsPanel(page: Page) {

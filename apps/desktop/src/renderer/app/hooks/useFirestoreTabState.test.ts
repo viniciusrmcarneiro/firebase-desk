@@ -263,6 +263,42 @@ describe('useFirestoreTabState', () => {
     expect(result.current.resultsStale).toBe(false);
   });
 
+  it('keeps result view scoped to the query tab and preserves it on rerun', () => {
+    const secondTab: WorkspaceTab = { ...tab, id: 'tab-firestore-query-2' };
+    let activeTab = tab;
+    const { rerender, result } = renderHook(() =>
+      useFirestoreTabState({
+        activeProject: project,
+        activeTab,
+        selectedTreeItemId: 'collection:emu:orders',
+      })
+    );
+
+    act(() => result.current.setResultView(tab.id, 'tree'));
+
+    expect(result.current.resultView).toBe('tree');
+
+    activeTab = secondTab;
+    rerender();
+
+    expect(result.current.resultView).toBe('table');
+
+    act(() => result.current.setResultView(secondTab.id, 'json'));
+
+    expect(result.current.resultView).toBe('json');
+
+    activeTab = tab;
+    rerender();
+
+    expect(result.current.resultView).toBe('tree');
+
+    act(() => {
+      result.current.runQuery();
+    });
+
+    expect(result.current.resultView).toBe('tree');
+  });
+
   it('keeps selected document scoped to current query rows', async () => {
     tabActions.restore({
       activeTabId: tab.id,

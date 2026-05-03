@@ -35,6 +35,11 @@ import { QueryBuilder } from './QueryBuilder.tsx';
 import { findDocumentByPath, isCollectionPath } from './resultModel.tsx';
 import type { FirestoreResultView } from './types.ts';
 
+type ResultViewChangeHandler = (
+  resultView: FirestoreResultView,
+  scopeKey?: string,
+) => void;
+
 export interface FirestoreQuerySurfaceProps {
   readonly createDocumentRequest?: FirestoreCreateDocumentRequest | null | undefined;
   readonly draft: FirestoreQueryDraft;
@@ -63,6 +68,7 @@ export interface FirestoreQuerySurfaceProps {
   readonly onOpenDocumentInNewTab: (documentPath: string) => void;
   readonly onReset: () => void;
   readonly onRefreshResults?: () => void;
+  readonly onResultViewChange?: ResultViewChangeHandler | undefined;
   readonly onResultsStaleChange?: ((stale: boolean, scopeKey?: string) => void) | undefined;
   readonly onRun: () => void;
   readonly onSaveDocument?: (
@@ -80,6 +86,7 @@ export interface FirestoreQuerySurfaceProps {
     | void;
   readonly onSelectDocument: (documentPath: string) => void;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
+  readonly resultView?: FirestoreResultView | undefined;
   readonly resultsScopeKey?: string | undefined;
   readonly resultsStale?: boolean | undefined;
   readonly selectedDocument?: FirestoreDocumentResult | null;
@@ -131,12 +138,14 @@ export function FirestoreQuerySurface(
     onOpenDocumentInNewTab,
     onReset,
     onRefreshResults,
+    onResultViewChange,
     onResultsStaleChange,
     onRun,
     onSaveDocument,
     onUpdateDocumentFields,
     onSelectDocument,
     rows,
+    resultView,
     resultsScopeKey,
     resultsStale,
     selectedDocument = null,
@@ -144,7 +153,9 @@ export function FirestoreQuerySurface(
     settings,
   }: FirestoreQuerySurfaceProps,
 ) {
-  const [resultView, setResultView] = useState<FirestoreResultView>('table');
+  const [uncontrolledResultView, setUncontrolledResultView] = useState<FirestoreResultView>(
+    'table',
+  );
   const [editorDocument, setEditorDocument] = useState<FirestoreDocumentResult | null>(null);
   const [fieldEditor, setFieldEditor] = useState<FieldEditTarget | null>(null);
   const [deleteDocumentTarget, setDeleteDocumentTarget] = useState<FirestoreDocumentResult | null>(
@@ -160,7 +171,9 @@ export function FirestoreQuerySurface(
   const [uncontrolledResultsStale, setUncontrolledResultsStale] = useState(false);
   const [actionErrorMessage, setActionErrorMessage] = useState<string | null>(null);
   const [actionNoticeMessage, setActionNoticeMessage] = useState<string | null>(null);
+  const effectiveResultView = resultView ?? uncontrolledResultView;
   const effectiveResultsStale = resultsStale ?? uncontrolledResultsStale;
+  const onResultViewChangeRef = useRef(onResultViewChange);
   const onResultsStaleChangeRef = useRef(onResultsStaleChange);
   const resultsScopeKeyRef = useRef(resultsScopeKey);
   const fieldSuggestions = useFirestoreFieldCatalog({
@@ -185,9 +198,10 @@ export function FirestoreQuerySurface(
   }, [createDocumentRequest, handledCreateRequestId, onCreateDocumentRequestHandled]);
 
   useEffect(() => {
+    onResultViewChangeRef.current = onResultViewChange;
     onResultsStaleChangeRef.current = onResultsStaleChange;
     resultsScopeKeyRef.current = resultsScopeKey;
-  }, [onResultsStaleChange, resultsScopeKey]);
+  }, [onResultViewChange, onResultsStaleChange, resultsScopeKey]);
 
   async function createDocument(
     collectionPath: string,
@@ -382,6 +396,18 @@ export function FirestoreQuerySurface(
     onChange(stale, scopeKey);
   }
 
+  function setResultViewState(nextResultView: FirestoreResultView) {
+    setUncontrolledResultView(nextResultView);
+    const onChange = onResultViewChangeRef.current;
+    if (!onChange) return;
+    const scopeKey = resultsScopeKeyRef.current;
+    if (scopeKey === undefined) {
+      onChange(nextResultView);
+      return;
+    }
+    onChange(nextResultView, scopeKey);
+  }
+
   function openCreateDocument(collectionPath: string) {
     if (!isCollectionPath(collectionPath)) return;
     setCreateDocumentState({ collectionPath, collectionPathEditable: false });
@@ -452,7 +478,7 @@ export function FirestoreQuerySurface(
         actionErrorMessage={actionErrorMessage}
         actionNoticeMessage={actionNoticeMessage}
         queryPath={draft.path}
-        resultView={resultView}
+        resultView={effectiveResultView}
         resultsStale={effectiveResultsStale}
         rows={rows}
         selectedDocument={selectedDocument}
@@ -475,7 +501,7 @@ export function FirestoreQuerySurface(
         onLoadMore={onLoadMore}
         onLoadSubcollections={onLoadSubcollections}
         onOpenDocumentInNewTab={onOpenDocumentInNewTab}
-        onResultViewChange={setResultView}
+        onResultViewChange={setResultViewState}
         onRefreshResults={refreshResults}
         onSettingsError={setActionErrorMessage}
         onCreateDocument={onCreateDocument && onGenerateDocumentId

@@ -26,12 +26,14 @@ import {
 import {
   createInitialFirestoreQueryRuntimeState,
   type FirestoreQueryRuntimeState,
+  type FirestoreResultView,
 } from '../../app-core/firestore/query/firestoreQueryState.ts';
 import {
   firestoreDocumentSelected,
   firestoreDraftChanged,
   firestoreResultsMarkedStale,
   firestoreResultsRefreshed,
+  firestoreResultViewChanged,
   firestoreTabCleared,
 } from '../../app-core/firestore/query/firestoreQueryTransitions.ts';
 import { useRepositories } from '../RepositoryProvider.tsx';
@@ -60,6 +62,7 @@ export interface FirestoreTabState {
   readonly isLoading: boolean;
   readonly isTabLoading: (tabId: string) => boolean;
   readonly queryRows: ReadonlyArray<FirestoreDocumentResult>;
+  readonly resultView: FirestoreResultView;
   readonly resultsStale: boolean;
   readonly selectedDocument: FirestoreDocumentResult | null;
   readonly selectedDocumentPath: string | null;
@@ -72,6 +75,7 @@ export interface FirestoreTabState {
   readonly runQuery: () => string | null;
   readonly selectDocument: (tabId: string, path: string | null) => void;
   readonly setDraft: (draft: FirestoreQueryDraft) => void;
+  readonly setResultView: (tabId: string, resultView: FirestoreResultView) => void;
   readonly setResultsStale: (tabId: string, stale: boolean) => void;
 }
 
@@ -256,6 +260,10 @@ export function useFirestoreTabState(
     if (tabId === tabsStore.state.activeTabId) selectionActions.selectDocument(path);
   }
 
+  function setResultView(tabId: string, resultView: FirestoreResultView) {
+    updateQueryState((current) => firestoreResultViewChanged(current, tabId, resultView));
+  }
+
   function setResultsStale(tabId: string, stale: boolean) {
     updateQueryState((current) =>
       stale
@@ -291,6 +299,7 @@ export function useFirestoreTabState(
     isLoading: activeResult.isLoading,
     isTabLoading,
     queryRows,
+    resultView: activeResult.resultView,
     resultsStale: activeResult.resultsStale,
     selectedDocument,
     selectedDocumentPath,
@@ -303,6 +312,7 @@ export function useFirestoreTabState(
     runQuery,
     selectDocument,
     setDraft,
+    setResultView,
     setResultsStale,
   };
 

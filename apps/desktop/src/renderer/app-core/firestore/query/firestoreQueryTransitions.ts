@@ -43,9 +43,10 @@ export function firestoreQueryStarted(
         : state.selectedDocumentPaths,
     },
     input.tabId,
-    () => ({
+    (current) => ({
       ...emptyFirestoreQueryResultState(),
       isLoading: true,
+      resultView: current.resultView,
     }),
   );
 }
@@ -150,9 +151,10 @@ export function firestoreRefreshSucceeded(
 
 export function firestoreResultViewChanged(
   state: FirestoreQueryRuntimeState,
+  tabId: string,
   resultView: FirestoreResultView,
 ): FirestoreQueryRuntimeState {
-  return { ...state, resultView };
+  return updateTabResult(state, tabId, (current) => ({ ...current, resultView }));
 }
 
 export function firestoreDocumentSelected(
@@ -314,6 +316,7 @@ function updateTabResult(
     isLoading: nextResult.isLoading,
     pages: nextResult.pages,
     resultsByTab: { ...state.resultsByTab, [tabId]: nextResult },
+    resultView: nextResult.resultView,
     resultsStale: nextResult.resultsStale,
   };
 }

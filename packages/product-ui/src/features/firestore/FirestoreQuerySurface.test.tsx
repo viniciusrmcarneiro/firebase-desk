@@ -13,6 +13,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { AppearanceProvider } from '../../appearance/AppearanceProvider.tsx';
 import type { DeleteDocumentOptions } from './deleteDocumentModel.ts';
 import { FirestoreQuerySurface } from './FirestoreQuerySurface.tsx';
+import type { FirestoreResultView } from './types.ts';
 
 vi.mock('@tanstack/react-virtual', () => ({
   useVirtualizer: (
@@ -248,6 +249,18 @@ describe('FirestoreQuerySurface editing UX', () => {
     fireEvent.click(screen.getAllByRole('button', { name: 'set null active' })[0]!);
 
     await waitFor(() => expect(onResultsStaleChange).toHaveBeenCalledWith(true));
+  });
+
+  it('uses controlled result view state', () => {
+    const onResultViewChange = vi.fn();
+    renderSurface({ onResultViewChange, resultView: 'table' });
+
+    fireEvent.mouseDown(screen.getByRole('tab', { name: 'Tree' }), {
+      button: 0,
+      ctrlKey: false,
+    });
+
+    expect(onResultViewChange).toHaveBeenCalledWith('tree');
   });
 
   it('defaults stale behavior when settings predate Firestore write settings', async () => {
@@ -531,10 +544,12 @@ function renderSurface(
     onDeleteDocument,
     onCreateDocument,
     onGenerateDocumentId,
+    onResultViewChange,
     onResultsStaleChange,
     onRun,
     onSaveDocument,
     onUpdateDocumentFields,
+    resultView,
     resultsStale,
     settings = new MockSettingsRepository(),
   }: {
@@ -547,10 +562,12 @@ function renderSurface(
     readonly onCreateDocument?: CreateDocument;
     readonly onDeleteDocument?: DeleteDocument;
     readonly onGenerateDocumentId?: (collectionPath: string) => Promise<string> | string;
+    readonly onResultViewChange?: (resultView: FirestoreResultView) => void;
     readonly onResultsStaleChange?: (stale: boolean) => void;
     readonly onRun?: () => void;
     readonly onSaveDocument?: SaveDocument;
     readonly onUpdateDocumentFields?: UpdateDocumentFields;
+    readonly resultView?: FirestoreResultView;
     readonly resultsStale?: boolean;
     readonly settings?: SettingsRepository;
   },
@@ -564,6 +581,7 @@ function renderSurface(
         rows={[inputDocument]}
         selectedDocument={inputDocument}
         selectedDocumentPath={inputDocument.path}
+        resultView={resultView}
         resultsStale={resultsStale}
         {...(onCreateDocument ? { onCreateDocument } : {})}
         {...(onDeleteDocument ? { onDeleteDocument } : {})}
@@ -572,6 +590,7 @@ function renderSurface(
         onLoadMore={() => {}}
         onOpenDocumentInNewTab={() => {}}
         onReset={() => {}}
+        onResultViewChange={onResultViewChange}
         onResultsStaleChange={onResultsStaleChange}
         onRun={onRun ?? (() => {})}
         onSaveDocument={onSaveDocument ?? vi.fn<SaveDocument>()}

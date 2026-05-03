@@ -184,6 +184,26 @@ describe('createAppShellController', () => {
       false,
     );
   });
+
+  it('scopes result view state to the active Firestore tab', () => {
+    const tab = firestoreTab({ id: 'tab-firestore-1' });
+    const { input, mocks } = createInput({
+      activeTab: tab,
+      tabsState: tabsState([tab], tab.id),
+    });
+    const controller = createAppShellController(input);
+
+    controller.tabView?.firestore.onResultViewChange('tree');
+
+    expect(mocks.firestoreTab.setResultView).toHaveBeenCalledWith(tab.id, 'tree');
+
+    controller.tabView?.firestore.onResultViewChange('json', 'tab-firestore-2');
+
+    expect(mocks.firestoreTab.setResultView).toHaveBeenLastCalledWith(
+      'tab-firestore-2',
+      'json',
+    );
+  });
 });
 
 function createInput(
@@ -248,12 +268,14 @@ function createInput(
     queryRows: [],
     refreshQuery: vi.fn(() => 'orders'),
     resetDraft: vi.fn(),
+    resultView: 'table' as const,
     resultsStale: false,
     runQuery: vi.fn(() => 'orders'),
     selectDocument: vi.fn(),
     selectedDocument: null,
     selectedDocumentPath: null,
     setDraft: vi.fn(),
+    setResultView: vi.fn(),
     setResultsStale: vi.fn(),
   };
   const firestoreWriteFacade = {

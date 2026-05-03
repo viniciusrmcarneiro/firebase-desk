@@ -116,8 +116,21 @@ describe('firestore query transitions and selectors', () => {
     );
     expect(selected.selectedDocumentPaths['tab-1']).toBe('a/b');
 
-    const viewChanged = firestoreResultViewChanged(selected, 'json');
+    const viewChanged = firestoreResultViewChanged(selected, 'tab-1', 'json');
     expect(viewChanged.resultView).toBe('json');
+    expect(viewChanged.resultsByTab['tab-1']?.resultView).toBe('json');
+
+    const otherTabChanged = firestoreResultViewChanged(viewChanged, 'tab-2', 'tree');
+    expect(otherTabChanged.resultsByTab['tab-1']?.resultView).toBe('json');
+    expect(otherTabChanged.resultsByTab['tab-2']?.resultView).toBe('tree');
+
+    const rerun = firestoreQueryStarted(viewChanged, {
+      clearSelection: true,
+      limit: 25,
+      query: query('orders'),
+      tabId: 'tab-1',
+    });
+    expect(rerun.resultsByTab['tab-1']?.resultView).toBe('json');
 
     const stale = firestoreResultsMarkedStale(viewChanged, 'tab-1');
     expect(stale.resultsStale).toBe(true);

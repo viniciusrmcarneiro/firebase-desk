@@ -24,6 +24,7 @@ export interface FirestoreQueryResultState {
   readonly isFetchingMore: boolean;
   readonly isLoading: boolean;
   readonly pages: ReadonlyArray<FirestoreQueryPage>;
+  readonly resultView: FirestoreResultView;
   readonly resultsStale: boolean;
 }
 
@@ -64,7 +65,7 @@ export function createInitialFirestoreQueryRuntimeState(
     queryRequests: {},
     recordedQueryCompletions: {},
     resultsByTab: {},
-    resultView: 'table',
+    resultView: result.resultView,
     resultsStale: result.resultsStale,
     selectedDocumentPaths: {},
   };
@@ -77,6 +78,7 @@ export function emptyFirestoreQueryResultState(): FirestoreQueryResultState {
     isFetchingMore: false,
     isLoading: false,
     pages: [],
+    resultView: 'table',
     resultsStale: false,
   };
 }

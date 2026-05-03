@@ -3,6 +3,7 @@ import {
   type DeleteDocumentOptions,
   type FirestoreCreateDocumentRequest,
   FirestoreQuerySurface,
+  type FirestoreResultView,
   JsQuerySurface,
 } from '@firebase-desk/product-ui';
 import type {
@@ -71,6 +72,7 @@ export interface FirestoreTabSurfaceModel {
   readonly onOpenDocumentInNewTab: (documentPath: string) => void;
   readonly onReset: () => void;
   readonly onRefreshResults: () => void;
+  readonly onResultViewChange: (resultView: FirestoreResultView, scopeKey?: string) => void;
   readonly onResultsStaleChange: (stale: boolean, scopeKey?: string) => void;
   readonly onRunQuery: () => void;
   readonly onSaveDocument: (
@@ -87,6 +89,7 @@ export interface FirestoreTabSurfaceModel {
     | FirestoreUpdateDocumentFieldsResult
     | void;
   readonly onSelectDocument: (documentPath: string) => void;
+  readonly resultView: FirestoreResultView;
   readonly resultsStale: boolean;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly selectedDocument: FirestoreDocumentResult | null;
@@ -150,6 +153,7 @@ export function WorkspaceTabView(props: WorkspaceTabViewProps) {
       isFetchingMore={props.firestore.isFetchingMore}
       isLoading={props.firestore.isLoading}
       rows={props.firestore.rows}
+      resultView={props.firestore.resultView}
       resultsScopeKey={props.activeTab.id}
       resultsStale={props.firestore.resultsStale}
       selectedDocument={props.firestore.selectedDocument}
@@ -165,6 +169,7 @@ export function WorkspaceTabView(props: WorkspaceTabViewProps) {
       onOpenDocumentInNewTab={props.firestore.onOpenDocumentInNewTab}
       onReset={props.firestore.onReset}
       onRefreshResults={props.firestore.onRefreshResults}
+      onResultViewChange={props.firestore.onResultViewChange}
       onResultsStaleChange={props.firestore.onResultsStaleChange}
       onRun={props.firestore.onRunQuery}
       onSaveDocument={props.firestore.onSaveDocument}
