@@ -13,6 +13,7 @@ interface AppSidebarProps {
   readonly onCollapse: () => void;
   readonly onCreateCollection: AccountTreeProps['onCreateCollection'];
   readonly onCreateDocument: AccountTreeProps['onCreateDocument'];
+  readonly onCollectionJob: AccountTreeProps['onCollectionJob'];
   readonly onEditItem: AccountTreeProps['onEditItem'];
   readonly onExpand: () => void;
   readonly onFilterChange: AccountTreeProps['onFilterChange'];
@@ -32,6 +33,7 @@ export function AppSidebar(
     onCollapse,
     onCreateCollection,
     onCreateDocument,
+    onCollectionJob,
     onEditItem,
     onExpand,
     onFilterChange,
@@ -70,6 +72,7 @@ export function AppSidebar(
         onToggleItem={onToggleItem}
         {...(onCreateCollection ? { onCreateCollection } : {})}
         {...(onCreateDocument ? { onCreateDocument } : {})}
+        {...(onCollectionJob ? { onCollectionJob } : {})}
         {...(onEditItem ? { onEditItem } : {})}
       />
     </SidebarShell>

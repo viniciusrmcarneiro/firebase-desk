@@ -48,12 +48,22 @@ describe('createRepositories', () => {
 
   it('uses desktop activity in mock data mode when the desktop API is available', async () => {
     const listActivity = vi.fn(async () => []);
+    const listJobs = vi.fn(async () => []);
     vi.stubGlobal('firebaseDesk', {
       activity: {
         append: vi.fn(),
         clear: vi.fn(),
         export: vi.fn(),
         list: listActivity,
+      },
+      jobs: {
+        cancel: vi.fn(),
+        clearCompleted: vi.fn(),
+        list: listJobs,
+        pickExportFile: vi.fn(),
+        pickImportFile: vi.fn(),
+        start: vi.fn(),
+        subscribe: vi.fn(() => () => {}),
       },
       projects: {
         list: vi.fn(async () => []),
@@ -68,8 +78,10 @@ describe('createRepositories', () => {
 
     const repositories = createRepositories({ dataMode: 'mock' });
     await repositories.activity.list({ limit: 1 });
+    await repositories.jobs.list({ limit: 1 });
 
     expect(listActivity).toHaveBeenCalledWith({ limit: 1 });
+    expect(listJobs).toHaveBeenCalledWith({ limit: 1 });
   });
 
   it('does not fall back to mock feature repositories in live data mode', async () => {
@@ -86,6 +98,15 @@ describe('createRepositories', () => {
       },
       firestore: {
         listRootCollections: vi.fn(async () => []),
+      },
+      jobs: {
+        cancel: vi.fn(),
+        clearCompleted: vi.fn(),
+        list: vi.fn(async () => []),
+        pickExportFile: vi.fn(),
+        pickImportFile: vi.fn(),
+        start: vi.fn(),
+        subscribe: vi.fn(() => () => {}),
       },
       projects: {
         list: vi.fn(async () => []),

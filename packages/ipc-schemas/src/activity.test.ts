@@ -18,16 +18,16 @@ describe('activity schemas', () => {
 
     expect(
       ActivityLogEntrySchema.parse({
-        action: 'Save document',
+        action: 'Delete collection',
         area: 'firestore',
         id: 'entry-1',
-        metadata: { fieldCount: 2 },
+        metadata: { jobId: 'job-1' },
         status: 'success',
-        summary: 'Saved orders/ord_1',
-        target: { path: 'orders/ord_1', type: 'firestore-document' },
+        summary: 'Deleted 2 documents.',
+        target: { path: 'orders', type: 'firestore-collection' },
         timestamp: '2026-04-29T00:00:00.000Z',
       }),
-    ).toMatchObject({ action: 'Save document', area: 'firestore' });
+    ).toMatchObject({ action: 'Delete collection', area: 'firestore' });
 
     expect(
       ActivityLogListRequestSchema.parse({

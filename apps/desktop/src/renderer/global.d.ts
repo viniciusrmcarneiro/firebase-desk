@@ -2,6 +2,7 @@
 
 import type { IpcRequest, IpcResponse } from '@firebase-desk/ipc-schemas';
 import type { ScriptRunEventListener } from '@firebase-desk/repo-contracts';
+import type { BackgroundJobEvent } from '@firebase-desk/repo-contracts/jobs';
 
 declare global {
   interface DesktopAppApi {
@@ -24,6 +25,18 @@ declare global {
     readonly list: (
       request: IpcRequest<'activity.list'>,
     ) => Promise<IpcResponse<'activity.list'>>;
+  }
+
+  interface DesktopJobsApi {
+    readonly cancel: (request: IpcRequest<'jobs.cancel'>) => Promise<IpcResponse<'jobs.cancel'>>;
+    readonly clearCompleted: () => Promise<IpcResponse<'jobs.clearCompleted'>>;
+    readonly list: (request: IpcRequest<'jobs.list'>) => Promise<IpcResponse<'jobs.list'>>;
+    readonly pickExportFile: (
+      request: IpcRequest<'jobs.pickExportFile'>,
+    ) => Promise<IpcResponse<'jobs.pickExportFile'>>;
+    readonly pickImportFile: () => Promise<IpcResponse<'jobs.pickImportFile'>>;
+    readonly start: (request: IpcRequest<'jobs.start'>) => Promise<IpcResponse<'jobs.start'>>;
+    readonly subscribe: (listener: (event: BackgroundJobEvent) => void) => () => void;
   }
 
   interface DesktopProjectsApi {
@@ -113,6 +126,7 @@ declare global {
     readonly app: DesktopAppApi;
     readonly activity: DesktopActivityApi;
     readonly health: DesktopHealthApi;
+    readonly jobs: DesktopJobsApi;
     readonly projects: DesktopProjectsApi;
     readonly settings: DesktopSettingsApi;
     readonly firestore: DesktopFirestoreApi;

@@ -5,6 +5,7 @@ import { useEffect, useMemo, useRef, useState } from 'react';
 import type { ActivityStore } from '../../app-core/activity/activityStore.ts';
 import { useActivityController } from '../../app-core/activity/useActivityController.ts';
 import { useFirestoreWriteController } from '../../app-core/firestore/write/useFirestoreWriteController.ts';
+import { useJobsController } from '../../app-core/jobs/useJobsController.ts';
 import { useSettingsController } from '../../app-core/settings/useSettingsController.ts';
 import { closeWorkspaceTabsCommand } from '../../app-core/workspace/workspaceCommands.ts';
 import { type AppShellController, createAppShellController } from '../appShellOrchestrator.ts';
@@ -62,6 +63,14 @@ export function useAppShellController(
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const destructiveAction = useDestructiveActionController();
   const nextCreateDocumentRequestId = useRef(1);
+  const nextCollectionJobRequestId = useRef(1);
+  const [collectionJobRequest, setCollectionJobRequest] = useState<
+    {
+      readonly collectionPath: string;
+      readonly kind: 'copy' | 'delete' | 'duplicate' | 'export' | 'import';
+      readonly requestId: number;
+    } | null
+  >(null);
 
   const activity = useActivityController({
     loadIssuePreviewOnMount: !activityStore,
@@ -70,6 +79,10 @@ export function useAppShellController(
     store: activityStore,
   });
   const recordActivity = activity.record;
+  const jobs = useJobsController({
+    onStatus: setLastAction,
+    repository: repositories.jobs,
+  });
   const persistedWorkspace = usePersistedWorkspaceState({
     onError: setWorkspacePersistenceError,
     settings: repositories.settings,
@@ -196,6 +209,7 @@ export function useAppShellController(
     focusAuthFilter,
     focusTreeFilter,
     jsTab,
+    jobs,
     lastAction,
     layout: {
       sidebarCollapsed,
@@ -203,7 +217,13 @@ export function useAppShellController(
       onSidebarResize: (size) => persistSidebarWidth(repositories, size),
     },
     nextCreateDocumentRequestId: () => nextCreateDocumentRequestId.current++,
+    collectionJobRequest,
+    nextCollectionJobRequestId: () => nextCollectionJobRequestId.current++,
     projects,
+    jobsRepository: {
+      pickExportFile: repositories.jobs.pickExportFile,
+      pickImportFile: repositories.jobs.pickImportFile,
+    },
     projectsRepository: repositories.projects,
     projectCommands,
     repositories: {
@@ -244,6 +264,7 @@ export function useAppShellController(
       selectTreeItem: selectionActions.selectTreeItem,
       setAddProjectOpen,
       setCredentialWarning,
+      setCollectionJobRequest,
       setDensity,
       setEditingProjectId,
       setLastAction,

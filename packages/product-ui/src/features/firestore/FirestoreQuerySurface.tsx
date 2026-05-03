@@ -8,11 +8,17 @@ import type {
   FirestoreSaveDocumentResult,
   FirestoreUpdateDocumentFieldsOptions,
   FirestoreUpdateDocumentFieldsResult,
+  ProjectSummary,
   SettingsRepository,
 } from '@firebase-desk/repo-contracts';
 import { normalizeFirestoreWriteSettings } from '@firebase-desk/repo-contracts';
+import type {
+  FirestoreCollectionJobRequest,
+  FirestoreExportFormat,
+} from '@firebase-desk/repo-contracts/jobs';
 import { useEffect, useRef, useState } from 'react';
 import { messageFromError } from '../../shared/errors.ts';
+import { CollectionJobDialog } from './CollectionJobDialog.tsx';
 import { ConfirmDialog } from './ConfirmDialog.tsx';
 import { ConflictMergeModal } from './ConflictMergeModal.tsx';
 import { CreateDocumentModal } from './CreateDocumentModal.tsx';
@@ -40,7 +46,11 @@ type ResultViewChangeHandler = (
   scopeKey?: string,
 ) => void;
 
+export type CollectionJobKind = 'copy' | 'delete' | 'duplicate' | 'export' | 'import';
+
 export interface FirestoreQuerySurfaceProps {
+  readonly activeProject?: ProjectSummary | null | undefined;
+  readonly collectionJobRequest?: FirestoreCollectionJobDialogRequest | null | undefined;
   readonly createDocumentRequest?: FirestoreCreateDocumentRequest | null | undefined;
   readonly draft: FirestoreQueryDraft;
   readonly errorMessage?: string | null;
@@ -53,6 +63,7 @@ export interface FirestoreQuerySurfaceProps {
     data: Record<string, unknown>,
   ) => Promise<void> | void;
   readonly onCreateDocumentRequestHandled?: ((requestId: number) => void) | undefined;
+  readonly onCollectionJobRequestHandled?: ((requestId: number) => void) | undefined;
   readonly onDeleteDocument?: (
     documentPath: string,
     options: DeleteDocumentOptions,
@@ -61,6 +72,12 @@ export interface FirestoreQuerySurfaceProps {
   readonly onGenerateDocumentId?: (
     collectionPath: string,
   ) => Promise<string> | string;
+  readonly onPickCollectionJobExportFile?:
+    | ((format: FirestoreExportFormat) => Promise<string | null> | string | null)
+    | undefined;
+  readonly onPickCollectionJobImportFile?:
+    | (() => Promise<string | null> | string | null)
+    | undefined;
   readonly onLoadMore: () => void;
   readonly onLoadSubcollections?: (
     documentPath: string,
@@ -85,6 +102,10 @@ export interface FirestoreQuerySurfaceProps {
     | FirestoreUpdateDocumentFieldsResult
     | void;
   readonly onSelectDocument: (documentPath: string) => void;
+  readonly onStartCollectionJob?:
+    | ((request: FirestoreCollectionJobRequest) => Promise<void> | void)
+    | undefined;
+  readonly projects?: ReadonlyArray<ProjectSummary> | undefined;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
   readonly resultView?: FirestoreResultView | undefined;
   readonly resultsScopeKey?: string | undefined;
@@ -97,6 +118,12 @@ export interface FirestoreQuerySurfaceProps {
 export interface FirestoreCreateDocumentRequest {
   readonly collectionPath: string;
   readonly collectionPathEditable?: boolean;
+  readonly requestId: number;
+}
+
+export interface FirestoreCollectionJobDialogRequest {
+  readonly collectionPath: string;
+  readonly kind: CollectionJobKind;
   readonly requestId: number;
 }
 
@@ -122,6 +149,8 @@ interface PendingStaleFieldPatch {
 
 export function FirestoreQuerySurface(
   {
+    activeProject = null,
+    collectionJobRequest = null,
     draft,
     createDocumentRequest = null,
     errorMessage = null,
@@ -129,10 +158,13 @@ export function FirestoreQuerySurface(
     isFetchingMore = false,
     isLoading = false,
     onCreateDocument,
+    onCollectionJobRequestHandled,
     onCreateDocumentRequestHandled,
     onDeleteDocument,
     onDraftChange,
     onGenerateDocumentId,
+    onPickCollectionJobExportFile,
+    onPickCollectionJobImportFile,
     onLoadMore,
     onLoadSubcollections,
     onOpenDocumentInNewTab,
@@ -144,6 +176,8 @@ export function FirestoreQuerySurface(
     onSaveDocument,
     onUpdateDocumentFields,
     onSelectDocument,
+    onStartCollectionJob,
+    projects = [],
     rows,
     resultView,
     resultsScopeKey,
@@ -163,7 +197,16 @@ export function FirestoreQuerySurface(
   );
   const [deleteFieldTarget, setDeleteFieldTarget] = useState<FieldEditTarget | null>(null);
   const [createDocumentState, setCreateDocumentState] = useState<CreateDocumentState | null>(null);
+  const [collectionJob, setCollectionJob] = useState<
+    {
+      readonly collectionPath: string;
+      readonly kind: CollectionJobKind;
+    } | null
+  >(null);
   const [handledCreateRequestId, setHandledCreateRequestId] = useState<number | null>(null);
+  const [handledCollectionJobRequestId, setHandledCollectionJobRequestId] = useState<number | null>(
+    null,
+  );
   const [conflictMerge, setConflictMerge] = useState<ConflictMergeState | null>(null);
   const [pendingStaleFieldPatch, setPendingStaleFieldPatch] = useState<
     PendingStaleFieldPatch | null
@@ -196,6 +239,18 @@ export function FirestoreQuerySurface(
     });
     onCreateDocumentRequestHandled?.(createDocumentRequest.requestId);
   }, [createDocumentRequest, handledCreateRequestId, onCreateDocumentRequestHandled]);
+
+  useEffect(() => {
+    if (!collectionJobRequest || collectionJobRequest.requestId === handledCollectionJobRequestId) {
+      return;
+    }
+    setHandledCollectionJobRequestId(collectionJobRequest.requestId);
+    setCollectionJob({
+      collectionPath: collectionJobRequest.collectionPath,
+      kind: collectionJobRequest.kind,
+    });
+    onCollectionJobRequestHandled?.(collectionJobRequest.requestId);
+  }, [collectionJobRequest, handledCollectionJobRequestId, onCollectionJobRequestHandled]);
 
   useEffect(() => {
     onResultViewChangeRef.current = onResultViewChange;
@@ -484,6 +539,9 @@ export function FirestoreQuerySurface(
         selectedDocument={selectedDocument}
         selectedDocumentPath={selectedDocumentPath}
         settings={settings}
+        onCollectionJob={onStartCollectionJob
+          ? (kind, collectionPath) => setCollectionJob({ collectionPath, kind })
+          : undefined}
         onDeleteDocument={onDeleteDocument ? setDeleteDocumentTarget : undefined}
         onDeleteField={fieldActionsEnabled ? setDeleteFieldTarget : undefined}
         onEditDocument={setEditorDocument}
@@ -579,6 +637,27 @@ export function FirestoreQuerySurface(
           if (!open) setCreateDocumentState(null);
         }}
       />
+      {collectionJob
+        ? (
+          <CollectionJobDialog
+            activeProject={activeProject}
+            collectionPath={collectionJob.collectionPath}
+            initialKind={collectionJob.kind}
+            open
+            projects={projects}
+            onOpenChange={(open) => {
+              if (!open) setCollectionJob(null);
+            }}
+            onPickExportFile={async (format) =>
+              await Promise.resolve(onPickCollectionJobExportFile?.(format) ?? null)}
+            onPickImportFile={async () =>
+              await Promise.resolve(onPickCollectionJobImportFile?.() ?? null)}
+            onStartJob={async (request) => {
+              await onStartCollectionJob?.(request);
+            }}
+          />
+        )
+        : null}
       {conflictMerge
         ? (
           <ConflictMergeModal

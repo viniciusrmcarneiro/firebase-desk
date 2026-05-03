@@ -6,11 +6,13 @@ import type {
   ProjectsRepository,
   ScriptRunnerRepository,
 } from '@firebase-desk/repo-contracts';
+import type { BackgroundJobRepository } from '@firebase-desk/repo-contracts/jobs';
 import { createActivityHandlers } from './activity-handlers.ts';
 import { type AppHandlerDeps, createAppHandlers } from './app-handlers.ts';
 import { createAuthHandlers } from './auth-handlers.ts';
 import { createFirestoreHandlers } from './firestore-handlers.ts';
 import type { IpcHandlerMap } from './handler-types.ts';
+import { createJobsHandlers } from './jobs-handlers.ts';
 import { createProjectsHandlers } from './projects-handlers.ts';
 import { createScriptRunnerHandlers } from './script-runner-handlers.ts';
 import { createSettingsHandlers } from './settings-handlers.ts';
@@ -21,6 +23,7 @@ export interface CreateIpcHandlersDeps extends AppHandlerDeps {
     readonly invalidateConnection: (connectionId: string) => Promise<void>;
   };
   readonly authRepository: AuthRepository;
+  readonly jobsRepository: BackgroundJobRepository;
   readonly firestoreProvider: {
     readonly invalidateConnection: (connectionId: string) => Promise<void>;
   };
@@ -38,6 +41,7 @@ export function createIpcHandlers(deps: CreateIpcHandlersDeps): IpcHandlerMap {
   return {
     ...createAppHandlers(deps),
     ...createActivityHandlers(deps.activityLogRepository),
+    ...createJobsHandlers(deps.jobsRepository),
     ...createProjectsHandlers({
       authProvider: deps.authProvider,
       firestoreProvider: deps.firestoreProvider,

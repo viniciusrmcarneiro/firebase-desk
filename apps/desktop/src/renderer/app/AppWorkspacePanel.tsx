@@ -4,8 +4,9 @@ import {
   type WorkspaceTabModel,
   WorkspaceTabStrip,
 } from '@firebase-desk/product-ui';
+import { JobsDrawer } from '@firebase-desk/product-ui/jobs';
 import type { ActivityLogEntry, ProjectSummary } from '@firebase-desk/repo-contracts';
-import { Badge, IconButton, Toolbar } from '@firebase-desk/ui';
+import { Badge, Button, IconButton, Toolbar } from '@firebase-desk/ui';
 import { Database, RefreshCw } from 'lucide-react';
 import type { ComponentProps, ReactNode } from 'react';
 import { AppStatusBar } from './AppStatusBar.tsx';
@@ -24,7 +25,7 @@ interface AppWorkspacePanelProps {
       readonly label: string;
       readonly variant: ComponentProps<typeof Badge>['variant'];
     } | null;
-    readonly buttonVariant: ComponentProps<typeof IconButton>['variant'];
+    readonly buttonVariant: ComponentProps<typeof Button>['variant'];
     readonly entries: ReadonlyArray<ActivityLogEntry>;
     readonly expanded: boolean;
     readonly isLoading: boolean;
@@ -33,6 +34,17 @@ interface AppWorkspacePanelProps {
     readonly status: 'all' | ActivityLogEntry['status'];
   };
   readonly lastAction: string;
+  readonly jobs: {
+    readonly buttonBadge: {
+      readonly label: string;
+      readonly variant: ComponentProps<typeof Badge>['variant'];
+    } | null;
+    readonly buttonVariant: ComponentProps<typeof Button>['variant'];
+    readonly expanded: boolean;
+    readonly isLoading: boolean;
+    readonly open: boolean;
+    readonly rows: ComponentProps<typeof JobsDrawer>['jobs'];
+  };
   readonly projects: ReadonlyArray<ProjectSummary>;
   readonly selectedTreeItemId: string | null;
   readonly tabModels: ReadonlyArray<WorkspaceTabModel>;
@@ -46,6 +58,11 @@ interface AppWorkspacePanelProps {
   readonly onActivitySearchChange: (search: string) => void;
   readonly onActivityStatusChange: (status: 'all' | ActivityLogEntry['status']) => void;
   readonly onActivityToggle: () => void;
+  readonly onJobsCancel: (id: string) => void;
+  readonly onJobsClearCompleted: () => void;
+  readonly onJobsClose: () => void;
+  readonly onJobsExpandedChange: (expanded: boolean) => void;
+  readonly onJobsToggle: () => void;
   readonly onCloseAllTabs: () => void;
   readonly onCloseOtherTabs: (tabId: string) => void;
   readonly onCloseTab: (tabId: string) => void;
@@ -67,6 +84,7 @@ export function AppWorkspacePanel(
     activeView,
     activity,
     lastAction,
+    jobs,
     projects,
     selectedTreeItemId,
     tabModels,
@@ -80,6 +98,11 @@ export function AppWorkspacePanel(
     onActivitySearchChange,
     onActivityStatusChange,
     onActivityToggle,
+    onJobsCancel,
+    onJobsClearCompleted,
+    onJobsClose,
+    onJobsExpandedChange,
+    onJobsToggle,
     onCloseAllTabs,
     onCloseOtherTabs,
     onCloseTab,
@@ -94,7 +117,7 @@ export function AppWorkspacePanel(
   }: AppWorkspacePanelProps,
 ) {
   return (
-    <div className='grid h-full min-h-0 overflow-hidden grid-rows-[minmax(0,1fr)_auto_auto]'>
+    <div className='grid h-full min-h-0 overflow-hidden grid-rows-[minmax(0,1fr)_auto_auto_auto]'>
       <WorkspaceShell
         className='h-full min-h-0'
         tabStrip={
@@ -174,15 +197,29 @@ export function AppWorkspacePanel(
         onSearchChange={onActivitySearchChange}
         onStatusChange={onActivityStatusChange}
       />
+      <JobsDrawer
+        expanded={jobs.expanded}
+        isLoading={jobs.isLoading}
+        jobs={jobs.rows}
+        open={jobs.open}
+        onCancel={onJobsCancel}
+        onClearCompleted={onJobsClearCompleted}
+        onClose={onJobsClose}
+        onExpandedChange={onJobsExpandedChange}
+      />
       <AppStatusBar
         activeProject={activeProject}
         activeTabTitle={activeTab?.title ?? 'No tab'}
         activityBadge={activity.buttonBadge}
         activityButtonVariant={activity.buttonVariant}
         activityOpen={activity.open}
+        jobsBadge={jobs.buttonBadge}
+        jobsButtonVariant={jobs.buttonVariant}
+        jobsOpen={jobs.open}
         lastAction={lastAction}
         selectedTreeItemId={selectedTreeItemId}
         onActivityToggle={onActivityToggle}
+        onJobsToggle={onJobsToggle}
       />
     </div>
   );

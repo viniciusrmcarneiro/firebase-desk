@@ -19,6 +19,7 @@ const mocks = vi.hoisted(() => ({
   useFirestoreTabState: vi.fn(),
   useFirestoreWriteController: vi.fn(),
   useJsTabState: vi.fn(),
+  useJobsController: vi.fn(),
   usePersistWorkspaceSnapshot: vi.fn(),
   usePersistedWorkspaceState: vi.fn(),
   useProjectCommandController: vi.fn(),
@@ -44,6 +45,10 @@ vi.mock('../../app-core/activity/useActivityController.ts', () => ({
 
 vi.mock('../../app-core/firestore/write/useFirestoreWriteController.ts', () => ({
   useFirestoreWriteController: mocks.useFirestoreWriteController,
+}));
+
+vi.mock('../../app-core/jobs/useJobsController.ts', () => ({
+  useJobsController: mocks.useJobsController,
 }));
 
 vi.mock('../../app-core/settings/useSettingsController.ts', () => ({
@@ -242,6 +247,7 @@ interface Scenario {
   readonly firestoreTab: ReturnType<typeof createFirestoreTab>;
   readonly firestoreWrite: ReturnType<typeof createFirestoreWrite>;
   readonly jsTab: ReturnType<typeof createJsTab>;
+  readonly jobs: ReturnType<typeof createJobs>;
   readonly persistedWorkspace: {
     readonly restored: boolean;
     readonly snapshot: {
@@ -274,6 +280,7 @@ function setupMocks(scenario: Scenario) {
   mocks.useFirestoreTabState.mockReturnValue(scenario.firestoreTab);
   mocks.useFirestoreWriteController.mockReturnValue(scenario.firestoreWrite);
   mocks.useJsTabState.mockReturnValue(scenario.jsTab);
+  mocks.useJobsController.mockReturnValue(scenario.jobs);
   mocks.usePersistedWorkspaceState.mockReturnValue(scenario.persistedWorkspace);
   mocks.useProjectCommandController.mockReturnValue(scenario.projectCommands);
   mocks.useProjects.mockReturnValue(scenario.projectsQuery);
@@ -328,6 +335,7 @@ function createScenario(
     firestoreTab: firestoreTabState,
     firestoreWrite: createFirestoreWrite(),
     jsTab,
+    jobs: createJobs(),
     persistedWorkspace: {
       restored: true,
       snapshot: { authFilter, drafts, scripts },
@@ -351,6 +359,15 @@ function createRepositories(
     activity: {},
     auth: {},
     firestore: { listSubcollections: vi.fn() },
+    jobs: {
+      cancel: vi.fn(),
+      clearCompleted: vi.fn(),
+      list: vi.fn(),
+      pickExportFile: vi.fn(),
+      pickImportFile: vi.fn(),
+      start: vi.fn(),
+      subscribe: vi.fn(),
+    },
     projects: {},
     scriptRunner: {},
     settings: { save },
@@ -489,6 +506,31 @@ function createJsTab({ scripts = {} }: { readonly scripts?: Record<string, strin
     scriptStartedAt: null,
     scripts,
     setScriptSource: vi.fn(),
+  };
+}
+
+function createJobs() {
+  return {
+    button: { badge: null, variant: 'ghost' as const },
+    cancel: vi.fn(),
+    clearCompleted: vi.fn(),
+    close: vi.fn(),
+    expanded: false,
+    isLoading: false,
+    jobs: [],
+    load: vi.fn(),
+    open: vi.fn(),
+    opened: false,
+    setExpanded: vi.fn(),
+    start: vi.fn(),
+    state: {
+      errorMessage: null,
+      expanded: false,
+      isLoading: false,
+      jobs: [],
+      open: false,
+    },
+    toggle: vi.fn(),
   };
 }
 

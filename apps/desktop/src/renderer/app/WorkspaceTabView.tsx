@@ -1,6 +1,7 @@
 import {
   AuthUsersSurface,
   type DeleteDocumentOptions,
+  type FirestoreCollectionJobDialogRequest,
   type FirestoreCreateDocumentRequest,
   FirestoreQuerySurface,
   type FirestoreResultView,
@@ -16,9 +17,14 @@ import type {
   FirestoreSaveDocumentResult,
   FirestoreUpdateDocumentFieldsOptions,
   FirestoreUpdateDocumentFieldsResult,
+  ProjectSummary,
   ScriptRunResult,
   SettingsRepository,
 } from '@firebase-desk/repo-contracts';
+import type {
+  FirestoreCollectionJobRequest,
+  FirestoreExportFormat,
+} from '@firebase-desk/repo-contracts/jobs';
 import type { WorkspaceTab } from './stores/tabsStore.ts';
 
 export interface WorkspaceTabViewProps {
@@ -49,6 +55,8 @@ export interface AuthTabSurfaceModel {
 export interface FirestoreTabSurfaceModel {
   readonly createDocumentRequest: FirestoreCreateDocumentRequest | null;
   readonly draft: FirestoreQueryDraft;
+  readonly activeProject: ProjectSummary | null;
+  readonly collectionJobRequest: FirestoreCollectionJobDialogRequest | null;
   readonly errorMessage: string | null;
   readonly hasMore: boolean;
   readonly isFetchingMore: boolean;
@@ -59,12 +67,17 @@ export interface FirestoreTabSurfaceModel {
     data: Record<string, unknown>,
   ) => Promise<void> | void;
   readonly onCreateDocumentRequestHandled: (requestId: number) => void;
+  readonly onCollectionJobRequestHandled: (requestId: number) => void;
   readonly onDeleteDocument: (
     documentPath: string,
     options: DeleteDocumentOptions,
   ) => void;
   readonly onDraftChange: (draft: FirestoreQueryDraft) => void;
   readonly onGenerateDocumentId: (collectionPath: string) => Promise<string> | string;
+  readonly onPickCollectionJobExportFile: (
+    format: FirestoreExportFormat,
+  ) => Promise<string | null> | string | null;
+  readonly onPickCollectionJobImportFile: () => Promise<string | null> | string | null;
   readonly onLoadMore: () => void;
   readonly onLoadSubcollections: (
     documentPath: string,
@@ -89,6 +102,8 @@ export interface FirestoreTabSurfaceModel {
     | FirestoreUpdateDocumentFieldsResult
     | void;
   readonly onSelectDocument: (documentPath: string) => void;
+  readonly onStartCollectionJob: (request: FirestoreCollectionJobRequest) => Promise<void> | void;
+  readonly projects: ReadonlyArray<ProjectSummary>;
   readonly resultView: FirestoreResultView;
   readonly resultsStale: boolean;
   readonly rows: ReadonlyArray<FirestoreDocumentResult>;
@@ -146,6 +161,8 @@ export function WorkspaceTabView(props: WorkspaceTabViewProps) {
   return (
     <FirestoreQuerySurface
       key={props.activeTab.id}
+      activeProject={props.firestore.activeProject}
+      collectionJobRequest={props.firestore.collectionJobRequest}
       createDocumentRequest={props.firestore.createDocumentRequest}
       draft={props.firestore.draft}
       errorMessage={props.firestore.errorMessage}
@@ -159,11 +176,15 @@ export function WorkspaceTabView(props: WorkspaceTabViewProps) {
       selectedDocument={props.firestore.selectedDocument}
       selectedDocumentPath={props.firestore.selectedDocumentPath}
       settings={props.firestore.settings}
+      projects={props.firestore.projects}
       onCreateDocument={props.firestore.onCreateDocument}
+      onCollectionJobRequestHandled={props.firestore.onCollectionJobRequestHandled}
       onCreateDocumentRequestHandled={props.firestore.onCreateDocumentRequestHandled}
       onDraftChange={props.firestore.onDraftChange}
       onDeleteDocument={props.firestore.onDeleteDocument}
       onGenerateDocumentId={props.firestore.onGenerateDocumentId}
+      onPickCollectionJobExportFile={props.firestore.onPickCollectionJobExportFile}
+      onPickCollectionJobImportFile={props.firestore.onPickCollectionJobImportFile}
       onLoadMore={props.firestore.onLoadMore}
       onLoadSubcollections={props.firestore.onLoadSubcollections}
       onOpenDocumentInNewTab={props.firestore.onOpenDocumentInNewTab}
@@ -175,6 +196,7 @@ export function WorkspaceTabView(props: WorkspaceTabViewProps) {
       onSaveDocument={props.firestore.onSaveDocument}
       onUpdateDocumentFields={props.firestore.onUpdateDocumentFields}
       onSelectDocument={props.firestore.onSelectDocument}
+      onStartCollectionJob={props.firestore.onStartCollectionJob}
     />
   );
 }

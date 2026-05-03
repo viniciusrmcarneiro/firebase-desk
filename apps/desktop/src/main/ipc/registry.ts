@@ -1,9 +1,11 @@
 import {
   IPC_CHANNELS,
   type IpcChannel,
+  JOB_EVENT_CHANNEL,
   SCRIPT_RUN_EVENT_CHANNEL,
 } from '@firebase-desk/ipc-schemas';
 import type { ScriptRunEvent } from '@firebase-desk/repo-contracts';
+import type { BackgroundJobEvent } from '@firebase-desk/repo-contracts/jobs';
 import {
   AdminAuthProvider,
   AdminFirestoreProvider,
@@ -18,10 +20,13 @@ import { readFile } from 'node:fs/promises';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { MainActivityLogRepository } from '../activity/main-activity-log-repository.ts';
+import { MainBackgroundJobRepository } from '../jobs/background-job-repository.ts';
+import { FirestoreCollectionJobRunner } from '../jobs/firestore-collection-job-runner.ts';
 import { MainProjectsRepository } from '../projects/main-projects-repository.ts';
 import { MainSettingsRepository } from '../settings/main-settings-repository.ts';
 import { ActivityLogStore } from '../storage/activity-log-store.ts';
 import { CredentialsStore } from '../storage/credentials-store.ts';
+import { JobsStore } from '../storage/jobs-store.ts';
 import { ProjectsStore } from '../storage/projects-store.ts';
 import { SettingsStore } from '../storage/settings-store.ts';
 import { toIpcScriptRunEvent } from './converters.ts';
@@ -73,6 +78,15 @@ export function registerIpcHandlers(): void {
   };
   const firestoreProvider = new AdminFirestoreProvider(connectionResolver);
   const firestoreRepository = new FirebaseFirestoreRepository(firestoreProvider);
+  const jobsRepository = new MainBackgroundJobRepository(
+    new JobsStore(userDataPath),
+    new FirestoreCollectionJobRunner(firestoreProvider, {
+      tempDirectory: resolve(userDataPath, 'tmp'),
+    }),
+    activityLogRepository,
+  );
+  jobsRepository.subscribe(broadcastBackgroundJobEvent);
+  void jobsRepository.initialize();
   const authProvider = new AdminAuthProvider(connectionResolver);
   const scriptRunnerRepository = new ProcessScriptRunnerRepository(connectionResolver, {
     workerPath: scriptRunnerWorkerPath(),
@@ -88,6 +102,7 @@ export function registerIpcHandlers(): void {
     dataDirectory: userDataPath,
     firestoreProvider,
     firestoreRepository,
+    jobsRepository,
     openDataDirectory: () => shell.openPath(userDataPath),
     pickServiceAccountFile: async () => {
       const result = await dialog.showOpenDialog({
@@ -139,5 +154,11 @@ function errorText(error: unknown): string {
 export function broadcastScriptRunEvent(event: ScriptRunEvent): void {
   for (const window of BrowserWindow.getAllWindows()) {
     window.webContents.send(SCRIPT_RUN_EVENT_CHANNEL, toIpcScriptRunEvent(event));
+  }
+}
+
+export function broadcastBackgroundJobEvent(event: BackgroundJobEvent): void {
+  for (const window of BrowserWindow.getAllWindows()) {
+    window.webContents.send(JOB_EVENT_CHANNEL, event);
   }
 }

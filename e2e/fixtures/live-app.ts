@@ -17,16 +17,31 @@ export interface LiveApp {
 
 export interface OpenLiveAppOptions {
   readonly activityExportFileName?: string;
+  readonly jobExportFileName?: string;
+  readonly jobImportFileName?: string;
 }
 
 export async function openLiveApp(options: OpenLiveAppOptions = {}): Promise<LiveApp> {
   const userDataDir = await mkdtemp(join(tmpdir(), 'firebase-desk-e2e-'));
   const app = await launchDesktop({
     args: ['--data-mode=live'],
-    ...(options.activityExportFileName
+    ...(options.activityExportFileName || options.jobExportFileName || options.jobImportFileName
       ? {
         env: {
-          FIREBASE_DESK_ACTIVITY_EXPORT_PATH: join(userDataDir, options.activityExportFileName),
+          ...(options.activityExportFileName
+            ? {
+              FIREBASE_DESK_ACTIVITY_EXPORT_PATH: join(
+                userDataDir,
+                options.activityExportFileName,
+              ),
+            }
+            : {}),
+          ...(options.jobExportFileName
+            ? { FIREBASE_DESK_JOB_EXPORT_PATH: join(userDataDir, options.jobExportFileName) }
+            : {}),
+          ...(options.jobImportFileName
+            ? { FIREBASE_DESK_JOB_IMPORT_PATH: join(userDataDir, options.jobImportFileName) }
+            : {}),
         },
       }
       : {}),

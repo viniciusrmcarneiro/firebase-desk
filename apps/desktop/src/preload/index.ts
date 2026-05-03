@@ -3,10 +3,13 @@ import {
   type IpcChannel,
   type IpcRequest,
   type IpcResponse,
+  JOB_EVENT_CHANNEL,
   SCRIPT_RUN_EVENT_CHANNEL,
   ScriptRunEventSchema,
 } from '@firebase-desk/ipc-schemas';
+import { BackgroundJobEventSchema } from '@firebase-desk/ipc-schemas/jobs';
 import type { ScriptRunEvent, ScriptRunEventListener } from '@firebase-desk/repo-contracts';
+import type { BackgroundJobEvent } from '@firebase-desk/repo-contracts/jobs';
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from 'electron';
 
 function invoke<C extends IpcChannel>(channel: C, request: IpcRequest<C>): Promise<IpcResponse<C>> {
@@ -26,6 +29,24 @@ const api = {
     clear: () => invoke('activity.clear', {}),
     export: (request: IpcRequest<'activity.export'>) => invoke('activity.export', request),
     list: (request: IpcRequest<'activity.list'>) => invoke('activity.list', request),
+  },
+  jobs: {
+    cancel: (request: IpcRequest<'jobs.cancel'>) => invoke('jobs.cancel', request),
+    clearCompleted: () => invoke('jobs.clearCompleted', {}),
+    list: (request: IpcRequest<'jobs.list'>) => invoke('jobs.list', request),
+    pickExportFile: (request: IpcRequest<'jobs.pickExportFile'>) =>
+      invoke('jobs.pickExportFile', request),
+    pickImportFile: () => invoke('jobs.pickImportFile', {}),
+    start: (request: IpcRequest<'jobs.start'>) => invoke('jobs.start', request),
+    subscribe: (listener: (event: BackgroundJobEvent) => void) => {
+      const handler = (_event: IpcRendererEvent, raw: unknown) => {
+        const parsed = BackgroundJobEventSchema.safeParse(raw);
+        if (!parsed.success) return;
+        listener(parsed.data as BackgroundJobEvent);
+      };
+      ipcRenderer.on(JOB_EVENT_CHANNEL, handler);
+      return () => ipcRenderer.removeListener(JOB_EVENT_CHANNEL, handler);
+    },
   },
   projects: {
     list: () => invoke('projects.list', {}),

@@ -17,6 +17,8 @@ import { OverviewCollapseStrip, ResultContextPanel } from './ResultOverviewPanel
 import { ResultPanel } from './ResultPanel.tsx';
 import type { FirestoreResultView } from './types.ts';
 
+type CollectionJobKind = 'copy' | 'delete' | 'duplicate' | 'export' | 'import';
+
 export interface FirestoreDocumentBrowserProps {
   readonly className?: string;
   readonly errorMessage?: string | null;
@@ -27,6 +29,9 @@ export interface FirestoreDocumentBrowserProps {
   readonly actionErrorMessage?: string | null;
   readonly actionNoticeMessage?: string | null;
   readonly onCreateDocument?: ((collectionPath: string) => void) | undefined;
+  readonly onCollectionJob?:
+    | ((kind: CollectionJobKind, collectionPath: string) => void)
+    | undefined;
   readonly onDeleteDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
   readonly onDeleteField?: ((target: FieldEditTarget) => void) | undefined;
   readonly onEditDocument?: ((document: FirestoreDocumentResult) => void) | undefined;
@@ -64,6 +69,7 @@ export function FirestoreDocumentBrowser(
     isFetchingMore = false,
     isLoading = false,
     onCreateDocument,
+    onCollectionJob,
     onDeleteDocument,
     onDeleteField,
     onEditDocument,
@@ -149,6 +155,7 @@ export function FirestoreDocumentBrowser(
         selectedDocumentPath={selectedDocumentPath}
         settings={settings}
         subcollectionStates={subcollectionStates}
+        onCollectionJob={onCollectionJob}
         onCreateDocument={onCreateDocument}
         onDeleteDocument={onDeleteDocument}
         onDeleteField={onDeleteField}

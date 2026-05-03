@@ -10,6 +10,7 @@ import type {
   SettingsRepository,
   SettingsSnapshot,
 } from '@firebase-desk/repo-contracts';
+import type { BackgroundJobRepository } from '@firebase-desk/repo-contracts/jobs';
 import {
   MockActivityLogRepository,
   MockAuthRepository,
@@ -18,9 +19,11 @@ import {
   MockScriptRunnerRepository,
   MockSettingsRepository,
 } from '@firebase-desk/repo-mocks';
+import { MockBackgroundJobRepository } from '@firebase-desk/repo-mocks/jobs';
 import { createContext, type ReactNode, useContext } from 'react';
 import { IpcActivityLogRepository } from './repositories/ipc-activity-log-repository.ts';
 import { IpcAuthRepository } from './repositories/ipc-auth-repository.ts';
+import { IpcBackgroundJobRepository } from './repositories/ipc-background-job-repository.ts';
 import { IpcFirestoreRepository } from './repositories/ipc-firestore-repository.ts';
 import { IpcProjectsRepository } from './repositories/ipc-projects-repository.ts';
 import { IpcScriptRunnerRepository } from './repositories/ipc-script-runner-repository.ts';
@@ -30,6 +33,7 @@ export interface RepositorySet {
   readonly activity: ActivityLogRepository;
   readonly auth: AuthRepository;
   readonly firestore: FirestoreRepository;
+  readonly jobs: BackgroundJobRepository;
   readonly projects: ProjectsRepository;
   readonly scriptRunner: ScriptRunnerRepository;
   readonly settings: SettingsRepository;
@@ -52,6 +56,7 @@ export function createMockRepositories(): RepositorySet {
     activity: new MockActivityLogRepository(),
     auth: new MockAuthRepository(),
     firestore: new MockFirestoreRepository(),
+    jobs: new MockBackgroundJobRepository(),
     projects: new MockProjectsRepository(),
     scriptRunner: new MockScriptRunnerRepository(),
     settings: new MockSettingsRepository(),
@@ -66,16 +71,20 @@ export function createRepositories(
   const activity = desktopApiAvailable
     ? new IpcActivityLogRepository()
     : new MockActivityLogRepository();
+  const jobs = desktopApiAvailable
+    ? new IpcBackgroundJobRepository()
+    : new MockBackgroundJobRepository();
   const repositories: RepositorySet = dataMode === 'live'
     ? {
       activity,
       auth: new IpcAuthRepository(),
       firestore: new IpcFirestoreRepository(),
+      jobs,
       projects: new IpcProjectsRepository(),
       scriptRunner: new IpcScriptRunnerRepository(),
       settings,
     }
-    : { ...createMockRepositories(), activity, settings };
+    : { ...createMockRepositories(), activity, jobs, settings };
 
   return {
     ...repositories,
