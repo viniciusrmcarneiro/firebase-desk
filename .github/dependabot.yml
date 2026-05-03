@@ -4,6 +4,10 @@ updates:
     directory: "/"           # Target the root where the lockfile resides
     schedule:
       interval: "weekly"
+    ignore:
+      - dependency-name: "*"
+        update-types:
+          - "version-update:semver-major"
     groups:                  # Recommended to avoid PR fatigue in monorepos
       dependencies:
         patterns:
