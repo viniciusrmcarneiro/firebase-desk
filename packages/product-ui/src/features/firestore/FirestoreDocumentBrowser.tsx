@@ -1,3 +1,4 @@
+import type { DensityName } from '@firebase-desk/design-tokens';
 import type {
   FirestoreCollectionNode,
   FirestoreDocumentResult,
@@ -21,6 +22,7 @@ type CollectionJobKind = 'copy' | 'delete' | 'duplicate' | 'export' | 'import';
 
 export interface FirestoreDocumentBrowserProps {
   readonly className?: string;
+  readonly density?: DensityName | undefined;
   readonly errorMessage?: string | null;
   readonly hasMore: boolean;
   readonly header?: ReactNode;
@@ -61,6 +63,7 @@ export interface FirestoreDocumentBrowserProps {
 export function FirestoreDocumentBrowser(
   {
     className,
+    density,
     errorMessage = null,
     hasMore,
     header,
@@ -142,6 +145,7 @@ export function FirestoreDocumentBrowser(
     >
       {header}
       <ResultPanel
+        density={density}
         hasMore={hasMore}
         errorMessage={errorMessage}
         isFetchingMore={isFetchingMore}

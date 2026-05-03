@@ -1,3 +1,4 @@
+import type { DensityName } from '@firebase-desk/design-tokens';
 import type {
   FirestoreCollectionNode,
   FirestoreDocumentResult,
@@ -53,6 +54,7 @@ export interface FirestoreQuerySurfaceProps {
   readonly collectionJobRequest?: FirestoreCollectionJobDialogRequest | null | undefined;
   readonly createDocumentRequest?: FirestoreCreateDocumentRequest | null | undefined;
   readonly draft: FirestoreQueryDraft;
+  readonly density?: DensityName | undefined;
   readonly errorMessage?: string | null;
   readonly hasMore: boolean;
   readonly isFetchingMore?: boolean;
@@ -153,6 +155,7 @@ export function FirestoreQuerySurface(
     collectionJobRequest = null,
     draft,
     createDocumentRequest = null,
+    density,
     errorMessage = null,
     hasMore,
     isFetchingMore = false,
@@ -516,6 +519,7 @@ export function FirestoreQuerySurface(
   return (
     <div className='h-full min-h-0 p-2'>
       <FirestoreDocumentBrowser
+        density={density}
         errorMessage={errorMessage}
         hasMore={hasMore}
         header={

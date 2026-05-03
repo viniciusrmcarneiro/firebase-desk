@@ -1,3 +1,4 @@
+import { defaultDensity, densityNames } from '@firebase-desk/design-tokens';
 import {
   DEFAULT_ACTIVITY_LOG_SETTINGS,
   DEFAULT_FIRESTORE_WRITE_SETTINGS,
@@ -11,6 +12,7 @@ import { ActivityLogSettingsSchema } from './activity.ts';
 export const HotkeyOverridesSchema = z.record(z.string(), z.string());
 
 export const DataModeSchema = z.enum(['mock', 'live']);
+export const DensityNameSchema = z.enum(densityNames);
 
 export const ResultTableLayoutSchema = z.object({
   columnOrder: z.array(z.string()),
@@ -46,6 +48,7 @@ export const SettingsSnapshotSchema = z.object({
   sidebarWidth: z.number().int().nonnegative(),
   inspectorWidth: z.number().int().nonnegative(),
   theme: z.enum(['system', 'light', 'dark']),
+  density: DensityNameSchema.default(defaultDensity),
   dataMode: DataModeSchema,
   hotkeyOverrides: HotkeyOverridesSchema,
   resultTableLayouts: ResultTableLayoutsSchema.default({}),
@@ -59,6 +62,7 @@ export const SettingsPatchSchema = z.object({
   sidebarWidth: z.number().int().nonnegative().optional(),
   inspectorWidth: z.number().int().nonnegative().optional(),
   theme: z.enum(['system', 'light', 'dark']).optional(),
+  density: DensityNameSchema.optional(),
   dataMode: DataModeSchema.optional(),
   hotkeyOverrides: HotkeyOverridesSchema.optional(),
   resultTableLayouts: ResultTableLayoutsSchema.optional(),

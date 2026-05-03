@@ -2,6 +2,7 @@ import { SettingsFileSchema } from '@firebase-desk/ipc-schemas';
 import {
   type ActivityLogSettings,
   DEFAULT_ACTIVITY_LOG_SETTINGS,
+  DEFAULT_DENSITY,
   DEFAULT_FIRESTORE_WRITE_SETTINGS,
   normalizeFirestoreWriteSettings,
   type SettingsSnapshot,
@@ -15,6 +16,7 @@ export const DEFAULT_SETTINGS_SNAPSHOT: SettingsSnapshot = {
   sidebarWidth: 320,
   inspectorWidth: 360,
   theme: 'system',
+  density: DEFAULT_DENSITY,
   dataMode: 'live',
   hotkeyOverrides: {},
   resultTableLayouts: {},
@@ -74,6 +76,7 @@ function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
   return {
     ...snapshot,
     activityLog: cloneActivityLogSettings(snapshot.activityLog),
+    density: snapshot.density ?? DEFAULT_DENSITY,
     firestoreWrites: normalizeFirestoreWriteSettings(snapshot.firestoreWrites),
     hotkeyOverrides: { ...snapshot.hotkeyOverrides },
     workspaceState: cloneWorkspaceState(snapshot.workspaceState),

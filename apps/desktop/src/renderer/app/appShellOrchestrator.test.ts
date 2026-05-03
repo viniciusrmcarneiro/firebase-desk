@@ -342,7 +342,6 @@ function createInput(
     setAddProjectOpen: vi.fn(),
     setCollectionJobRequest: vi.fn(),
     setCredentialWarning: vi.fn(),
-    setDensity: vi.fn(),
     setEditingProjectId: vi.fn(),
     setLastAction: vi.fn(),
     setSidebarCollapsed: vi.fn(),
@@ -399,6 +398,7 @@ function createInput(
       treeItemId: collectionNodeId('emu', 'orders'),
     },
     settings: {
+      changeDensity: vi.fn(),
       changeTheme: vi.fn(),
       dataDirectoryPath: null,
       open: false,

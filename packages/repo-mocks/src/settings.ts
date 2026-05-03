@@ -7,6 +7,7 @@ import type {
 } from '@firebase-desk/repo-contracts';
 import {
   DEFAULT_ACTIVITY_LOG_SETTINGS,
+  DEFAULT_DENSITY,
   DEFAULT_FIRESTORE_WRITE_SETTINGS,
   normalizeFirestoreWriteSettings,
 } from '@firebase-desk/repo-contracts';
@@ -16,6 +17,7 @@ const DEFAULT_SNAPSHOT: SettingsSnapshot = {
   sidebarWidth: 320,
   inspectorWidth: 360,
   theme: 'system',
+  density: DEFAULT_DENSITY,
   dataMode: 'mock',
   hotkeyOverrides: {},
   resultTableLayouts: {},
@@ -39,6 +41,7 @@ export class MockSettingsRepository implements SettingsRepository {
       sidebarWidth: patch.sidebarWidth ?? this.snapshot.sidebarWidth,
       inspectorWidth: patch.inspectorWidth ?? this.snapshot.inspectorWidth,
       theme: patch.theme ?? this.snapshot.theme,
+      density: patch.density ?? this.snapshot.density,
       dataMode: patch.dataMode ?? this.snapshot.dataMode,
       hotkeyOverrides: patch.hotkeyOverrides
         ? { ...patch.hotkeyOverrides }
@@ -72,6 +75,7 @@ function cloneSnapshot(snapshot: SettingsSnapshot): SettingsSnapshot {
   return {
     ...snapshot,
     activityLog: cloneActivityLogSettings(snapshot.activityLog),
+    density: snapshot.density ?? DEFAULT_DENSITY,
     hotkeyOverrides: { ...snapshot.hotkeyOverrides },
     resultTableLayouts: cloneResultTableLayouts(snapshot.resultTableLayouts),
     firestoreFieldCatalogs: cloneFirestoreFieldCatalogs(snapshot.firestoreFieldCatalogs),

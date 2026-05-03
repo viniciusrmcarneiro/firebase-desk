@@ -191,6 +191,7 @@ describe('fieldCatalog', () => {
 const settingsSnapshot: SettingsSnapshot = {
   activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
   dataMode: 'mock',
+  density: 'compact',
   firestoreFieldCatalogs: {},
   firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
   hotkeyOverrides: {},

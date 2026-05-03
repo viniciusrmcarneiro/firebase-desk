@@ -97,6 +97,7 @@ function settingsSnapshot(): SettingsSnapshot {
     sidebarWidth: 280,
     inspectorWidth: 360,
     theme: 'system',
+    density: 'compact',
     dataMode: 'mock',
     hotkeyOverrides: {},
     resultTableLayouts: {},

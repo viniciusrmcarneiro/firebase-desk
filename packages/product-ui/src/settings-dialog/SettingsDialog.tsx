@@ -15,7 +15,7 @@ import { messageFromError } from '../shared/errors.ts';
 
 export interface SettingsDialogProps {
   readonly dataDirectoryPath?: string | null | undefined;
-  readonly density?: DensityName;
+  readonly density?: DensityName | undefined;
   readonly onOpenChange: (open: boolean) => void;
   readonly onOpenDataDirectory?: () => Promise<void>;
   readonly onDensityChange?: (density: DensityName) => void;
@@ -220,7 +220,7 @@ export function SettingsDialog(
                 </Button>
                 <select
                   aria-label='Activity detail'
-                  className='h-[var(--density-compact-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
+                  className='h-[var(--density-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
                   value={settingsSnapshot.activityLog.detailMode}
                   onChange={(event) =>
                     void handleActivityLogChange({
@@ -255,7 +255,7 @@ export function SettingsDialog(
               <div className='text-sm font-medium text-text-primary'>Firestore writes</div>
               <select
                 aria-label='Stale field edits'
-                className='h-[var(--density-compact-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
+                className='h-[var(--density-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
                 value={normalizeFirestoreWriteSettings(settingsSnapshot.firestoreWrites)
                   .fieldStaleBehavior}
                 onChange={(event) =>

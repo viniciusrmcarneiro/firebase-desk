@@ -1,3 +1,4 @@
+import type { DensityName } from '@firebase-desk/design-tokens';
 import type { FirestoreDocumentResult, SettingsRepository } from '@firebase-desk/repo-contracts';
 import {
   Badge,
@@ -34,6 +35,7 @@ import type { FirestoreResultView } from './types.ts';
 type CollectionJobKind = 'copy' | 'delete' | 'duplicate' | 'export' | 'import';
 
 export interface ResultPanelProps {
+  readonly density?: DensityName | undefined;
   readonly errorMessage: string | null;
   readonly hasMore: boolean;
   readonly isFetchingMore: boolean;
@@ -67,6 +69,7 @@ export interface ResultPanelProps {
 
 export function ResultPanel(
   {
+    density,
     hasMore,
     actionErrorMessage = null,
     actionNoticeMessage = null,
@@ -253,6 +256,7 @@ export function ResultPanel(
               value='table'
             >
               <ResultTable
+                density={density}
                 hasMore={showPagination}
                 isFetchingMore={isFetchingMore}
                 queryPath={queryPath}
@@ -279,6 +283,7 @@ export function ResultPanel(
               {rows.length
                 ? (
                   <ResultTreeView
+                    density={density}
                     queryPath={queryPath}
                     expandedIds={expandedTreeIds}
                     hasMore={showPagination}

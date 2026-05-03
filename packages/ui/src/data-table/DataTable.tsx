@@ -29,7 +29,7 @@ export interface DataTableProps<TData> {
   readonly data: ReadonlyArray<TData>;
   readonly cellContextMenu?: (row: TData, columnId: string) => ReactNode | null;
   readonly columnLayout?: DataTableColumnLayout | null;
-  readonly density?: DensityName;
+  readonly density?: DensityName | undefined;
   readonly emptyState?: ReactNode;
   readonly enableColumnReorder?: boolean;
   readonly enableColumnResize?: boolean;

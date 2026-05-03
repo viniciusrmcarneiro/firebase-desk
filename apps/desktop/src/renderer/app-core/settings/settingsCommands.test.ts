@@ -1,7 +1,17 @@
-import type { SettingsPatch } from '@firebase-desk/repo-contracts';
+import type {
+  HotkeyOverrides,
+  SettingsPatch,
+  SettingsRepository,
+  SettingsSnapshot,
+} from '@firebase-desk/repo-contracts';
+import {
+  DEFAULT_ACTIVITY_LOG_SETTINGS,
+  DEFAULT_FIRESTORE_WRITE_SETTINGS,
+} from '@firebase-desk/repo-contracts';
 import { describe, expect, it, vi } from 'vitest';
 import {
   changeAppearanceModeCommand,
+  changeDensityCommand,
   loadDataDirectoryPathCommand,
   openDataDirectoryCommand,
   recordSettingsSavedCommand,
@@ -18,6 +28,9 @@ describe('settings core', () => {
     };
 
     expect(settingsPatchSummary({ dataMode: 'live' })).toBe('Data mode changed to live');
+    expect(settingsPatchSummary({ density: 'comfortable' })).toBe(
+      'Density changed to comfortable',
+    );
     expect(settingsPatchSummary(activityPatch)).toBe('Activity settings changed');
     expect(settingsPatchSummary(firestorePatch)).toBe('Firestore write settings changed');
     expect(settingsPatchSummary({ theme: 'dark' })).toBe('Theme changed to dark');
@@ -28,6 +41,10 @@ describe('settings core', () => {
     expect(settingsPatchMetadata(firestorePatch)).toMatchObject({
       changedKeys: ['firestoreWrites'],
       firestoreWrites: { fieldStaleBehavior: 'block' },
+    });
+    expect(settingsPatchMetadata({ density: 'comfortable' })).toMatchObject({
+      changedKeys: ['density'],
+      density: 'comfortable',
     });
   });
 
@@ -68,6 +85,32 @@ describe('settings core', () => {
         error: { message: 'Disk full' },
         status: 'failure',
         summary: 'Disk full',
+      }),
+    );
+  });
+
+  it('persists density changes and records activity', async () => {
+    const recordActivity = vi.fn();
+    const setDensity = vi.fn();
+    const settings = new DensitySettingsRepository();
+
+    await changeDensityCommand(
+      { now: vi.fn().mockReturnValueOnce(10).mockReturnValueOnce(18), recordActivity },
+      {
+        density: 'comfortable',
+        settings,
+        setDensity,
+      },
+    );
+
+    expect(settings.save).toHaveBeenCalledWith({ density: 'comfortable' });
+    expect(setDensity).toHaveBeenCalledWith('comfortable');
+    expect(recordActivity).toHaveBeenCalledWith(
+      expect.objectContaining({
+        action: 'Change density',
+        durationMs: 8,
+        metadata: { density: 'comfortable' },
+        status: 'success',
       }),
     );
   });
@@ -115,3 +158,37 @@ describe('settings core', () => {
     );
   });
 });
+
+class DensitySettingsRepository implements SettingsRepository {
+  private snapshot: SettingsSnapshot = {
+    activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
+    dataMode: 'mock',
+    density: 'compact',
+    firestoreFieldCatalogs: {},
+    firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
+    hotkeyOverrides: {},
+    inspectorWidth: 360,
+    resultTableLayouts: {},
+    sidebarWidth: 320,
+    theme: 'system',
+    workspaceState: null,
+  };
+
+  readonly load = vi.fn(async (): Promise<SettingsSnapshot> => this.snapshot);
+
+  readonly save = vi.fn(async (patch: SettingsPatch): Promise<SettingsSnapshot> => {
+    this.snapshot = {
+      ...this.snapshot,
+      density: patch.density ?? this.snapshot.density,
+    };
+    return this.snapshot;
+  });
+
+  async getHotkeyOverrides(): Promise<HotkeyOverrides> {
+    return this.snapshot.hotkeyOverrides;
+  }
+
+  async setHotkeyOverrides(overrides: HotkeyOverrides): Promise<void> {
+    this.snapshot = { ...this.snapshot, hotkeyOverrides: overrides };
+  }
+}

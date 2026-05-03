@@ -4,6 +4,7 @@ export function settingsPatchMetadata(patch: SettingsPatch): Record<string, unkn
   return {
     changedKeys: Object.keys(patch),
     ...(patch.dataMode ? { dataMode: patch.dataMode } : {}),
+    ...(patch.density ? { density: patch.density } : {}),
     ...(patch.activityLog
       ? {
         activityLog: {
@@ -26,6 +27,7 @@ export function settingsPatchMetadata(patch: SettingsPatch): Record<string, unkn
 
 export function settingsPatchSummary(patch: SettingsPatch): string {
   if (patch.dataMode) return `Data mode changed to ${patch.dataMode}`;
+  if (patch.density) return `Density changed to ${patch.density}`;
   if (patch.activityLog) return 'Activity settings changed';
   if (patch.firestoreWrites) return 'Firestore write settings changed';
   if (patch.theme) return `Theme changed to ${patch.theme}`;

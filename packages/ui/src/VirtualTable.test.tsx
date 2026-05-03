@@ -51,6 +51,13 @@ describe('VirtualTable', () => {
     expect(screen.queryAllByTestId('name-cell')).toHaveLength(0);
   });
 
+  it('uses density row height when row height is not provided', () => {
+    render(<VirtualTable density='comfortable' rows={rows} columns={columns} />);
+
+    const dataRows = screen.getAllByRole('row').slice(1) as HTMLElement[];
+    expect(dataRows[1]?.style.transform).toBe('translateY(36px)');
+  });
+
   it('sizes the sticky header to the full table width', () => {
     render(
       <VirtualTable

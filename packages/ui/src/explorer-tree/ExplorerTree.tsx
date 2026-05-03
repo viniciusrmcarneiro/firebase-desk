@@ -1,3 +1,4 @@
+import type { DensityName } from '@firebase-desk/design-tokens';
 import { ChevronRight } from 'lucide-react';
 import {
   type KeyboardEvent,
@@ -25,6 +26,7 @@ export interface ExplorerTreeRowModel {
 export interface ExplorerTreeProps<TNode extends ExplorerTreeRowModel = ExplorerTreeRowModel> {
   readonly className?: string;
   readonly contextMenu?: ((node: TNode) => ReactNode | null) | undefined;
+  readonly density?: DensityName | undefined;
   readonly estimateSize?: (index: number) => number;
   readonly onOpen?: ((id: string) => void) | undefined;
   readonly onSelect?: ((id: string) => void) | undefined;
@@ -37,7 +39,8 @@ export function ExplorerTree<TNode extends ExplorerTreeRowModel = ExplorerTreeRo
   {
     className,
     contextMenu,
-    estimateSize = () => 32,
+    density,
+    estimateSize,
     onOpen,
     onSelect,
     onToggle,
@@ -91,7 +94,6 @@ export function ExplorerTree<TNode extends ExplorerTreeRowModel = ExplorerTreeRo
   return (
     <div className={cn('h-full min-w-[680px] font-mono text-xs', className)} role='tree'>
       <VirtualList
-        estimateSize={estimateSize}
         getItemKey={(item) => item.id}
         items={rows}
         renderItem={(item, index) => (
@@ -108,6 +110,8 @@ export function ExplorerTree<TNode extends ExplorerTreeRowModel = ExplorerTreeRo
             onToggle={onToggle}
           />
         )}
+        {...(density ? { density } : {})}
+        {...(estimateSize ? { estimateSize } : {})}
       />
     </div>
   );

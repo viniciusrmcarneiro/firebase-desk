@@ -370,7 +370,7 @@ function createRepositories(
     },
     projects: {},
     scriptRunner: {},
-    settings: { save },
+    settings: { load: vi.fn(async () => ({ density: 'compact' })), save },
   } as unknown as RepositorySet;
 }
 
@@ -551,6 +551,7 @@ function createProjectsQuery(project: ReturnType<typeof createProjectFixture>) {
 
 function createSettings() {
   return {
+    changeDensity: vi.fn(),
     changeTheme: vi.fn(),
     dataDirectoryPath: null,
     open: false,

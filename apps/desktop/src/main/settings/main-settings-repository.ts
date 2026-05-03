@@ -5,7 +5,7 @@ import type {
   SettingsRepository,
   SettingsSnapshot,
 } from '@firebase-desk/repo-contracts';
-import { normalizeFirestoreWriteSettings } from '@firebase-desk/repo-contracts';
+import { DEFAULT_DENSITY, normalizeFirestoreWriteSettings } from '@firebase-desk/repo-contracts';
 
 interface SettingsStoreLike {
   readonly load: () => Promise<SettingsSnapshot>;
@@ -32,6 +32,7 @@ export class MainSettingsRepository implements SettingsRepository {
       sidebarWidth: patch.sidebarWidth ?? current.sidebarWidth,
       inspectorWidth: patch.inspectorWidth ?? current.inspectorWidth,
       theme: patch.theme ?? current.theme,
+      density: patch.density ?? current.density ?? DEFAULT_DENSITY,
       dataMode: patch.dataMode ?? current.dataMode,
       hotkeyOverrides: patch.hotkeyOverrides
         ? { ...patch.hotkeyOverrides }

@@ -1,3 +1,4 @@
+import type { DensityName } from '@firebase-desk/design-tokens';
 import type { ProjectTarget } from '@firebase-desk/repo-contracts';
 import {
   Badge,
@@ -46,6 +47,7 @@ export interface AccountTreeItem extends VirtualTreeNode {
 }
 
 export interface AccountTreeProps {
+  readonly density?: DensityName | undefined;
   readonly filterValue: string;
   readonly items: ReadonlyArray<AccountTreeItem>;
   readonly onAddProject: () => void;
@@ -66,6 +68,7 @@ export interface AccountTreeProps {
 
 export function AccountTree(
   {
+    density,
     filterValue,
     items,
     onAddProject,
@@ -102,8 +105,8 @@ export function AccountTree(
       <div className='min-h-0'>
         <VirtualTree
           ariaLabel='Account tree'
+          density={density}
           flattenedNodes={items}
-          rowHeight={30}
           renderNode={(node) => (
             <AccountTreeRow
               item={node as AccountTreeItem}

@@ -1,8 +1,9 @@
-import type { AppearanceMode } from '@firebase-desk/design-tokens';
-import type { SettingsPatch } from '@firebase-desk/repo-contracts';
+import type { AppearanceMode, DensityName } from '@firebase-desk/design-tokens';
+import type { SettingsPatch, SettingsRepository } from '@firebase-desk/repo-contracts';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   changeAppearanceModeCommand,
+  changeDensityCommand,
   type DesktopDataDirectoryApi,
   loadDataDirectoryPathCommand,
   openDataDirectoryCommand,
@@ -16,10 +17,13 @@ export interface SettingsControllerInput {
   readonly now?: (() => number) | undefined;
   readonly onStatus: (message: string) => void;
   readonly recordActivity: SettingsCommandEnvironment['recordActivity'];
+  readonly repository: SettingsRepository;
   readonly setAppearanceMode: (mode: AppearanceMode) => Promise<void>;
+  readonly setDensity: (density: DensityName) => void;
 }
 
 export interface SettingsController {
+  readonly changeDensity: (density: DensityName) => void;
   readonly changeTheme: (mode: AppearanceMode) => void;
   readonly dataDirectoryPath: string | null | undefined;
   readonly open: boolean;
@@ -65,6 +69,17 @@ export function useSettingsController(input: SettingsControllerInput): SettingsC
     [commandEnv, input.setAppearanceMode],
   );
 
+  const changeDensity = useCallback(
+    (density: DensityName) => {
+      void changeDensityCommand(commandEnv, {
+        density,
+        settings: input.repository,
+        setDensity: input.setDensity,
+      });
+    },
+    [commandEnv, input.repository, input.setDensity],
+  );
+
   const openDataDirectory = useCallback(async () => {
     await openDataDirectoryCommand(commandEnv, input.dataDirectoryApi);
   }, [commandEnv, input.dataDirectoryApi]);
@@ -79,6 +94,7 @@ export function useSettingsController(input: SettingsControllerInput): SettingsC
   const openSettings = useCallback(() => setOpen(true), []);
 
   return {
+    changeDensity,
     changeTheme,
     dataDirectoryPath,
     open,

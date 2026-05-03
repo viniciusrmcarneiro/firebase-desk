@@ -1,3 +1,4 @@
+import { defaultDensity } from '@firebase-desk/design-tokens';
 import {
   DEFAULT_ACTIVITY_LOG_SETTINGS,
   DEFAULT_FIRESTORE_WRITE_SETTINGS,
@@ -20,9 +21,17 @@ describe('settings schemas', () => {
       }).snapshot,
     ).toMatchObject({
       activityLog: DEFAULT_ACTIVITY_LOG_SETTINGS,
+      density: defaultDensity,
       firestoreWrites: DEFAULT_FIRESTORE_WRITE_SETTINGS,
       resultTableLayouts: {},
     });
+  });
+
+  it('validates density in patches', () => {
+    expect(SettingsPatchSchema.parse({ density: 'comfortable' })).toEqual({
+      density: 'comfortable',
+    });
+    expect(() => SettingsPatchSchema.parse({ density: 'spacious' })).toThrow();
   });
 
   it('does not default activity settings in patches', () => {

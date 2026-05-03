@@ -20,7 +20,7 @@ export interface VirtualTreeNode {
 
 export interface VirtualTreeProps {
   readonly flattenedNodes: ReadonlyArray<VirtualTreeNode>;
-  readonly density?: DensityName;
+  readonly density?: DensityName | undefined;
   readonly rowHeight?: number;
   readonly onToggle: (id: string) => void;
   readonly onOpen?: (id: string) => void;

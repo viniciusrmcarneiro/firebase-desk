@@ -119,7 +119,7 @@ export function WorkspaceTabStrip(
   };
 
   return (
-    <div className='flex h-[var(--density-compact-tab-height)] min-w-0 items-stretch border-b border-border-subtle bg-gradient-to-b from-bg-subtle to-bg-panel'>
+    <div className='flex h-[var(--density-tab-height)] min-w-0 items-stretch border-b border-border-subtle bg-gradient-to-b from-bg-subtle to-bg-panel'>
       {scrollState.hasOverflow
         ? (
           <IconButton

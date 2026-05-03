@@ -1,3 +1,4 @@
+import type { DensityName } from '@firebase-desk/design-tokens';
 import {
   AuthUsersSurface,
   type DeleteDocumentOptions,
@@ -30,6 +31,7 @@ import type { WorkspaceTab } from './stores/tabsStore.ts';
 export interface WorkspaceTabViewProps {
   readonly activeTab: WorkspaceTab;
   readonly auth: AuthTabSurfaceModel;
+  readonly density: DensityName;
   readonly firestore: FirestoreTabSurfaceModel;
   readonly script: ScriptTabSurfaceModel;
 }
@@ -128,6 +130,7 @@ export function WorkspaceTabView(props: WorkspaceTabViewProps) {
   if (props.activeTab.kind === 'auth-users') {
     return (
       <AuthUsersSurface
+        density={props.density}
         errorMessage={props.auth.errorMessage}
         filterValue={props.auth.filter}
         hasMore={props.auth.hasMore}
@@ -165,6 +168,7 @@ export function WorkspaceTabView(props: WorkspaceTabViewProps) {
       collectionJobRequest={props.firestore.collectionJobRequest}
       createDocumentRequest={props.firestore.createDocumentRequest}
       draft={props.firestore.draft}
+      density={props.density}
       errorMessage={props.firestore.errorMessage}
       hasMore={props.firestore.hasMore}
       isFetchingMore={props.firestore.isFetchingMore}

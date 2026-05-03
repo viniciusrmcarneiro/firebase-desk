@@ -11,6 +11,7 @@ const snapshot: SettingsSnapshot = {
   sidebarWidth: 320,
   inspectorWidth: 360,
   theme: 'system',
+  density: 'compact',
   dataMode: 'mock',
   hotkeyOverrides: {},
   resultTableLayouts: {},

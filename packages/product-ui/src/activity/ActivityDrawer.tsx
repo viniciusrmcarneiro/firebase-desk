@@ -95,7 +95,7 @@ export function ActivityDrawer(
           />
           <select
             aria-label='Activity area'
-            className='h-[var(--density-compact-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
+            className='h-[var(--density-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
             value={area}
             onChange={(event) => onAreaChange(event.currentTarget.value as ActivityLogArea | 'all')}
           >
@@ -104,7 +104,7 @@ export function ActivityDrawer(
           </select>
           <select
             aria-label='Activity status'
-            className='h-[var(--density-compact-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
+            className='h-[var(--density-control-height)] rounded-md border border-border bg-bg-panel px-2 text-sm text-text-primary'
             value={status}
             onChange={(event) =>
               onStatusChange(event.currentTarget.value as ActivityLogStatus | 'all')}

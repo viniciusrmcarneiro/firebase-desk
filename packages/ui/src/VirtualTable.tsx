@@ -25,7 +25,7 @@ export interface VirtualTableProps<T> {
   readonly rows: ReadonlyArray<T>;
   readonly columns: ReadonlyArray<VirtualTableColumn<T>>;
   readonly className?: string;
-  readonly density?: DensityName;
+  readonly density?: DensityName | undefined;
   readonly emptyState?: ReactNode;
   readonly enableColumnReorder?: boolean;
   readonly enableColumnResize?: boolean;

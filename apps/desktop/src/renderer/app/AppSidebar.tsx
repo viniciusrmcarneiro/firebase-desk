@@ -1,3 +1,4 @@
+import type { DensityName } from '@firebase-desk/design-tokens';
 import { AccountTree, SidebarShell } from '@firebase-desk/product-ui';
 import { IconButton } from '@firebase-desk/ui';
 import { PanelLeftClose, PanelLeftOpen } from 'lucide-react';
@@ -7,6 +8,7 @@ type AccountTreeProps = ComponentProps<typeof AccountTree>;
 
 interface AppSidebarProps {
   readonly collapsed: boolean;
+  readonly density: DensityName;
   readonly filterValue: string;
   readonly items: AccountTreeProps['items'];
   readonly onAddProject: AccountTreeProps['onAddProject'];
@@ -27,6 +29,7 @@ interface AppSidebarProps {
 export function AppSidebar(
   {
     collapsed,
+    density,
     filterValue,
     items,
     onAddProject,
@@ -61,6 +64,7 @@ export function AppSidebar(
       }
     >
       <AccountTree
+        density={density}
         filterValue={filterValue}
         items={items}
         onAddProject={onAddProject}
