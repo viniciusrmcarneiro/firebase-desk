@@ -1,36 +1,15 @@
 # Testing And CI
 
-## Testing Rules
+This doc explains how testing runs in CI, release, and package validation. Test authoring policy lives in `.github/skills/writing-tests/SKILL.md`.
 
-- UI code uses repository contracts only (`packages/repo-contracts`).
-- Unit tests are colocated with the code under test, inside the owning package/app.
-- Each package extends `packages/config-vitest`; turbo runs `test` across all packages with caching.
-- `packages/repo-mocks` is the first-class test fixture for UI/feature tests.
-- E2E tests live in the `e2e/` workspace and use the Firebase Emulator Suite.
-- No automated test should require production Firebase credentials.
+## Test Automation Topology
 
-## Unit Tests
-
-- Components test rendering, user actions, loading states, empty states, and errors with `repo-mocks`.
-- Repository contract tests live in `packages/repo-contracts` (or a shared `repo-contract-tests` helper) and verify each implementation (`repo-mocks`, `repo-firebase`) returns the same normalized shapes.
-- `packages/repo-firebase` tests cover Firebase result normalization, IPC payload validation (via `ipc-schemas`), and credential metadata handling.
-- `packages/script-runner` tests cover logs, returned values, empty returns, thrown errors, and timeout behavior.
-- `packages/data-format` tests cover encode/decode round-trips for every `__type__`.
-
-## Integration Tests
-
-- Unit tests are the default. Do not add a `.unit.test.*` suffix.
-- Use `.integration.test.*` only for rare adapter or package-boundary tests where the behavior depends on real composition between several units.
-- Prefer extracting pure app-core logic and testing it with normal `.test.*` files before adding an integration test.
-- Integration tests should stay small, have a clear reason to exist, and avoid becoming broad AppShell regressions for unrelated workflows.
-
-## E2E Tests
-
-- Start Firestore and Authentication emulators.
-- Seed deterministic test data.
-- Launch the Electron app against emulator profile.
-- Test primary flows: project target selection, Firestore tree, query, table/JSON toggle, document edit, JS Query, Auth user lookup.
-- Never connect to production Firebase.
+- Package test scripts extend `packages/config-vitest`.
+- Root test scripts run through turbo with caching.
+- CI uses coverage-producing unit/integration runs before build.
+- E2E CI starts Firebase emulators, seeds data, launches Electron against the emulator profile, and uploads traces/screenshots on failure.
+- Release/package workflows build desktop artifacts and run packaged smoke checks on the built app.
+- CI and E2E automation must not require production Firebase credentials.
 
 ## GitHub Actions From Day One
 
