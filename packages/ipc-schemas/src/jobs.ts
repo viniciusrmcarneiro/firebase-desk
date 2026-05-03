@@ -105,7 +105,7 @@ export const BackgroundJobListRequestSchema = z.object({
 });
 
 export const BackgroundJobAcknowledgeIssuesRequestSchema = z.object({
-  ids: z.array(z.string().min(1)),
+  ids: z.array(z.string().min(1)).min(1),
 });
 
 export const BackgroundJobPickExportFileRequestSchema = z.object({

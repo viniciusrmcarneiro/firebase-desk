@@ -72,6 +72,7 @@ describe('job schemas', () => {
     expect(() => BackgroundJobListRequestSchema.parse({ limit: 0 })).toThrow();
     expect(() => BackgroundJobAcknowledgeIssuesRequestSchema.parse({ ids: ['job-1'] }))
       .not.toThrow();
+    expect(() => BackgroundJobAcknowledgeIssuesRequestSchema.parse({ ids: [] })).toThrow();
     expect(() => BackgroundJobAcknowledgeIssuesRequestSchema.parse({ ids: [''] })).toThrow();
   });
 });
