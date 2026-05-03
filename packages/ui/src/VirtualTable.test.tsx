@@ -112,4 +112,75 @@ describe('VirtualTable', () => {
     expect(onRowClick).toHaveBeenCalledWith(rows[0]);
     expect(document.activeElement).toBe(dataRows[1]);
   });
+
+  it('runs row click once for a real browser double-click sequence', () => {
+    const onRowClick = vi.fn();
+    render(
+      <VirtualTable
+        rows={rows}
+        columns={columns}
+        onRowClick={onRowClick}
+        rowHeight={24}
+      />,
+    );
+
+    const row = screen.getAllByRole('row')[1]!;
+    fireEvent.click(row, { detail: 1 });
+    fireEvent.click(row, { detail: 2 });
+    const event = new MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2 });
+    fireEvent(row, event);
+
+    expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('uses row click for double-click when no double-click action is provided', () => {
+    const onRowClick = vi.fn();
+    render(
+      <VirtualTable
+        rows={rows}
+        columns={columns}
+        onRowClick={onRowClick}
+        rowHeight={24}
+      />,
+    );
+
+    fireEvent.doubleClick(screen.getAllByRole('row')[1]!, { detail: 2 });
+
+    expect(onRowClick).toHaveBeenCalledWith(rows[0]);
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('runs explicit row double-click once after the first row click', () => {
+    const onRowClick = vi.fn();
+    const onRowDoubleClick = vi.fn();
+    render(
+      <VirtualTable
+        rows={rows}
+        columns={columns}
+        onRowClick={onRowClick}
+        onRowDoubleClick={onRowDoubleClick}
+        rowHeight={24}
+      />,
+    );
+
+    const row = screen.getAllByRole('row')[1]!;
+    fireEvent.click(row, { detail: 1 });
+    fireEvent.click(row, { detail: 2 });
+    fireEvent.doubleClick(row, { detail: 2 });
+
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+    expect(onRowDoubleClick).toHaveBeenCalledWith(rows[0]);
+    expect(onRowDoubleClick).toHaveBeenCalledTimes(1);
+  });
+
+  it('keeps native double-click behavior when no row action is provided', () => {
+    render(<VirtualTable rows={rows} columns={columns} rowHeight={24} />);
+
+    const event = new MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2 });
+    fireEvent(screen.getAllByRole('row')[1]!, event);
+
+    expect(event.defaultPrevented).toBe(false);
+  });
 });

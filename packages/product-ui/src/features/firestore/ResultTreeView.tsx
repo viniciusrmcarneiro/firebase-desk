@@ -96,6 +96,7 @@ export function ResultTreeView(
 
   return (
     <ExplorerTree
+      className='select-text'
       density={density}
       rows={treeRows}
       onOpen={openNode}

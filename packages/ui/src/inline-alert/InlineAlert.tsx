@@ -2,7 +2,7 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { type HTMLAttributes } from 'react';
 import { cn } from '../cn.ts';
 
-const inlineAlertVariants = cva('rounded-md border px-3 py-2 text-sm', {
+const inlineAlertVariants = cva('select-text rounded-md border px-3 py-2 text-sm', {
   variants: {
     variant: {
       info: 'border-border bg-bg-subtle text-text-secondary',

@@ -57,6 +57,26 @@ describe('ExplorerTree', () => {
     expect(onAction).toHaveBeenCalledWith('doc:one');
   });
 
+  it('keeps native double-click behavior when no open action is provided', () => {
+    render(<ExplorerTree rows={rows} onToggle={vi.fn()} />);
+
+    const event = new MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2 });
+    fireEvent(screen.getByRole('treeitem', { name: /one/ }), event);
+
+    expect(event.defaultPrevented).toBe(false);
+  });
+
+  it('prevents native double-click behavior when opening a row', () => {
+    const onOpen = vi.fn();
+    render(<ExplorerTree rows={rows} onOpen={onOpen} onToggle={vi.fn()} />);
+
+    const event = new MouseEvent('dblclick', { bubbles: true, cancelable: true, detail: 2 });
+    fireEvent(screen.getByRole('treeitem', { name: /one/ }), event);
+
+    expect(event.defaultPrevented).toBe(true);
+    expect(onOpen).toHaveBeenCalledWith('doc:one');
+  });
+
   it('selects leaf rows without toggling them', () => {
     const onSelect = vi.fn();
     const onToggle = vi.fn();

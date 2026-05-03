@@ -145,8 +145,10 @@ export function DataTable<TData>(
           ),
         }
         : {})}
-      onRowClick={(row) => onRowClick?.(row.original)}
-      onRowDoubleClick={(row) => onRowDoubleClick?.(row.original)}
+      {...(onRowClick ? { onRowClick: (row: Row<TData>) => onRowClick(row.original) } : {})}
+      {...(onRowDoubleClick
+        ? { onRowDoubleClick: (row: Row<TData>) => onRowDoubleClick(row.original) }
+        : {})}
     />
   );
 }

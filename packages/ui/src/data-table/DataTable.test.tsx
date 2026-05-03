@@ -43,6 +43,25 @@ describe('DataTable', () => {
     expect(onRowClick).toHaveBeenCalledWith({ id: '1', name: 'Ada' });
   });
 
+  it('uses row click as double-click fallback when no double-click action is provided', () => {
+    const onRowClick = vi.fn();
+    render(
+      <div className='h-60'>
+        <DataTable
+          columns={columns}
+          data={[{ id: '1', name: 'Ada' }]}
+          getRowId={(row) => row.id}
+          onRowClick={onRowClick}
+        />
+      </div>,
+    );
+
+    fireEvent.doubleClick(screen.getAllByRole('row')[1]!, { detail: 2 });
+
+    expect(onRowClick).toHaveBeenCalledWith({ id: '1', name: 'Ada' });
+    expect(onRowClick).toHaveBeenCalledTimes(1);
+  });
+
   it('exposes grid roles and selected row state', () => {
     render(
       <div className='h-60'>
